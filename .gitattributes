@@ -1,0 +1,22 @@
+# ─────────────────────────────────────────────────────────────
+# .gitattributes · 选择性 LFS 规则(来自「项目一致性机制」)
+#   栅格图(插画 / 照片 / 截图)走 Git LFS → 进 git,有版本史。
+#   _drafts/ 里的同类文件被 .gitignore 整体挡掉,不会进 LFS(省额度)。
+#   设计源 .psd/.ai/.indd、PDF、字体、媒体仍由 .gitignore 排除 + _manifest.md 翻译。
+#   .svg 是 XML 文本,留普通 git,不在此列。
+# 详见 一致性机制/机制设计说明.md 决策 4(二进制处理策略)。
+#
+# 〔按项目裁剪〕不需要图片 / 二进制版本管理的项目(纯代码、纯文字):
+#   可整份清空或删除本文件,本机制其余部分照常工作。
+#   需要 LFS 的项目,在 git init 之后、git add 之前跑一次:  git lfs install --local
+# ─────────────────────────────────────────────────────────────
+
+*.png  filter=lfs diff=lfs merge=lfs -text
+*.jpg  filter=lfs diff=lfs merge=lfs -text
+*.jpeg filter=lfs diff=lfs merge=lfs -text
+*.webp filter=lfs diff=lfs merge=lfs -text
+*.gif  filter=lfs diff=lfs merge=lfs -text
+*.tif  filter=lfs diff=lfs merge=lfs -text
+*.tiff filter=lfs diff=lfs merge=lfs -text
+*.bmp  filter=lfs diff=lfs merge=lfs -text
+*.heic filter=lfs diff=lfs merge=lfs -text
