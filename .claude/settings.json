@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/一致性机制/hooks/收尾提醒.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
