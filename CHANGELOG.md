@@ -4,6 +4,11 @@
 > 任何机制文件发生真实变化:全部版本行一起 bump 到当天 + 在此记一节。
 > 本文件**套件专属,不随模板进项目**(绿地 rsync 已排除;安装器也不拷它)。
 
+## 2026-06-18
+
+- **catchup synced 检查去歧义**:第二层「未同步范围」原命令是 `git rev-parse … && git diff --stat synced || echo "(无 synced tag…)"`,踩了 `A && B || C` 陷阱——`synced` 已在 HEAD(零 diff)时 `git diff` 无输出、`echo` 又不触发,**健康稳态完全静默**,极易被读者(尤其 LLM)误读为「无 synced tag」;且 `git diff` 万一失败也会被误标成「无 tag」。改为显式三态输出(`synced` / `pending` / `no_tag`),稳态打印「(已同步:synced 已在 HEAD,无新改动)」。按决策 9 bump 全部版本行到当天(含 CLAUDE.md 同步纪律 begin marker)。
+  - 注:单副本套件**不引入** `bin/sync-status.sh` 脚本与测试架——抽脚本只在「双宿主重复 + 有测试架」的项目里划算(如 校园杂志排版框架),属各项目本地增强,不回灌套件。
+
 ## 2026-06-12
 
 - **出向兜底 hook 实装**(决策 10;推翻 06-11「暂不实装」的权衡——用户拍板要做):新增 `一致性机制/hooks/收尾提醒.sh`(挂 Stop 事件;有未同步改动时提醒收尾,每脏周期最多一次,只提醒不行动)+ `.claude/settings.json` 项目级接线;安装器步骤 2 纳入分发(hooks 拷贝 + settings JSON 增量合并);联动目录规则 1 触发范围扩到 hooks / 接线;决策 3「局限」改指向决策 10;8 场景脚本实测通过
