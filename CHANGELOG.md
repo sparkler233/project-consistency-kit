@@ -4,6 +4,10 @@
 > 任何机制文件发生真实变化:全部版本行一起 bump 到当天 + 在此记一节。
 > 本文件**套件专属,不随模板进项目**(绿地 rsync 已排除;安装器也不拷它)。
 
+## 2026-07-22
+
+- **套件公开发布至 GitHub**(`sparkler233/project-consistency-kit`,private → public):新增 MIT `LICENSE`;README 顶部加门面介绍段(这是什么 / 快速上手 / 许可证),原「项目地图」骨架保留、降为二节;git 全部历史邮箱改写为 GitHub noreply 并强推;仓库本地 `user.email` 同步改为 noreply 防回漏。本次无机制文件(版本行文件)变化,**版本不 bump**,仍为 2026-06-18。
+
 ## 2026-06-18
 
 - **catchup synced 检查去歧义**:第二层「未同步范围」原命令是 `git rev-parse … && git diff --stat synced || echo "(无 synced tag…)"`,踩了 `A && B || C` 陷阱——`synced` 已在 HEAD(零 diff)时 `git diff` 无输出、`echo` 又不触发,**健康稳态完全静默**,极易被读者(尤其 LLM)误读为「无 synced tag」;且 `git diff` 万一失败也会被误标成「无 tag」。改为显式三态输出(`synced` / `pending` / `no_tag`),稳态打印「(已同步:synced 已在 HEAD,无新改动)」。按决策 9 bump 全部版本行到当天(含 CLAUDE.md 同步纪律 begin marker)。
