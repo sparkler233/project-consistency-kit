@@ -7,6 +7,8 @@
 ## 2026-07-22
 
 - **套件公开发布至 GitHub**(`sparkler233/project-consistency-kit`,private → public):新增 MIT `LICENSE`;README 顶部加门面介绍段(这是什么 / 快速上手 / 许可证),原「项目地图」骨架保留、降为二节;git 全部历史邮箱改写为 GitHub noreply、提交信息统一改为短主题行(细节留正文)后强推;仓库本地 `user.email` 同步改为 noreply 防回漏。本次无机制文件(版本行文件)变化,**版本不 bump**,仍为 2026-06-18。
+- **删库重建清除悬空旧对象**:邮箱重写后被强推顶掉的旧 commit 在 GitHub 上仍可按 hash 匿名访问(实测 200,含旧邮箱)→ 删除仓库同名重建、重推全量历史(commit hash 不变),旧对象随旧库销毁(实测旧 hash 404);README 顶层目录表补登 `LICENSE` / `CHANGELOG.md` / `初始化新项目.md`。
+- **提交信息风格约定**:短主题行(说清「做了什么」)+ 细节进正文——GitHub 文件列表只显示主题行;`/同步` 提交沿用此风格。
 
 ## 2026-06-18
 
