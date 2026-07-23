@@ -6,7 +6,7 @@
 
 ## 2026-07-22
 
-- **套件公开发布至 GitHub**(`sparkler233/project-consistency-kit`,private → public):新增 MIT `LICENSE`;README 顶部加门面介绍段(这是什么 / 快速上手 / 许可证),原「项目地图」骨架保留、降为二节;git 全部历史邮箱改写为 GitHub noreply 并强推;仓库本地 `user.email` 同步改为 noreply 防回漏。本次无机制文件(版本行文件)变化,**版本不 bump**,仍为 2026-06-18。
+- **套件公开发布至 GitHub**(`sparkler233/project-consistency-kit`,private → public):新增 MIT `LICENSE`;README 顶部加门面介绍段(这是什么 / 快速上手 / 许可证),原「项目地图」骨架保留、降为二节;git 全部历史邮箱改写为 GitHub noreply、提交信息统一改为短主题行(细节留正文)后强推;仓库本地 `user.email` 同步改为 noreply 防回漏。本次无机制文件(版本行文件)变化,**版本不 bump**,仍为 2026-06-18。
 
 ## 2026-06-18
 
@@ -33,8 +33,6 @@
 
 ## 追溯(版本治理启用前,自 git log)
 
-> 2026-07-22 历史邮箱重写后,commit hash 全体变更;以下为重写后的新 hash。
-
-- 2026-06-05:安装器内置 CLAUDE.md/AGENTS.md 双文件策略,从节点项目实跑回灌(b43c8f6)
-- 2026-06-04:新增 `/引入一致性机制` 跨项目安装器(befb6d8);打磨机制文档——push 由用户负责、CLAUDE.md 改可见横幅、catchup 抑制 rev-parse 噪声(c8b581c)
-- 2026-06-03:初始版本——从〔中华体育精神读本〕harness 抽取并去书籍化(abaead9)
+- 2026-06-05:安装器内置 CLAUDE.md/AGENTS.md 双文件策略,从节点项目实跑回灌
+- 2026-06-04:新增 `/引入一致性机制` 跨项目安装器;打磨机制文档——push 由用户负责、CLAUDE.md 改可见横幅、catchup 抑制 rev-parse 噪声
+- 2026-06-03:初始版本——从〔中华体育精神读本〕harness 抽取并去书籍化
