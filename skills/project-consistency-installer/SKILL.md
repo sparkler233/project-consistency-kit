@@ -43,6 +43,7 @@ description: Fetch Project Consistency Kit from a trusted local checkout or its 
    - `templates/PROJECT.md`
    - `templates/AGENTS.md`
    - `templates/一致性机制/文件联动目录.md`
+   - `templates/一致性机制/决策档案.md`
 6. 记录套件源 `git rev-parse HEAD` 和当前 ref,最终报告中回显。定位或验证失败就停止,不得拿半成品源继续安装。
 
 ## 步骤 1 · 探测目标现状
@@ -157,13 +158,13 @@ test -L CLAUDE.md && readlink CLAUDE.md
 
 ## 步骤 5 · 安装或更新机制件
 
-从已验证的套件源读取。不存在才新建;已存在时比较统一版本行和项目定制,用户确认后更新:
+从已验证的套件源读取。不存在才新建;已存在时比较统一版本行、实际内容和项目定制,用户确认后更新。版本行相同不等于内容相同:同日热修仍须做 diff;只有规范内容确实一致才能跳过,差异中含项目定制时先拆分归属,不得整文件覆盖:
 
 - `.agents/skills/catchup/`、`.agents/skills/wrapup/`(完整目录,含 `SKILL.md` 与 `agents/openai.yaml`);
 - `.claude/commands/catchup.md`、`.claude/commands/wrapup.md`;
 - `一致性机制/机制设计说明.md`、`一致性机制/README.md`;
 - `一致性机制/hooks/收尾提醒.sh`(随后 `chmod +x`);
-- `一致性机制/决策档案.md`(已有归档绝不覆盖);
+- `一致性机制/决策档案.md`(目标不存在时从 `templates/一致性机制/决策档案.md` 新建;已有归档绝不覆盖;不得复制套件根的实况档案);
 - `一致性机制/LICENSE.project-consistency-kit`(从套件根 LICENSE 新建,已有不覆盖)。
 
 旧版完整命令迁移规则:
@@ -177,6 +178,17 @@ test -L CLAUDE.md && readlink CLAUDE.md
 完成后验证完整流程只存在于 `.agents/skills/`,Claude 命令不复制步骤正文。
 
 `一致性机制/文件联动目录.md` 必须来自套件的 `templates/一致性机制/文件联动目录.md`,不是套件自身真实规则。目标已存在时只逐条补缺,保留项目自定内容。
+
+`一致性机制/决策档案.md` 必须从套件的 `templates/一致性机制/决策档案.md` 新建,不得复制套件自身已经轮转的历史。目标已存在时整文件跳过,不合并、不覆盖。
+
+兼容决策 21 之前的泄漏版本时,只检查下面两条**完整且逐字相同**的已知套件记录,不得按日期、决策编号或模糊文本扩大匹配:
+
+```text
+- 2026-06-11:启用套件级统一版本行与 CHANGELOG 治理(决策 9)
+- 2026-06-12:加入 Stop 收尾提醒与决策记录轮转归档(决策 10/11)
+```
+
+命中时先展示记录及上下文并标为“疑似套件历史泄漏”;只有用户确认后才删除命中的精确整行。档案中的其他文字和项目记录原位保留,不得用空白模板重写整个文件;未命中则完全跳过。
 
 `.claude/settings.json` 已存在时只向 `hooks.Stop` 追加收尾提醒 entry;已有同类 entry 就跳过,不覆盖其他 hooks。
 

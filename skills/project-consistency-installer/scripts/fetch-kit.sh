@@ -111,6 +111,7 @@ skills/project-consistency-installer/scripts/fetch-kit.sh
 templates/PROJECT.md
 templates/AGENTS.md
 templates/一致性机制/文件联动目录.md
+templates/一致性机制/决策档案.md
 一致性机制/README.md
 一致性机制/机制设计说明.md
 一致性机制/hooks/收尾提醒.sh

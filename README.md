@@ -129,7 +129,9 @@ Claude Code 的 `/引入一致性机制` 只是兼容适配器；安装行为正
 ├── templates/
 │   ├── PROJECT.md              # 新项目使用的事实与地图模板
 │   ├── AGENTS.md               # 新项目使用的 Agent 规则模板
-│   └── 一致性机制/文件联动目录.md # 新项目使用的联动规则模板
+│   └── 一致性机制/
+│       ├── 文件联动目录.md      # 新项目使用的联动规则模板
+│       └── 决策档案.md          # 新项目使用的空白决策档案
 ├── PROJECT.md                  # 套件自身的事实、地图、阶段与决策
 ├── AGENTS.md                   # 套件自身的 Agent 指令正本
 ├── CLAUDE.md -> AGENTS.md      # Claude Code 适配链接
