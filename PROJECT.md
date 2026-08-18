@@ -15,12 +15,13 @@
 
 ## 二、工作流程与里程碑
 
-问题或实战反馈 → 设计讨论与拍板 → 修改机制件及联动文档 → 统一版本行并更新 CHANGELOG → wrapup 检查 → 本地提交并推进 `synced` → 按需推送远端。
+问题或实战反馈 → 设计讨论与拍板 → 修改机制件及联动文档 → 构建并验证干净分发包 → 统一版本行并更新 CHANGELOG → wrapup 检查 → 本地提交并推进 `synced` → 按需推送远端 / 推送版本标签发布 Release。
 
 1. **机制成型**:Git 事件源、catchup、wrapup、联动目录与二进制策略。
 2. **可靠性加固**:独立 `synced` horizon、Stop hook、决策轮转和版本治理。
 3. **可分发化**:skills.sh 全局安装器、GitHub bootstrap、增量安装、绿地初始化与公开文档。
-4. **当前阶段**:公开发布后的跨宿主分发与安装链路加固。
+4. **发布面隔离**:源码仓库保留自举状态,GitHub Release 只发布白名单生成的干净产物。
+5. **当前阶段**:公开发布后的跨宿主、跨发布面安装链路加固。
 
 ## 三、项目地图
 
@@ -33,6 +34,9 @@
 | `.agents/skills/` | catchup / wrapup 的跨 Harness 行为正本与 Codex 仓库级入口 |
 | `skills/project-consistency-installer/` | skills.sh 可发现的机器级安装器行为正本与 GitHub 获取脚本 |
 | `.claude/commands/` | Claude Code 的 `/catchup`、`/wrapup` 与 `/引入一致性机制` 薄适配器 |
+| `.github/workflows/distribution.yml` | 验证每次源码变更,在 `v*` 标签上发布干净 GitHub Release |
+| `distribution/manifest.txt` | 干净分发包逐文件白名单 |
+| `scripts/` | 构建、验证分发包并阻断套件自举状态泄漏 |
 | `一致性机制/` | 套件自身使用的机制索引、设计说明、真实联动规则、决策档案与 hook |
 | `templates/` | 分发给新项目的 `PROJECT.md`、`AGENTS.md`、联动规则与空白决策档案骨架 |
 | `初始化新项目.md` | 绿地项目接入指南 |
@@ -41,13 +45,12 @@
 
 ## 四、当前阶段
 
-公开版本已具备入向、出向、安装、升级与文档体系。2026-08-18 已完成三层文件模型、跨 Harness 工作流与安装器分发收敛:catchup / wrapup 作为仓库级 Skill 随项目运行,`project-consistency-installer` 作为机器级 Skill 通过 skills.sh 分发并按需从 GitHub 获取套件,Claude Code 命令统一降为薄适配器。
+公开版本已具备入向、出向、安装、升级、文档与干净发布体系。2026-08-18 已完成三层文件模型、跨 Harness 工作流、安装器分发与发布面收敛:catchup / wrapup 作为仓库级 Skill 随项目运行,`project-consistency-installer` 作为机器级 Skill 通过 skills.sh 分发并按需获取校验后的 GitHub Release,源码仓库自身的 PROJECT / AGENTS / 决策历史不进入发布包。
 
 ## 五、关键决策记录
 
 > 本节只留最近 ~10 条;超限时 wrapup 把最老条目轮转到 `一致性机制/决策档案.md`。更早的架构取舍及完整理由见 `一致性机制/机制设计说明.md`。
 
-- 2026-07-23:安装器采用全局命令 + skill 双入口(决策 12;行为正本位置后由决策 19 取代)
 - 2026-08-17:套件公开主页与新项目 README 模板分离(决策 13)
 - 2026-08-18:套件自身 CLAUDE 项目大脑与新项目 CLAUDE 模板分离(决策 14;同日被决策 15 扩展取代)
 - 2026-08-18:运行事实、公开展示与 Agent 指令三层分离;AGENTS 为正本、CLAUDE 为相对链接(决策 15)
@@ -57,3 +60,4 @@
 - 2026-08-18:安装器重构为 skills.sh 可分发的 `project-consistency-installer`,可从 GitHub 获取套件后增量引入项目(决策 19)
 - 2026-08-18:安装器以自然语言意图作为跨 Harness 统一入口,显式 Skill 或斜杠语法归宿主适配层(决策 20)
 - 2026-08-18:决策档案拆分为套件实况与空白模板;安装不得复制套件历史,旧泄漏只按精确行确认清理(决策 21)
+- 2026-08-18:源码仓库保留自举状态,分发改由白名单生成并校验的干净 GitHub Release 承担(决策 22)

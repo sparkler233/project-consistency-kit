@@ -34,6 +34,9 @@
 | catchup 行为正本 | `.agents/skills/catchup/` | Codex 与兼容 Harness 从仓库级 Skill 发现;Claude Code 命令也转发到这里 |
 | wrapup 行为正本 | `.agents/skills/wrapup/` | 同上 |
 | 安装器行为正本 | `skills/project-consistency-installer/` | skills.sh 从 GitHub 发现并分发;含 GitHub 获取脚本,机器级使用,不进入目标项目 |
+| 干净分发白名单 | `distribution/manifest.txt` | 发布边界必须独立于套件源码目录,新增产品文件需显式评审 |
+| 分发构建与验证 | `scripts/build-distribution.sh`、`scripts/verify-distribution.sh` | 源码工具,负责生成 Release 资产并阻断自举状态泄漏 |
+| GitHub Release 工作流 | `.github/workflows/distribution.yml` | 普通变更只验证;`v*` 标签才用最小写权限创建 Release |
 | `/catchup` 适配器 | `.claude/commands/catchup.md` | Claude Code 斜杠入口;只读取对应 Skill,不复制流程 |
 | `/wrapup` 适配器 | `.claude/commands/wrapup.md` | 同上 |
 | `/引入一致性机制` 适配器 | `.claude/commands/引入一致性机制.md` | Claude Code 兼容入口;只定位并读取安装器 Skill,不复制流程 |
@@ -52,10 +55,11 @@
 
 ## 在新项目里启用本机制
 
+- **源码与发布面**:GitHub `main` 是套件源码仓库,保留套件自身 PROJECT、AGENTS、联动规则和决策历史;`v*` 标签自动生成的 GitHub Release 才是无自举状态的干净分发源。
 - **项目模板**:套件根 `PROJECT.md` / `AGENTS.md` 是套件自身正本,不进入目标项目;新项目使用 `templates/PROJECT.md` / `templates/AGENTS.md`,再创建 `CLAUDE.md -> AGENTS.md`。README 由目标项目自行决定,套件不创建。
 - **项目机制模板**:套件根 `一致性机制/文件联动目录.md` 与 `决策档案.md` 分别保存套件自身规则和历史;新项目必须从 `templates/一致性机制/` 下的联动规则与空白决策档案生成,不得复制套件实况。
 - **绿地(全新项目)**:整包套用,仓库级 catchup / wrapup Skill 与 Claude Code 适配器一并复制;完整步骤见模板仓库根的 `初始化新项目.md`(随模板分发,开张后通常已删)。
-- **已有项目(已有文件 / git 历史)**:别整包拷。安装机器级引导器后,进入目标项目并告诉 Agent“给这个项目引入一致性机制”;也可以通过当前 Harness 显式选择 `project-consistency-installer`。安装器先取得可信套件源,再增量合并并扫描项目中枢。
+- **已有项目(已有文件 / git 历史)**:别整包拷。安装机器级引导器后,进入目标项目并告诉 Agent“给这个项目引入一致性机制”;也可以通过当前 Harness 显式选择 `project-consistency-installer`。安装器默认取得带双层 SHA-256 与来源元数据的最新干净 Release,再增量合并并扫描项目中枢。
 
 ## 改了机制怎么办
 

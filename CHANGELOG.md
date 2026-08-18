@@ -6,6 +6,7 @@
 
 ## 2026-08-18
 
+- **源码与发布面隔离**(决策 22):新增逐文件分发白名单、干净包构建/污染验证脚本和 `v*` 标签 GitHub Release 工作流;发布包携带来源元数据、内部逐文件 SHA-256 与外层压缩包校验,安装器默认获取干净 Release 而不是源码仓库。
 - **决策档案模板隔离**(决策 21):新增空白 `templates/一致性机制/决策档案.md`;安装器与绿地初始化不再复制套件历史。升级时已有档案默认整文件保留;只对已知泄漏的精确记录行提示确认清理,且同版本日期仍比较实际内容以接收同日热修。
 - **跨 Harness 调用口径**(决策 20):安装器以“给这个项目引入一致性机制”作为统一的用户入口;`project-consistency-installer` 保留为稳定 Skill 标识,显式选择语法由 Harness 决定。
 - **skills.sh 安装器分发**(决策 19):新增 `skills/project-consistency-installer/` 作为机器级安装行为唯一正本,使用标准英文 Skill 标识与 `agents/openai.yaml`,可由 `npx skills add sparkler233/project-consistency-kit --skill project-consistency-installer --global` 安装。

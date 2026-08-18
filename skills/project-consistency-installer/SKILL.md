@@ -1,13 +1,13 @@
 ---
 name: project-consistency-installer
-description: Fetch Project Consistency Kit from a trusted local checkout or its canonical GitHub repository, then safely integrate or upgrade PROJECT.md, AGENTS.md, the CLAUDE.md adapter, catchup and wrapup repository Skills, linkage rules, and hooks without silently overwriting project content. Use when the user asks to install, introduce, bootstrap, migrate, or update the consistency mechanism in the current repository.
+description: Fetch Project Consistency Kit from a trusted local source or its verified clean GitHub Release, then safely integrate or upgrade PROJECT.md, AGENTS.md, the CLAUDE.md adapter, catchup and wrapup repository Skills, linkage rules, and hooks without silently overwriting project content. Use when the user asks to install, introduce, bootstrap, migrate, or update the consistency mechanism in the current repository.
 ---
 
 <!-- 一致性机制 version: 2026-08-18 -->
 
 # Project Consistency Installer
 
-把 Project Consistency Kit 增量引入当前项目。安装器既能使用用户已有的本地套件仓库,也能先从 GitHub 获取只读套件源,再继续项目迁移。
+把 Project Consistency Kit 增量引入当前项目。安装器既能使用用户已有的本地源码 checkout 或干净分发目录,也能先从 GitHub Release 获取经过双层校验的只读套件源,再继续项目迁移。
 
 核心原则:
 
@@ -22,18 +22,23 @@ description: Fetch Project Consistency Kit from a trusted local checkout or its 
 2. 按以下顺序寻找套件源:
    - 用户本次明确提供的本地路径;
    - 环境变量 `PROJECT_CONSISTENCY_KIT_DIR` 指向的路径;
-   - 当前目录本身就是套件仓库(仅用于识别,若 `TARGET_DIR` 等于套件根则停止,不得把套件安装进自身);
-   - 运行本 Skill 随附的 `scripts/fetch-kit.sh`,从规范 GitHub 仓库获取到机器缓存。
+   - 当前目录本身就是套件源码仓库或干净分发目录(仅用于识别,若 `TARGET_DIR` 等于套件根则停止,不得把套件安装进自身);
+   - 运行本 Skill 随附的 `scripts/fetch-kit.sh`,从规范 GitHub Release 获取干净分发包到机器缓存。
 3. 运行下载脚本前,说明将访问网络并写入机器缓存,按当前 Harness 权限机制取得批准。脚本路径必须相对于**当前已加载的本 Skill 文件**解析,不得相对于目标项目猜测:
    ```bash
    bash "<本 Skill 所在目录>/scripts/fetch-kit.sh"
    ```
    可选参数:
    ```bash
-   bash "<本 Skill 所在目录>/scripts/fetch-kit.sh" --ref <tag-or-commit>
+   bash "<本 Skill 所在目录>/scripts/fetch-kit.sh" --release <v-tag>
    bash "<本 Skill 所在目录>/scripts/fetch-kit.sh" --offline
    ```
-4. 脚本 stdout 的最后一行是套件仓库绝对路径。完整读取该路径下的 `skills/project-consistency-installer/SKILL.md`;若它不是当前已加载文件,把获取到的版本视为后续行为正本,从步骤 1 继续,不要再次运行步骤 0。
+   用户提供的本地路径若含 `DISTRIBUTION-METADATA.txt`,先用该目录内部同版本脚本做只读校验,再把 stdout 路径作为套件源:
+   ```bash
+   bash "<本地分发目录>/skills/project-consistency-installer/scripts/fetch-kit.sh" \
+     --verify-dir "<本地分发目录绝对路径>"
+   ```
+4. 脚本 stdout 的最后一行是干净分发目录绝对路径。完整读取该路径下的 `skills/project-consistency-installer/SKILL.md`;若它不是当前已加载文件,把获取到的版本视为后续行为正本,从步骤 1 继续,不要再次运行步骤 0。
 5. 验证套件源至少包含:
    - `skills/project-consistency-installer/SKILL.md`
    - `.agents/skills/catchup/SKILL.md`
@@ -44,7 +49,10 @@ description: Fetch Project Consistency Kit from a trusted local checkout or its 
    - `templates/AGENTS.md`
    - `templates/一致性机制/文件联动目录.md`
    - `templates/一致性机制/决策档案.md`
-6. 记录套件源 `git rev-parse HEAD` 和当前 ref,最终报告中回显。定位或验证失败就停止,不得拿半成品源继续安装。
+6. 记录来源并在最终报告回显:
+   - 干净分发目录必须有 `DISTRIBUTION-METADATA.txt` 与 `DISTRIBUTION-MANIFEST.sha256`;记录其中的规范仓库、release ref 与 source commit;
+   - 本地源码 checkout 必须是 Git 仓库;记录 `git rev-parse HEAD` 与当前 ref,有未提交改动时明确标出;
+   - 两种来源都不满足时停止。不得拿无来源、校验失败或半成品目录继续安装。
 
 ## 步骤 1 · 探测目标现状
 
@@ -210,7 +218,7 @@ test -L CLAUDE.md && readlink CLAUDE.md
 
 ## 步骤 8 · 报告与验证
 
-报告套件源 URL、ref、commit,以及新建、合并、迁移、跳过、失败和待填项。至少验证:
+报告套件源 URL、release/ref、source commit、来源类型,以及新建、合并、迁移、跳过、失败和待填项。至少验证:
 
 - PROJECT 可独立说明背景、地图、阶段与近期决策;
 - AGENTS 是实体,CLAUDE 是正确相对链接且内容一致;
@@ -223,9 +231,10 @@ test -L CLAUDE.md && readlink CLAUDE.md
 
 ## 守则
 
-- 下载脚本只获取和验证套件源,不得修改目标项目。
-- 套件缓存有本地改动、remote 不符或验证不完整时停止,不得强制清理。
-- 不从不受信任的 fork 静默获取;非规范仓库 URL 必须由用户明确提供。
+- 下载脚本只获取和验证干净 Release,不得修改目标项目。
+- 发布包外层 SHA-256、内部逐文件清单、来源元数据或缓存完整性任一失败时停止,不得静默回退到源码仓库。
+- 用户明确提供的本地源码 checkout 可以作为开发来源;非规范远端不得由下载脚本静默获取。
+- 不从不受信任的 fork 静默获取;非规范来源必须由用户以本地路径明确提供。
 - 不丢旧内容,不因模板更标准而重排用户文档。
 - README 默认不写、不创建、不作为项目地图。
 - AGENTS 是唯一指令实体;CLAUDE 只做相对链接适配。

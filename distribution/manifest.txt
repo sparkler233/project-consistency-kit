@@ -1,0 +1,28 @@
+# Project Consistency Kit clean distribution whitelist.
+# 一致性机制 version: 2026-08-18
+# One tracked file per line. Directories and glob patterns are intentionally forbidden.
+.agents/skills/catchup/SKILL.md
+.agents/skills/catchup/agents/openai.yaml
+.agents/skills/wrapup/SKILL.md
+.agents/skills/wrapup/agents/openai.yaml
+.claude/commands/catchup.md
+.claude/commands/wrapup.md
+.claude/commands/引入一致性机制.md
+.claude/settings.json
+.gitattributes
+.gitignore
+CHANGELOG.md
+LICENSE
+README.md
+docs/example-session.md
+skills/project-consistency-installer/SKILL.md
+skills/project-consistency-installer/agents/openai.yaml
+skills/project-consistency-installer/scripts/fetch-kit.sh
+templates/AGENTS.md
+templates/PROJECT.md
+templates/一致性机制/决策档案.md
+templates/一致性机制/文件联动目录.md
+一致性机制/README.md
+一致性机制/hooks/收尾提醒.sh
+一致性机制/机制设计说明.md
+初始化新项目.md
