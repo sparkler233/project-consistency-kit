@@ -1,0 +1,5 @@
+# 一致性机制 version: 2026-08-18
+interface:
+  display_name: "Project Consistency Installer"
+  short_description: "Fetch and install the consistency kit safely"
+  default_prompt: "Use $project-consistency-installer to fetch the kit and integrate it into this repository."

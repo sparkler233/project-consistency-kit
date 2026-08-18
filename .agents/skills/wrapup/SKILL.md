@@ -1,5 +1,6 @@
 ---
-description: 同步——以 git 为事件源,按联动目录把本轮改动联动落盘并提交
+name: wrapup
+description: Close a Project Consistency Kit work cycle by recovering current-session decisions, comparing all changes since the synced horizon, checking linkage rules, updating approved files, and preparing a user-confirmed local commit and synced tag. Use when the user asks to wrap up, synchronize project records, reconcile linked documentation, checkpoint completed work, or finish a repository session.
 ---
 
 <!-- 一致性机制 version: 2026-08-18 -->
@@ -7,13 +8,13 @@ description: 同步——以 git 为事件源,按联动目录把本轮改动联�
 把「上次同步以来发生的一切」系统性收尾:捕获改动 → 补 B 类事件 → 查联动 → 用户确认 → 落盘 → 提交。
 
 > 机制动机见 `一致性机制/机制设计说明.md`,联动规则见 `一致性机制/文件联动目录.md`。
-> `/同步` 是**兜底工具,不是流程门禁**——用户可随时手工改 / commit;/同步 只把漏的联动补上、把改动收尾。
+> `wrapup` 是**兜底工具,不是流程门禁**——用户可随时手工改 / commit;本工作流只把漏的联动补上、把改动收尾。
 
 ## 步骤 0 · 前置检查
 
 - 不是 git repo(`git rev-parse --is-inside-work-tree` 失败)→ 提示「项目未纳入 git,一致性机制无法运行」并退出。
 - `一致性机制/文件联动目录.md` 不存在 → 提示「联动目录未建立」并退出。
-- `PROJECT.md` 不存在 → 提示「项目仍是旧版文件模型,请先运行 `/引入一致性机制` 完成迁移」并退出;不要把决策重新写回 README 或 Agent 指令文件。
+- `PROJECT.md` 不存在 → 提示「项目仍是旧版文件模型,请先告诉 Agent“给这个项目引入一致性机制”;也可使用当前 Harness 的显式安装器入口」并退出;不要把决策重新写回 README 或 Agent 指令文件。
 - 检查 `AGENTS.md` 是实体文件、`CLAUDE.md` 是相对链接 `AGENTS.md`;异常计入步骤 4 联动计划,不通过重复维护两份内容来补救。
 
 ## 步骤 1 · B 类事件 safety net
@@ -24,7 +25,7 @@ git 只看得见文件改动。**决策、对外对接、口头约定**这类事
 2. 列清单问用户:「这些要补写吗?」对**决策**类,规范落点是 `PROJECT.md` 关键决策记录(联动目录规则 2)。
 3. 用户确认后**立刻写入目标文件**——这样它们就变成下一步 git 能看见的改动。
 
-> 局限:safety net 只够得到**当前会话**的对话。跨会话未落盘的 B 类事件捞不回——所以结束会话前建议跑一次 `/同步`。
+> 局限:safety net 只够得到**当前会话**的对话。跨会话未落盘的 B 类事件捞不回——所以结束会话前建议执行一次 wrapup。
 
 ## 步骤 2 · 确定本轮同步范围(horizon = `synced`)
 
@@ -96,11 +97,11 @@ git 只看得见文件改动。**决策、对外对接、口头约定**这类事
    git commit -m "<确认后的 message>"
    git tag -f synced            # ★ 推进 horizon 到这次提交
    ```
-   > **push 由用户手动负责**:本机制按**单机**设计,`/同步` 到此为止——只本地 commit + 推进本地 `synced`,**不自动 push**。要云端备份就自己跑 `git push`;多机协作时 `synced` 是本地 tag,移动后需 `git push --force origin synced` 才能让远端 horizon 跟上,否则各机的 `git diff synced` 基准会不一致。
+   > **push 由用户手动负责**:本机制按**单机**设计,wrapup 到此为止——只本地 commit + 推进本地 `synced`,**不自动 push**。要云端备份就自己跑 `git push`;多机协作时 `synced` 是本地 tag,移动后需 `git push --force origin synced` 才能让远端 horizon 跟上,否则各机的 `git diff synced` 基准会不一致。
 4. 输出报告:
 
 ```
-同步完成。
+wrapup 完成。
 - ✅ 联动成功:N 项(列出)
 - ⏭️ 跳过:M 项(原因)
 - ❌ 失败:K 项(原因 + 建议)

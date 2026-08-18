@@ -6,9 +6,19 @@
 
 ## 2026-08-18
 
+- **跨 Harness 调用口径**(决策 20):安装器以“给这个项目引入一致性机制”作为统一的用户入口;`project-consistency-installer` 保留为稳定 Skill 标识,显式选择语法由 Harness 决定。
+- **skills.sh 安装器分发**(决策 19):新增 `skills/project-consistency-installer/` 作为机器级安装行为唯一正本,使用标准英文 Skill 标识与 `agents/openai.yaml`,可由 `npx skills add sparkler233/project-consistency-kit --skill project-consistency-installer --global` 安装。
+- **GitHub bootstrap**:安装器新增 `scripts/fetch-kit.sh`,在无本地套件时把规范 GitHub 仓库获取到机器缓存;验证 remote、干净工作区、ref、commit 与必要文件后才交给增量安装流程。
+- **安装器宿主适配收敛**:`.claude/commands/引入一致性机制.md` 降为薄适配器;移除旧的中文名纯指针 Skill 和本机固定 `~/Developer/项目一致性机制` 依赖。
+- **分发边界对齐**:公开 README 与绿地初始化改以 skills.sh 为默认首次落机入口;机器级 `skills/` 明确不随绿地项目复制,catchup / wrapup 仍由安装器写入目标仓库。
+- **仓库级工作流 Skill**(决策 18):新增 `.agents/skills/catchup/` 与 `wrapup/` 作为跨 Harness 行为唯一正本,含标准 `SKILL.md` 和 `agents/openai.yaml`;Codex 可用 `$catchup` / `$wrapup` 或语义触发。
+- **Claude Code 命令降为适配器**:`.claude/commands/catchup.md` 与 `wrapup.md` 不再复制完整流程,只读取对应仓库级 Skill;安装器新增旧完整命令定制迁移与单一正本验证。
+- **跨 Harness 分发对齐**:绿地初始化自动复制 `.agents/skills/`;PROJECT、AGENTS、模板、机制索引、联动规则、公开 README 和示例统一说明 Codex / Claude Code 入口差异。
+- **出向命令统一命名**(决策 17):原中文命令入口统一为 `/wrapup`,与 `/catchup` 形成会话开始 / 结束配对;命令文件改名为 `.claude/commands/wrapup.md`,随后由决策 18 降为 Skill 适配器。
+- **旧项目安全迁移**:增量安装器识别旧版中文命令文件;内容未定制时经确认迁移到 `wrapup.md`,存在项目定制时要求人工合并,避免升级后保留两个出向入口。
 - **三层文件模型**(决策 15):`README.md` 退出运行协议、只承载对外说明;新增 `PROJECT.md` 保存背景 / 流程 / 地图 / 阶段 / 近期决策;新增 `AGENTS.md` 作为 Agent 指令唯一实体正本,根 `CLAUDE.md` 改为相对链接 `AGENTS.md`。
 - **catchup 去重复**:`/catchup` 不再完整读取 harness 已注入的 AGENTS / CLAUDE,只验证链接形态,再读取 PROJECT、Git、中枢与当前焦点;PROJECT 缺失时仅提供 README 旧版兼容提示。
-- **决策落点迁移**:`/同步`、联动规则和决策档案将近期决策 canonical 落点从 CLAUDE 迁到 PROJECT,轮转上限仍为最近 10 条。
+- **决策落点迁移**:`/wrapup`、联动规则和决策档案将近期决策 canonical 落点从 CLAUDE 迁到 PROJECT,轮转上限仍为最近 10 条。
 - **联动规则双份职责拆分**(决策 16):套件根 `一致性机制/文件联动目录.md` 改为套件自身真实规则;新项目骨架迁到 `templates/一致性机制/文件联动目录.md`,初始化器和安装器只复制模板。
 - **分发模板重构**:移除 `templates/README.md` / `templates/CLAUDE.md`,新增 `templates/PROJECT.md` / `templates/AGENTS.md`;绿地初始化不再创建 README,显式创建 `CLAUDE.md -> AGENTS.md`。
 - **增量迁移器重构**:`/引入一致性机制` 新增旧 CLAUDE / AGENTS 组合探测、事实与规则语义拆分、替换链接前章节对账和无 Git 历史备份要求;README 默认不写。
@@ -21,7 +31,7 @@
 - **公开主页与项目模板分离**（决策 13）：重写套件根 `README.md`，移除项目地图占位，补充工作流程、能力边界、便携安装命令和使用示例；新增 `templates/README.md` 作为新项目专用地图骨架。
 - **绿地初始化修正**：`初始化新项目.md` 改为排除套件主页、示例和模板目录，再将 `templates/README.md` 复制为目标项目的 `README.md`，避免把套件介绍带进新项目。
 - **已有项目安装修正**：`/引入一致性机制` 在目标项目缺少 README 时改用 `templates/README.md`，并优先从全局命令符号链接定位套件根，不再依赖作者本机目录名。
-- **公开示例补全**：新增 `docs/example-session.md`，展示 `/catchup` 与 `/同步` 的简化输入输出和确认边界。
+- **公开示例补全**：新增 `docs/example-session.md`，展示 `/catchup` 与 `/wrapup` 的简化输入输出和确认边界。
 - 按决策 9 将全部机制版本行推进至 2026-08-17。
 
 ## 2026-07-23
@@ -35,7 +45,7 @@
 
 - **套件公开发布至 GitHub**(`sparkler233/project-consistency-kit`,private → public):新增 MIT `LICENSE`;README 顶部加门面介绍段(这是什么 / 快速上手 / 许可证),原「项目地图」骨架保留、降为二节;git 全部历史邮箱改写为 GitHub noreply、提交信息统一改为短主题行(细节留正文)后强推;仓库本地 `user.email` 同步改为 noreply 防回漏。本次无机制文件(版本行文件)变化,**版本不 bump**,仍为 2026-06-18。
 - **删库重建清除悬空旧对象**:邮箱重写后被强推顶掉的旧 commit 在 GitHub 上仍可按 hash 匿名访问(实测 200,含旧邮箱)→ 删除仓库同名重建、重推全量历史(commit hash 不变),旧对象随旧库销毁(实测旧 hash 404);README 顶层目录表补登 `LICENSE` / `CHANGELOG.md` / `初始化新项目.md`。
-- **提交信息风格约定**:短主题行(说清「做了什么」)+ 细节进正文——GitHub 文件列表只显示主题行;`/同步` 提交沿用此风格。
+- **提交信息风格约定**:短主题行(说清「做了什么」)+ 细节进正文——GitHub 文件列表只显示主题行;`/wrapup` 提交沿用此风格。
 
 ## 2026-06-18
 
@@ -45,7 +55,7 @@
 ## 2026-06-12
 
 - **出向兜底 hook 实装**(决策 10;推翻 06-11「暂不实装」的权衡——用户拍板要做):新增 `一致性机制/hooks/收尾提醒.sh`(挂 Stop 事件;有未同步改动时提醒收尾,每脏周期最多一次,只提醒不行动)+ `.claude/settings.json` 项目级接线;安装器步骤 2 纳入分发(hooks 拷贝 + settings JSON 增量合并);联动目录规则 1 触发范围扩到 hooks / 接线;决策 3「局限」改指向决策 10;8 场景脚本实测通过
-- **决策记录轮转归档**(决策 11):CLAUDE.md「关键决策记录」只留最近 10 条——超限由 `/同步` 按新增**通用规则 6** 提议轮转(剪切)到 `一致性机制/决策档案.md`(新骨架文件,时间升序;不进 Part A、catchup 不默认读);同步.md 步骤 3 加条件触发检查;CLAUDE.md 骨架决策节加轮转说明;安装器步骤 2/3 纳入分发
+- **决策记录轮转归档**(决策 11):CLAUDE.md「关键决策记录」只留最近 10 条——超限由 `/wrapup` 按新增**通用规则 6** 提议轮转(剪切)到 `一致性机制/决策档案.md`(新骨架文件,时间升序;不进 Part A、catchup 不默认读);wrapup.md 步骤 3 加条件触发检查;CLAUDE.md 骨架决策节加轮转说明;安装器步骤 2/3 纳入分发
 - **全套一致性自查修正**(大项目启用前体检):两处结构树补 `决策档案.md`;初始化树「通用 5 条」→6;安装器计划表「3 文档」→4;设计说明 §二标题补「一个制度件」、§五钉死清单补 `settings.json`、决策 9 与 §七 的版本行枚举补 hooks 脚本;同步守则补规则 6 条件触发注
 - **安装器 4 处实战回灌**(节点项目实跑 /引入一致性机制 06-12 版暴露):① 步骤 0 版本探测 glob 补 `一致性机制/hooks/*.sh`(原漏 hooks 脚本的版本行);② 该 grep 改 `-E` 锚定行首 `^(<!-- |# )`,避开机制设计说明正文里引用版本行格式的句子造成的误匹配;③ 步骤 2 settings.json 改「Write/Edit 写入、别用 shell cp」——cp 权限机制文件会被 Claude Code 权限分类器拦截;④ 决策记录锚点写明「有意无 marker、用标题 grep、永不整块替换」,杜绝与纪律块混淆
 
@@ -54,7 +64,7 @@
 - **版本治理启用**:6 个机制文件(catchup / 同步 / 安装器 / 三份机制文档)头部加统一版本行;新增本 CHANGELOG;`/引入一致性机制` 改为按版本行机械判定项目副本新旧(步骤 0 探测、步骤 2 询问更新、步骤 3 纪律块整块替换),计划表状态新增 🔼 可更新
 - **`git add -f` 破例通道加 LFS 护栏**:必须先 `git lfs track "<路径>"` 再 add -f(机制设计说明决策 4、.gitignore、CLAUDE.md 纪律节三处同步);设计说明新增决策 9,第七节加「发版即 bump」维护规矩
 - **模板 CLAUDE.md 的同步纪律节改用带版本的 marker 包裹**:绿地项目的纪律块从此也可被安装器版本检测、整块升级
-- **`/同步` 步骤 5**:`git add -A` 前先回显 `git status --short`,用户过目入库范围(守则同步加条)
+- **`/wrapup` 步骤 5**:`git add -A` 前先回显 `git status --short`,用户过目入库范围(守则同步加条)
 - **绿地 rsync 排除套件专属文件**(初始化新项目.md / CHANGELOG.md / 全局安装器)——新项目不再携带会过期的安装器副本
 - **全局安装器符号链接文档化**:《初始化新项目》新增「套件首次落机」一节(建链命令 + 迁移注意);登记进 `一致性机制/README.md` 钉死文件登记册
 - **修正 AGENTS.md 的 Windows 回退方向**:内容留 CLAUDE.md、AGENTS.md 做一行指针;原 `@AGENTS.md` 导入方案会把 CLAUDE.md 掏成空壳,致 /catchup 与 Part A 读空

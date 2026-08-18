@@ -1,6 +1,6 @@
 # Project Consistency Kit
 
-> 一套面向长期 AI Agent 协作的项目一致性机制。它用 Git 记录项目变化，通过 `/catchup` 恢复跨会话状态，再用 `/同步` 检查文档联动、完成本地提交并推进同步边界。
+> 一套面向长期 AI Agent 协作的项目一致性机制。它用 Git 记录项目变化，通过 catchup 恢复跨会话状态，再用 wrapup 检查文档联动、完成本地提交并推进同步边界。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f6f4e.svg)](LICENSE)
 
@@ -14,13 +14,13 @@ Project Consistency Kit 把这些状态交给仓库本身管理。Git 负责记�
 
 ```mermaid
 flowchart LR
-    A["新会话"] --> B["/catchup"]
+    A["新会话"] --> B["catchup"]
     B --> C["读取项目文档"]
     B --> D["检查 Git 历史与工作区"]
     C --> E["恢复当前任务状态"]
     D --> E
     E --> F["继续工作"]
-    F --> G["/同步"]
+    F --> G["wrapup"]
     G --> H["捕获本轮决策"]
     G --> I["按联动规则检查文档与素材"]
     H --> J["用户确认更新计划"]
@@ -28,50 +28,61 @@ flowchart LR
     J --> K["写入、提交并推进 synced"]
 ```
 
-`/catchup` 只读取和汇报，不修改文件。`/同步` 会先展示联动计划和待提交范围，获得确认后才写入文件或提交；它不会自动推送远端。
+catchup 只读取和汇报，不修改文件。wrapup 会先展示联动计划和待提交范围，获得确认后才写入文件或提交；它不会自动推送远端。Codex 使用 `$catchup` / `$wrapup` 或自然语言触发，Claude Code 使用 `/catchup` / `/wrapup`。
 
 ## 核心能力
 
-- **跨会话恢复**：Agent harness 自动加载 `AGENTS.md` / `CLAUDE.md` 工作规则，`/catchup` 再结合 `PROJECT.md`、中枢文档、Git 历史和未提交文件恢复状态，不重复读取指令。
-- **职责分离**：`README.md` 面向 GitHub 用户，`PROJECT.md` 保存运行事实，`AGENTS.md` 是 Agent 指令正本，`CLAUDE.md` 仅作为相对链接适配层。
+- **跨会话恢复**：Agent harness 自动加载 `AGENTS.md` / `CLAUDE.md` 工作规则，仓库级 catchup Skill 再结合 `PROJECT.md`、中枢文档、Git 历史和未提交文件恢复状态。
+- **跨 Harness 工作流**：catchup / wrapup 的唯一行为正本位于 `.agents/skills/`；Codex 直接发现，Claude Code 通过薄斜杠命令适配。
+- **职责分离**：`PROJECT.md` 保存运行事实，`AGENTS.md` 是 Agent 指令源本，`CLAUDE.md` 仅作为相对链接适配层。
 - **同步边界**：用独立的 `synced` 标签记录上次完成联动检查的位置，手工提交过但尚未同步的改动也不会被跳过。
 - **文件联动检查**：在 `一致性机制/文件联动目录.md` 中声明中枢文档和项目规则，改动发生后检查相关说明、决策记录和素材清单是否需要更新。
 - **对话决策落盘**：收尾时回看当前会话，将尚未进入文件的决策、约定和对接结果列给用户确认。
-- **增量接入**：`/引入一致性机制` 会扫描现有 PROJECT / AGENTS / CLAUDE / README，再生成迁移计划；旧内容按职责拆分，确认后才建立适配链接。
+- **可引导安装**：全局 `project-consistency-installer` Skill 可由 skills.sh 从 GitHub 安装；运行时自动获取套件源、扫描现有 PROJECT / AGENTS / CLAUDE / README，再经确认增量引入。
 - **收尾提醒**：Stop hook 检测到未同步改动时提醒一次，只提示，不自动修改、提交或推送。
 - **二进制资产治理**：可选用 Git LFS 管理栅格图，用 `_manifest.md` 记录设计源、字体和媒体素材的用途、来源与授权信息。
 
 ## 快速开始
 
-当前宿主为 Claude Code，需要本机安装 Git。先克隆仓库，并记住它的绝对路径：
+支持 Codex、Claude Code 及兼容 `AGENTS.md` / Agent Skills 的 Harness，需要本机安装 Git 和 Node.js。
+
+### 接入已有项目
+
+通过 skills.sh 将安装器装到用户级 Skill 目录：
+
+```bash
+npx skills add sparkler233/project-consistency-kit \
+  --skill project-consistency-installer \
+  --global
+```
+
+CLI 会自动检测可用的 Harness，必要时让你选择；也可以用 `--agent codex` 或 `--agent claude-code` 显式指定。安装完成后，进入目标项目，直接告诉 Agent：
+
+> 给这个项目引入一致性机制。
+
+支持显式 Skill 调用的 Harness，也可以通过各自的 Skill 选择方式调用 `project-consistency-installer`。具体入口由 Harness 决定。
+
+安装器会优先使用用户明确提供的本地套件；找不到时，从本仓库获取到机器缓存，验证来源和必要文件后再展示项目迁移计划。下载阶段不修改目标项目，写入仍需单独确认。
+
+### 本地开发接线
+
+维护套件或需要离线使用时，可以先 clone，再把本地安装器 Skill 链接到用户目录：
 
 ```bash
 git clone https://github.com/sparkler233/project-consistency-kit.git
 cd project-consistency-kit
 KIT_DIR="$PWD"
-```
 
-### 接入已有项目
+mkdir -p ~/.agents/skills
+ln -sfn "$KIT_DIR/skills/project-consistency-installer" \
+  ~/.agents/skills/project-consistency-installer
 
-把安装命令链接到 Claude Code 的全局命令目录：
-
-```bash
 mkdir -p ~/.claude/commands
 ln -sfn "$KIT_DIR/.claude/commands/引入一致性机制.md" \
   ~/.claude/commands/引入一致性机制.md
 ```
 
-随后进入目标项目，在 Claude Code 中运行 `/引入一致性机制`。安装器会扫描项目文档、Git 状态和二进制资产类型，展示计划并等待确认。
-
-安装器会优先从全局命令符号链接反推出套件位置；如果无法定位，才会尝试 `~/Developer/项目一致性机制`，仍找不到时会询问实际路径。
-
-如需通过自然语言触发安装，也可以链接同名 skill：
-
-```bash
-mkdir -p ~/.agents/skills
-ln -sfn "$KIT_DIR/一致性机制/skills/引入一致性机制" \
-  ~/.agents/skills/引入一致性机制
-```
+Claude Code 的 `/引入一致性机制` 只是兼容适配器；安装行为正本仍是同一个 `project-consistency-installer` Skill。套件目录迁移后需要重建这两条本地开发链接。
 
 ### 创建全新项目
 
@@ -81,31 +92,36 @@ ln -sfn "$KIT_DIR/一致性机制/skills/引入一致性机制" \
 
 假设一个内容生产项目刚调整了章节结构，并新增两张图片。工作区里已经有正文和素材改动，但 PROJECT 的进度、图片清单和决策记录还没有更新。
 
-1. 新会话运行 `/catchup`，Agent 会读取 Git 状态和相关文件，指出上次停在章节调整与图片接入。
-2. 完成工作后运行 `/同步`，机制会根据联动目录提出更新 PROJECT、素材清单和决策记录的计划；README 只有承载受影响的公开契约时才联动。
+1. 新会话执行 catchup（Codex：`$catchup`；Claude Code：`/catchup`），Agent 会读取 Git 状态和相关文件，指出上次停在章节调整与图片接入。
+2. 完成工作后执行 wrapup（Codex：`$wrapup`；Claude Code：`/wrapup`），机制会根据联动目录提出更新 PROJECT、素材清单和决策记录的计划；README 只有承载受影响的公开契约时才联动。
 3. 用户确认计划与提交范围后，机制执行更新、创建本地提交，并把 `synced` 移到该提交。
 
 更完整的输入和输出示意见 [`docs/example-session.md`](docs/example-session.md)。
 
 ## 设计边界
 
-- Git 是事实来源，但对话中的决定只有在当前会话运行 `/同步` 时才能被补写，已经丢失的旧会话内容无法自动恢复。
+- Git 是事实来源，但对话中的决定只有在当前会话执行 wrapup 时才能被补写，已经丢失的旧会话内容无法自动恢复。
 - 文件联动依赖项目自己的规则质量。安装器会协助发现中枢文档，领域规则仍需要项目维护者确认。
 - `synced` 是本地标签，项目按单机流程设计。多机使用时，需要自行同步标签并处理不同设备的基准差异。
-- Stop hook 目前通过 Claude Code 的项目设置接入。命令文档和 Shell 脚本可迁移到其他 Agent 宿主，但需要适配对应的命令与 hook 机制。
+- Stop hook 目前通过 Claude Code 的项目设置接入；catchup / wrapup 已通过仓库级 Skill 适配 Codex，其他 Harness 取决于其 Agent Skills 支持。
+- skills.sh 只分发全局安装器 Skill；PROJECT、AGENTS、hooks 和两个仓库级 Skill 由安装器从经验证的 GitHub 套件源增量写入。默认跟随 `main`，发布版可显式指定 Git ref。
 - `CLAUDE.md -> AGENTS.md` 当前按仓库内相对符号链接设计并已在 macOS/Codex 验证；Windows checkout 与 harness 行为尚待单独测试。
-- `/同步` 不自动推送远端，也不会在未确认时修改文件或创建提交。
+- wrapup 不自动推送远端，也不会在未确认时修改文件或创建提交。
 
 ## 仓库结构
 
 ```text
 .
+├── .agents/skills/
+│   ├── catchup/               # 跨 Harness 入向工作流正本
+│   └── wrapup/                # 跨 Harness 出向工作流正本
 ├── .claude/
-│   ├── commands/               # /catchup、/同步、/引入一致性机制
+│   ├── commands/               # Claude Code 薄适配器 + /引入一致性机制
 │   └── settings.json           # Stop hook 接线
+├── skills/
+│   └── project-consistency-installer/ # skills.sh 可分发的机器级安装器
 ├── 一致性机制/
 │   ├── hooks/收尾提醒.sh
-│   ├── skills/引入一致性机制/
 │   ├── 机制设计说明.md
 │   ├── 文件联动目录.md
 │   └── 决策档案.md
