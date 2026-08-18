@@ -26,7 +26,7 @@
 下一步建议
 1. 确认两张插图的版位。
 2. 完成第三章渲染检查。
-3. 收尾时运行 /同步，检查 README、素材清单和决策记录。
+3. 收尾时运行 /同步，检查 PROJECT、素材清单和决策记录。
 ```
 
 `/catchup` 到这里停止，只汇报状态，等待下一步指令。
@@ -38,17 +38,15 @@
 
 | 目标文件 | 改动 | 状态 |
 | --- | --- | --- |
-| README.md | 更新第三章进度 | 待确认 |
+| PROJECT.md | 更新第三章进度并记录跨页版式决定 | 待确认 |
 | images/ch03/_manifest.md | 登记两张插图的用途、来源与授权 | 待确认 |
-| CLAUDE.md | 记录跨页版式决定 | 待确认 |
 
 将提交的工作区改动
  M content/ch03.md
- M README.md
+ M PROJECT.md
 ?? images/ch03/figure-01.png
 ?? images/ch03/figure-02.png
  M images/ch03/_manifest.md
- M CLAUDE.md
 ```
 
 用户确认联动计划和提交范围后，机制才会写入文件、询问提交说明、创建本地提交，并推进 `synced` 标签。远端推送仍由用户手动完成。

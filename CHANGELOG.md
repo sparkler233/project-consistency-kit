@@ -4,6 +4,18 @@
 > 任何机制文件发生真实变化:全部版本行一起 bump 到当天 + 在此记一节。
 > 本文件**套件专属,不随模板进项目**(绿地 rsync 已排除;安装器也不拷它)。
 
+## 2026-08-18
+
+- **三层文件模型**(决策 15):`README.md` 退出运行协议、只承载对外说明;新增 `PROJECT.md` 保存背景 / 流程 / 地图 / 阶段 / 近期决策;新增 `AGENTS.md` 作为 Agent 指令唯一实体正本,根 `CLAUDE.md` 改为相对链接 `AGENTS.md`。
+- **catchup 去重复**:`/catchup` 不再完整读取 harness 已注入的 AGENTS / CLAUDE,只验证链接形态,再读取 PROJECT、Git、中枢与当前焦点;PROJECT 缺失时仅提供 README 旧版兼容提示。
+- **决策落点迁移**:`/同步`、联动规则和决策档案将近期决策 canonical 落点从 CLAUDE 迁到 PROJECT,轮转上限仍为最近 10 条。
+- **联动规则双份职责拆分**(决策 16):套件根 `一致性机制/文件联动目录.md` 改为套件自身真实规则;新项目骨架迁到 `templates/一致性机制/文件联动目录.md`,初始化器和安装器只复制模板。
+- **分发模板重构**:移除 `templates/README.md` / `templates/CLAUDE.md`,新增 `templates/PROJECT.md` / `templates/AGENTS.md`;绿地初始化不再创建 README,显式创建 `CLAUDE.md -> AGENTS.md`。
+- **增量迁移器重构**:`/引入一致性机制` 新增旧 CLAUDE / AGENTS 组合探测、事实与规则语义拆分、替换链接前章节对账和无 Git 历史备份要求;README 默认不写。
+- **分发边界修正**:绿地 rsync 排除 `.DS_Store`、套件根 LICENSE 与套件真实联动目录;MIT 许可改复制到 `一致性机制/LICENSE.project-consistency-kit`,避免被误解为目标项目整体许可证。
+- **决策 14 被扩展取代**:“根 CLAUDE 与 CLAUDE 模板分离”的中间设计未提交即被三层模型取代,保留在设计说明中作为演进线索。
+- 按决策 9 将全部机制版本行及根 / 模板 AGENTS 同步纪律版本推进至 2026-08-18。
+
 ## 2026-08-17
 
 - **公开主页与项目模板分离**（决策 13）：重写套件根 `README.md`，移除项目地图占位，补充工作流程、能力边界、便携安装命令和使用示例；新增 `templates/README.md` 作为新项目专用地图骨架。
