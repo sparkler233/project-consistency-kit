@@ -2,6 +2,8 @@
 
 > 一套面向长期 AI Agent 协作的项目一致性机制。它用 Git 记录项目变化，通过 catchup 恢复跨会话状态，再用 wrapup 检查文档联动、完成本地提交并推进同步边界。
 
+[![Latest release](https://img.shields.io/github/v/release/sparkler233/project-consistency-kit)](https://github.com/sparkler233/project-consistency-kit/releases/latest)
+[![Distribution](https://github.com/sparkler233/project-consistency-kit/actions/workflows/distribution.yml/badge.svg?branch=main)](https://github.com/sparkler233/project-consistency-kit/actions/workflows/distribution.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f6f4e.svg)](LICENSE)
 
 ## 为什么做这个项目
@@ -69,7 +71,7 @@ CLI 会自动检测可用的 Harness，必要时让你选择；也可以用 `--a
 
 本仓库 `main` 是源码与自举面，因此会包含维护套件自身所需的 `PROJECT.md`、`AGENTS.md`、`CLAUDE.md`、真实联动规则和决策档案；它不是可直接整包复制的项目模板。
 
-`v*` 标签会通过 GitHub Actions 生成 `project-consistency-kit.tar.gz` 和对应 `.sha256`。Release 包只包含 [源码仓库分发白名单](https://github.com/sparkler233/project-consistency-kit/blob/main/distribution/manifest.txt) 明确列出的产品文件，并额外生成来源元数据与内部逐文件校验清单。需要手工下载时可从 [GitHub Releases](https://github.com/sparkler233/project-consistency-kit/releases) 获取；通常直接使用安装器即可。
+`v*` 标签会通过 GitHub Actions 生成 `project-consistency-kit.tar.gz` 和对应 `.sha256`。Release 包只包含 [源码仓库分发白名单](https://github.com/sparkler233/project-consistency-kit/blob/main/distribution/manifest.txt) 明确列出的产品文件，并额外生成来源元数据与内部逐文件校验清单。最新稳定版本和发布说明见 [GitHub Releases](https://github.com/sparkler233/project-consistency-kit/releases/latest)；手工下载可直接使用 [发布包](https://github.com/sparkler233/project-consistency-kit/releases/latest/download/project-consistency-kit.tar.gz) 和 [SHA-256 校验文件](https://github.com/sparkler233/project-consistency-kit/releases/latest/download/project-consistency-kit.tar.gz.sha256)，通常直接使用安装器即可。
 
 ### 本地开发接线
 
