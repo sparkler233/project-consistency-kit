@@ -1,9 +1,11 @@
 ---
 name: project-consistency-installer
 description: Fetch Project Consistency Kit from a trusted local source or its verified clean GitHub Release, then safely integrate or upgrade PROJECT.md, AGENTS.md, the CLAUDE.md adapter, catchup and wrapup repository Skills, linkage rules, and hooks without silently overwriting project content. Use when the user asks to install, introduce, bootstrap, migrate, or update the consistency mechanism in the current repository.
+metadata:
+  version: "1.1.0"
 ---
 
-<!-- 一致性机制 version: 2026-08-18 -->
+<!-- 一致性机制 version: 2026-08-19 -->
 
 # Project Consistency Installer
 
@@ -15,10 +17,11 @@ description: Fetch Project Consistency Kit from a trusted local source or its ve
 2. **先计划、后确认、再写入。** 不静默覆盖已有内容,不擅自初始化 Git、commit 或 push。
 3. **职责分离。** PROJECT 保存项目事实,AGENTS 保存 Agent 规则,README 保持用户自有,CLAUDE 只做链接适配。
 4. **行为只有一个正本。** 本 Skill 是安装工作流正本;宿主命令只允许做薄适配。
+5. **正式版本只有一个。** `一致性机制/VERSION` 是 Kit SemVer 正本;本 Skill 的 `metadata.version` 必须与它一致,日期版本行只表示机制文件修订日期。
 
 ## 步骤 0 · 确定目标项目与套件源
 
-1. 把 Skill 被调用时的当前工作目录记为 `TARGET_DIR`;后续切换目录后仍不得丢失这个目标。
+1. 把 Skill 被调用时的当前工作目录记为 `TARGET_DIR`,把当前加载文件的 `metadata.version` 记为 `BOOTSTRAP_VERSION`;后续切换目录后仍不得丢失目标或引导器身份。
 2. 按以下顺序寻找套件源:
    - 用户本次明确提供的本地路径;
    - 环境变量 `PROJECT_CONSISTENCY_KIT_DIR` 指向的路径;
@@ -38,21 +41,25 @@ description: Fetch Project Consistency Kit from a trusted local source or its ve
    bash "<本地分发目录>/skills/project-consistency-installer/scripts/fetch-kit.sh" \
      --verify-dir "<本地分发目录绝对路径>"
    ```
-4. 脚本 stdout 的最后一行是干净分发目录绝对路径。完整读取该路径下的 `skills/project-consistency-installer/SKILL.md`;若它不是当前已加载文件,把获取到的版本视为后续行为正本,从步骤 1 继续,不要再次运行步骤 0。
-5. 验证套件源至少包含:
+4. 脚本 stdout 的最后一行是干净分发目录绝对路径,记为套件源;先完成下面的来源验证与版本记录,再切换行为正本。
+5. 所有套件源至少包含:
    - `skills/project-consistency-installer/SKILL.md`
    - `.agents/skills/catchup/SKILL.md`
    - `.agents/skills/wrapup/SKILL.md`
    - `.claude/commands/catchup.md`
    - `.claude/commands/wrapup.md`
+   - `.claude/settings.json`
    - `templates/PROJECT.md`
    - `templates/AGENTS.md`
    - `templates/一致性机制/文件联动目录.md`
    - `templates/一致性机制/决策档案.md`
-6. 记录来源并在最终报告回显:
-   - 干净分发目录必须有 `DISTRIBUTION-METADATA.txt` 与 `DISTRIBUTION-MANIFEST.sha256`;记录其中的规范仓库、release ref 与 source commit;
-   - 本地源码 checkout 必须是 Git 仓库;记录 `git rev-parse HEAD` 与当前 ref,有未提交改动时明确标出;
+   versioned 分发包或当前源码 checkout 还必须包含 `.codex/hooks.json` 与 `一致性机制/VERSION`;缺少新字段的 legacy schema 1 包按其历史最低集合验证,不得用 v1.1.0 文件要求反向否决 v1.0.0。
+6. 记录版本与来源并在计划和最终报告回显:
+   - 干净分发目录必须有 `DISTRIBUTION-METADATA.txt` 与 `DISTRIBUTION-MANIFEST.sha256`;记录其中的 `kit_version`、`mechanism_revision`、规范仓库、release ref 与 source commit;缺少版本字段的 schema 1 旧包标为 `legacy`,版本可从 `vX.Y.Z` release ref 派生展示,但必须标明不是包内 VERSION;
+   - 本地源码 checkout 必须是 Git 仓库;读取 `一致性机制/VERSION` 为 `SOURCE_VERSION`,读取源内安装器 `metadata.version`,两者必须一致;另记录统一修订日期、`git rev-parse HEAD` 与当前 ref,有未提交改动时明确标出;
+   - 当前加载的 `BOOTSTRAP_VERSION` 与取得的 `SOURCE_VERSION` 不同时同时报告;
    - 两种来源都不满足时停止。不得拿无来源、校验失败或半成品目录继续安装。
+7. 来源通过验证后,完整读取套件源的 `skills/project-consistency-installer/SKILL.md`;若它不是当前已加载文件,把取得版本视为后续行为正本,保留已经验证的来源与版本记录,从步骤 1 继续,不要再次运行步骤 0。
 
 ## 步骤 1 · 探测目标现状
 
@@ -63,6 +70,7 @@ git rev-parse --is-inside-work-tree 2>/dev/null
 git rev-parse -q --verify HEAD
 git rev-parse -q --verify refs/tags/synced
 git status --short 2>/dev/null
+cat 一致性机制/VERSION 2>/dev/null
 grep -hE '^(<!-- |# )一致性机制 version:' \
   .agents/skills/*/SKILL.md \
   .agents/skills/*/agents/openai.yaml \
@@ -70,11 +78,14 @@ grep -hE '^(<!-- |# )一致性机制 version:' \
   一致性机制/*.md \
   一致性机制/hooks/*.sh 2>/dev/null | sort -u
 ls -l README.md PROJECT.md AGENTS.md CLAUDE.md 2>/dev/null
+ls -l .claude/settings.json .codex/hooks.json .codex/config.toml 2>/dev/null
 test -L AGENTS.md && readlink AGENTS.md
 test -L CLAUDE.md && readlink CLAUDE.md
 ```
 
 另检查旧版 `.claude/commands/同步.md` 和仍含完整流程的 `catchup.md` / `wrapup.md`。
+
+把目标 `一致性机制/VERSION` 记为 `TARGET_VERSION`:不存在时标为“旧版或未标记”,不得从日期行反推 SemVer。`SOURCE_VERSION > TARGET_VERSION` 是升级,相等时仍检查实际 diff,`SOURCE_VERSION < TARGET_VERSION` 是降级请求,必须单独提示并再次确认;目标缺少版本时使用统一修订日期和实际内容规划迁移。
 
 完整读取现有 PROJECT、实体 AGENTS、实体 CLAUDE 与 README 的相关结构,建立内容归属表:
 
@@ -119,8 +130,10 @@ test -L CLAUDE.md && readlink CLAUDE.md
 │ .claude/commands/(catchup/wrapup)│ 新建或迁移为 Claude Code 薄适配器       │ …      │
 │ 旧版中文出向命令                 │ 对账定制后迁移并移除旧入口              │ …      │
 │ 一致性机制/(文档 + hooks)        │ 从套件新建或按版本更新                  │ …      │
+│ 一致性机制/VERSION               │ 全部机制件验证成功后最后写入             │ …      │
 │ 文件联动目录.md                  │ 从分发模板新建或逐条合并通用规则        │ …      │
 │ .claude/settings.json            │ 增量接线 Stop hook                     │ …      │
+│ .codex hooks                     │ 增量接线 Stop hook + 提示信任           │ …      │
 │ 项目自定中枢 / 领域规则          │ 扫描候选后询问                          │ …      │
 │ .gitignore / .gitattributes      │ 按项目二进制类型询问                    │ …      │
 │ synced tag                       │ 不存在时打在当前 HEAD                   │ …      │
@@ -175,6 +188,8 @@ test -L CLAUDE.md && readlink CLAUDE.md
 - `一致性机制/决策档案.md`(目标不存在时从 `templates/一致性机制/决策档案.md` 新建;已有归档绝不覆盖;不得复制套件根的实况档案);
 - `一致性机制/LICENSE.project-consistency-kit`(从套件根 LICENSE 新建,已有不覆盖)。
 
+`一致性机制/VERSION` 不参与内容合并,但只能在本轮用户批准的机制件全部写入并通过步骤 8 验证后,最后原样写入 `SOURCE_VERSION`。用户跳过任一必需升级、出现未解决冲突或验证失败时不得推进 VERSION;报告目标处于 mixed / pending 状态,避免把部分安装伪装成完整版本。
+
 旧版完整命令迁移规则:
 
 - 旧命令只是套件历史版本 → 安装 Skill 后替换为薄适配器;
@@ -200,6 +215,22 @@ test -L CLAUDE.md && readlink CLAUDE.md
 
 `.claude/settings.json` 已存在时只向 `hooks.Stop` 追加收尾提醒 entry;已有同类 entry 就跳过,不覆盖其他 hooks。
 
+Codex 本地客户端使用同一份 `一致性机制/hooks/收尾提醒.sh`,但接线必须先识别目标项目已有的 hook 表示:
+
+- `.codex/hooks.json` 与 `.codex/config.toml` 都不存在或后者没有 inline hooks → 从套件新建 `.codex/hooks.json`;
+- 已有 `.codex/hooks.json` → 只向 `hooks.Stop` 增量加入命令中包含 `一致性机制/hooks/收尾提醒.sh` 的 entry;已有同类 entry 就跳过,保留其他事件、matcher 与命令;
+- `.codex/config.toml` 已含 `[hooks]` 或 `[[hooks.` → 不再创建 `hooks.json`,避免同层两种表示并存警告;经用户确认后向现有 TOML 增量加入等价接线:
+  ```toml
+  [[hooks.Stop]]
+
+  [[hooks.Stop.hooks]]
+  type = "command"
+  command = 'bash "$(git rev-parse --show-toplevel)/一致性机制/hooks/收尾提醒.sh"'
+  timeout = 10
+  ```
+- 两种 Codex hook 表示已经并存 → 标为待整理,展示现状并由用户选择保留哪一种;不得继续制造重复 entry;
+- Codex 项目 hook 只覆盖本地客户端。写入后提醒用户在 Codex CLI 用 `/hooks` 审查并信任新配置;未信任或项目 `.codex/` 层未受信任时,hook 会被跳过。当前不生成 `commandWindows`,Windows 接线留待验证。
+
 ## 步骤 6 · 发现中枢、领域规则与二进制策略
 
 1. 扫描已跟踪文件、顶层与常见文档目录。
@@ -218,13 +249,16 @@ test -L CLAUDE.md && readlink CLAUDE.md
 
 ## 步骤 8 · 报告与验证
 
-报告套件源 URL、release/ref、source commit、来源类型,以及新建、合并、迁移、跳过、失败和待填项。至少验证:
+报告 `BOOTSTRAP_VERSION`、`SOURCE_VERSION`、安装前 `TARGET_VERSION`、安装后版本状态、统一修订日期、套件源 URL、release/ref、source commit、来源类型,以及新建、合并、迁移、跳过、失败和待填项。至少验证:
 
 - PROJECT 可独立说明背景、地图、阶段与近期决策;
 - AGENTS 是实体,CLAUDE 是正确相对链接且内容一致;
 - catchup / wrapup 两个仓库级 Skill 存在且通过 Skill 校验;
 - catchup 不重复读取 Agent 指令;
 - Claude 的 catchup / wrapup 文件只是薄适配器;
+- Claude Code 与 Codex 本地客户端的 Stop 配置都指向同一份收尾提醒脚本,且 Codex 没有重复的 JSON / TOML hook 表示;
+- Codex 新增或变化的项目 hook 已明确报告“待用户信任”或“已由用户信任”,不把配置存在误报为已经运行;
+- 完整安装时目标 `一致性机制/VERSION` 等于来源版本;部分安装或失败时 VERSION 未被错误推进;
 - README 不存在或完全改写时工作流仍可运行;
 - Part A 已登记项目真实中枢;
 - 用当前 Harness 的入口执行一次 catchup。
@@ -240,4 +274,6 @@ test -L CLAUDE.md && readlink CLAUDE.md
 - AGENTS 是唯一指令实体;CLAUDE 只做相对链接适配。
 - PROJECT 是项目事实与近期决策正本。
 - catchup / wrapup 以目标仓库 `.agents/skills/` 为行为正本。
+- 收尾提醒以 `一致性机制/hooks/收尾提醒.sh` 为共享逻辑正本;宿主配置只做接线。
+- `一致性机制/VERSION` 是正式套件版本正本;日期版本行只用于修订与混合版本检测。
 - 不擅自 `git init`、commit 或 push。

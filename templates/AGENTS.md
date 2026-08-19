@@ -9,9 +9,11 @@
 - **三层分离**:`README.md` 面向外部读者(可选),`PROJECT.md` 保存项目事实,`AGENTS.md` 保存 Agent 规则;三者不得互相代替。
 - **适配链接**:`CLAUDE.md` 只能是相对链接 `AGENTS.md`;不得维护第二份实体内容。
 - **工作流正本**:catchup / wrapup 行为只维护在 `.agents/skills/`;`.claude/commands/` 只做 Claude Code 入口适配,不得复制流程。
+- **宿主接线**:收尾提醒逻辑只维护在 `一致性机制/hooks/收尾提醒.sh`;`.claude/settings.json` 与 `.codex/hooks.json` 只做 Stop 事件接线,不得复制判断逻辑。
+- **套件身份**:`一致性机制/VERSION` 只表示最后一次完整安装成功的 Project Consistency Kit 正式版本;部分升级、冲突或验证失败时不得推进。
 - **重大决策**:必须在 `PROJECT.md`“关键决策记录”追加一行,操作性内容同步改写到对应正文。
 
-<!-- 一致性机制:同步纪律 begin (version: 2026-08-18) -->
+<!-- 一致性机制:同步纪律 begin (version: 2026-08-19) -->
 ## 同步纪律(git 驱动)
 
 事件源是 git,不手维护日志。配套 3 条纪律:

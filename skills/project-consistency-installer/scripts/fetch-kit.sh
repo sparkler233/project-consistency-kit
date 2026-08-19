@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-08-18
+# 一致性机制 version: 2026-08-19
 set -euo pipefail
 
 canonical_repository="https://github.com/sparkler233/project-consistency-kit.git"
@@ -12,6 +12,10 @@ tmp_dir=""
 validation_tmp=""
 validated_commit=""
 validated_ref=""
+validated_schema=""
+validated_version=""
+validated_revision=""
+validated_profile=""
 
 usage() {
   cat <<'EOF'
@@ -73,6 +77,25 @@ metadata_value() {
   printf '%s\n' "$value"
 }
 
+metadata_optional_value() {
+  local key="$1"
+  local file="$2"
+  local count
+  local value
+  count=$(awk -F= -v key="$key" '$1 == key { count++ } END { print count + 0 }' "$file")
+  if [ "$count" -gt 1 ]; then
+    printf 'metadata key appears more than once: %s\n' "$key" >&2
+    return 2
+  fi
+  [ "$count" -eq 1 ] || return 1
+  value=$(awk -F= -v key="$key" '$1 == key { print substr($0, length(key) + 2) }' "$file")
+  if [ -z "$value" ]; then
+    printf 'metadata value is empty: %s\n' "$key" >&2
+    return 2
+  fi
+  printf '%s\n' "$value"
+}
+
 validate_distribution() {
   local distribution_dir="$1"
   local manifest
@@ -80,6 +103,13 @@ validate_distribution() {
   local actual_files
   local listed_files
   local relative_path
+  local required_paths
+  local versioned_paths
+  local optional_version
+  local optional_revision
+  local optional_status
+  local version_field=0
+  local revision_field=0
 
   [ -d "$distribution_dir" ] || fail "distribution directory is missing: $distribution_dir"
   [ ! -L "$distribution_dir" ] || fail "refusing symlinked distribution: $distribution_dir"
@@ -113,7 +143,11 @@ validate_distribution() {
     checksum_verify DISTRIBUTION-MANIFEST.sha256
   ) >/dev/null
 
-  [ "$(metadata_value schema "$metadata")" = "1" ] || fail "unsupported metadata schema"
+  validated_schema=$(metadata_value schema "$metadata")
+  case "$validated_schema" in
+    1|2) ;;
+    *) fail "unsupported metadata schema: $validated_schema" ;;
+  esac
   [ "$(metadata_value source_repository "$metadata")" = "$canonical_repository" ] \
     || fail "distribution source repository mismatch"
   validated_commit=$(metadata_value source_commit "$metadata")
@@ -122,12 +156,57 @@ validate_distribution() {
   [[ "$validated_commit" =~ ^[0-9a-f]{40}$ ]] || fail "invalid source commit in metadata"
   [[ "$validated_ref" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "invalid source ref in metadata"
 
+  if [ "$validated_schema" = "2" ]; then
+    validated_version=$(metadata_value kit_version "$metadata")
+    validated_revision=$(metadata_value mechanism_revision "$metadata")
+    validated_profile="versioned"
+  else
+    if optional_version=$(metadata_optional_value kit_version "$metadata"); then
+      version_field=1
+    else
+      optional_status=$?
+      [ "$optional_status" -eq 1 ] || fail "invalid optional metadata key: kit_version"
+    fi
+    if optional_revision=$(metadata_optional_value mechanism_revision "$metadata"); then
+      revision_field=1
+    else
+      optional_status=$?
+      [ "$optional_status" -eq 1 ] || fail "invalid optional metadata key: mechanism_revision"
+    fi
+    [ "$version_field" -eq "$revision_field" ] \
+      || fail "schema 1 version metadata must include both kit_version and mechanism_revision"
+    if [ "$version_field" -eq 1 ]; then
+      validated_version="$optional_version"
+      validated_revision="$optional_revision"
+      validated_profile="versioned"
+    else
+      if [[ "$validated_ref" =~ ^v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$ ]]; then
+        validated_version="${BASH_REMATCH[1]}"
+      else
+        validated_version="legacy"
+      fi
+      validated_revision=$(sed -n 's/^<!-- 一致性机制 version: \([0-9][0-9-]*\) -->$/\1/p' \
+        "$distribution_dir/skills/project-consistency-installer/SKILL.md")
+      [[ "$validated_revision" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
+        || validated_revision="unknown"
+      validated_profile="legacy"
+    fi
+  fi
+
+  if [ "$validated_profile" = "versioned" ]; then
+    [[ "$validated_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
+      || fail "invalid kit version in metadata"
+    [[ "$validated_revision" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
+      || fail "invalid mechanism revision in metadata"
+  fi
+
   required_paths='skills/project-consistency-installer/SKILL.md
 skills/project-consistency-installer/scripts/fetch-kit.sh
 .agents/skills/catchup/SKILL.md
 .agents/skills/wrapup/SKILL.md
 .claude/commands/catchup.md
 .claude/commands/wrapup.md
+.claude/settings.json
 templates/PROJECT.md
 templates/AGENTS.md
 templates/一致性机制/文件联动目录.md
@@ -142,6 +221,33 @@ LICENSE'
   done <<EOF
 $required_paths
 EOF
+
+  if [ "$validated_profile" = "versioned" ]; then
+    versioned_paths='.codex/hooks.json
+一致性机制/VERSION'
+    while IFS= read -r relative_path; do
+      [ -f "$distribution_dir/$relative_path" ] \
+        || fail "versioned distribution is incomplete: missing $relative_path"
+    done <<EOF
+$versioned_paths
+EOF
+
+    packaged_version=$(tr -d '\r\n' < "$distribution_dir/一致性机制/VERSION")
+    [ "$packaged_version" = "$validated_version" ] \
+      || fail "packaged VERSION differs from metadata kit version"
+    installer_version=$(sed -n 's/^  version: "\([^"]*\)"$/\1/p' \
+      "$distribution_dir/skills/project-consistency-installer/SKILL.md")
+    [ "$installer_version" = "$validated_version" ] \
+      || fail "installer version differs from metadata kit version"
+    packaged_revision=$(sed -n 's/^<!-- 一致性机制 version: \([0-9][0-9-]*\) -->$/\1/p' \
+      "$distribution_dir/一致性机制/机制设计说明.md")
+    [ "$packaged_revision" = "$validated_revision" ] \
+      || fail "packaged revision differs from metadata mechanism revision"
+    if [[ "$validated_ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+      [ "$validated_ref" = "v$validated_version" ] \
+        || fail "release ref differs from metadata kit version"
+    fi
+  fi
 
   for relative_path in \
     PROJECT.md \
@@ -201,7 +307,8 @@ if [ -n "$verify_dir" ]; then
   [ "$offline" -eq 0 ] || fail "--verify-dir cannot be combined with --offline"
   case "$verify_dir" in /*) ;; *) fail "verification directory must be absolute" ;; esac
   validate_distribution "$verify_dir"
-  printf 'fetch-kit: source=%s release=%s commit=%s mode=local-verify\n' \
+  printf 'fetch-kit: kit_version=%s revision=%s schema=%s profile=%s source=%s release=%s commit=%s mode=local-verify\n' \
+    "$validated_version" "$validated_revision" "$validated_schema" "$validated_profile" \
     "$canonical_repository" "$validated_ref" "$validated_commit" >&2
   printf '%s\n' "$(cd "$verify_dir" && pwd)"
   exit 0
@@ -227,7 +334,8 @@ if [ "$offline" -eq 1 ]; then
   if [ "$release" != "latest" ] && [ "$validated_ref" != "$release" ]; then
     fail "offline release mismatch: requested $release, cached $validated_ref"
   fi
-  printf 'fetch-kit: source=%s release=%s commit=%s mode=offline\n' \
+  printf 'fetch-kit: kit_version=%s revision=%s schema=%s profile=%s source=%s release=%s commit=%s mode=offline\n' \
+    "$validated_version" "$validated_revision" "$validated_schema" "$validated_profile" \
     "$canonical_repository" "$validated_ref" "$validated_commit" >&2
   printf '%s\n' "$distribution_dir"
   exit 0
@@ -297,6 +405,7 @@ validate_distribution "$distribution_dir"
 if [ "$release" != "latest" ] && [ "$validated_ref" != "$release" ]; then
   fail "cached release mismatch after update: requested $release, cached $validated_ref"
 fi
-printf 'fetch-kit: source=%s release=%s commit=%s mode=release\n' \
+printf 'fetch-kit: kit_version=%s revision=%s schema=%s profile=%s source=%s release=%s commit=%s mode=release\n' \
+  "$validated_version" "$validated_revision" "$validated_schema" "$validated_profile" \
   "$canonical_repository" "$validated_ref" "$validated_commit" >&2
 printf '%s\n' "$distribution_dir"

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-08-18
+# 一致性机制 version: 2026-08-19
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source_root=$(cd "$script_dir/.." && pwd)
 whitelist="$source_root/distribution/manifest.txt"
+source_version_file="$source_root/一致性机制/VERSION"
 allow_dirty=0
 kit_dir=""
 
@@ -126,11 +127,26 @@ metadata="$kit_dir/DISTRIBUTION-METADATA.txt"
 [ "$(metadata_value schema "$metadata")" = "1" ] || fail "unsupported metadata schema"
 [ "$(metadata_value source_repository "$metadata")" = "https://github.com/sparkler233/project-consistency-kit.git" ] \
   || fail "unexpected source repository"
+kit_version=$(metadata_value kit_version "$metadata")
+mechanism_revision=$(metadata_value mechanism_revision "$metadata")
 source_commit=$(metadata_value source_commit "$metadata")
 source_ref=$(metadata_value source_ref "$metadata")
 dirty=$(metadata_value dirty "$metadata")
+[[ "$kit_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || fail "invalid kit version"
+[[ "$mechanism_revision" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || fail "invalid mechanism revision"
 [[ "$source_commit" =~ ^[0-9a-f]{40}$ ]] || fail "invalid source commit"
 [[ "$source_ref" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "invalid source ref"
+source_version=$(tr -d '\r\n' < "$source_version_file")
+packaged_version=$(tr -d '\r\n' < "$kit_dir/一致性机制/VERSION")
+[ "$kit_version" = "$source_version" ] || fail "metadata kit version differs from source VERSION"
+[ "$kit_version" = "$packaged_version" ] || fail "metadata kit version differs from packaged VERSION"
+installer_version=$(sed -n 's/^  version: "\([^"]*\)"$/\1/p' "$kit_dir/skills/project-consistency-installer/SKILL.md")
+[ "$installer_version" = "$kit_version" ] || fail "installer version differs from kit version"
+packaged_revision=$(sed -n 's/^<!-- 一致性机制 version: \([0-9][0-9-]*\) -->$/\1/p' "$kit_dir/一致性机制/机制设计说明.md")
+[ "$mechanism_revision" = "$packaged_revision" ] || fail "metadata mechanism revision differs from packaged files"
+if [[ "$source_ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+  [ "$source_ref" = "v$kit_version" ] || fail "release tag does not match kit version"
+fi
 case "$dirty" in
   false) ;;
   true) [ "$allow_dirty" -eq 1 ] || fail "dirty development build is not publishable" ;;
@@ -151,5 +167,6 @@ if grep -Eq '^- 20[0-9]{2}-' "$archive_template"; then
   fail "decision archive template contains project history"
 fi
 
-printf 'verify-distribution: source_ref=%s source_commit=%s files=%s\n' \
-  "$source_ref" "$source_commit" "$(wc -l < "$actual_files" | tr -d ' ')"
+printf 'verify-distribution: kit_version=%s revision=%s source_ref=%s source_commit=%s files=%s\n' \
+  "$kit_version" "$mechanism_revision" "$source_ref" "$source_commit" \
+  "$(wc -l < "$actual_files" | tr -d ' ')"

@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-08-18
+# 一致性机制 version: 2026-08-19
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source_root=$(cd "$script_dir/.." && pwd)
 whitelist="$source_root/distribution/manifest.txt"
+version_file="$source_root/一致性机制/VERSION"
+installer_skill="$source_root/skills/project-consistency-installer/SKILL.md"
+design_doc="$source_root/一致性机制/机制设计说明.md"
 output_dir=""
 source_ref=""
 allow_dirty=0
@@ -62,16 +65,45 @@ done
 case "$output_dir" in /*) ;; *) fail "output directory must be absolute" ;; esac
 [ "$output_dir" != "/" ] || fail "output directory must not be filesystem root"
 [ -f "$whitelist" ] || fail "distribution whitelist is missing: $whitelist"
+[ -f "$version_file" ] || fail "kit version file is missing: $version_file"
+[ -f "$installer_skill" ] || fail "installer skill is missing: $installer_skill"
+[ -f "$design_doc" ] || fail "mechanism design document is missing: $design_doc"
 duplicate_entry=$(awk 'NF && $1 !~ /^#/ { print }' "$whitelist" | LC_ALL=C sort | uniq -d)
 [ -z "$duplicate_entry" ] || fail "duplicate whitelist entry: $duplicate_entry"
 git -C "$source_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
   || fail "source root is not a Git repository"
+
+kit_version=$(tr -d '\r\n' < "$version_file")
+[[ "$kit_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
+  || fail "kit version is not valid SemVer: $kit_version"
+installer_version=$(sed -n 's/^  version: "\([^"]*\)"$/\1/p' "$installer_skill")
+[ -n "$installer_version" ] || fail "installer skill metadata.version is missing"
+[ "$installer_version" = "$kit_version" ] \
+  || fail "installer version $installer_version does not match kit version $kit_version"
+mechanism_revision=$(sed -n 's/^<!-- 一致性机制 version: \([0-9][0-9-]*\) -->$/\1/p' "$design_doc")
+[[ "$mechanism_revision" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
+  || fail "mechanism revision is missing or invalid"
+revision_values=$(
+  {
+    git -C "$source_root" grep -hE '^(<!-- |# )一致性机制 version: [0-9]{4}-[0-9]{2}-[0-9]{2}'
+    grep -hE '^<!-- 一致性机制:同步纪律 begin \(version: [0-9]{4}-[0-9]{2}-[0-9]{2}\) -->$' \
+      "$source_root/AGENTS.md" "$source_root/templates/AGENTS.md"
+  } | sed -E 's/.*version: ([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/' | LC_ALL=C sort -u
+)
+[ "$revision_values" = "$mechanism_revision" ] \
+  || fail "mechanism revision markers are inconsistent: $revision_values"
+grep -Fqx "## v$kit_version — $mechanism_revision" "$source_root/CHANGELOG.md" \
+  || fail "CHANGELOG is missing current version heading: v$kit_version — $mechanism_revision"
 
 source_commit=$(git -C "$source_root" rev-parse HEAD)
 if [ -z "$source_ref" ]; then
   source_ref=$(git -C "$source_root" describe --tags --exact-match 2>/dev/null || printf '%s' "$source_commit")
 fi
 [[ "$source_ref" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "source ref contains unsupported characters"
+if [[ "$source_ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+  [ "$source_ref" = "v$kit_version" ] \
+    || fail "release tag $source_ref does not match kit version v$kit_version"
+fi
 
 dirty_state=$(git -C "$source_root" status --porcelain --untracked-files=all)
 if [ -n "$dirty_state" ] && [ "$allow_dirty" -ne 1 ]; then
@@ -112,6 +144,8 @@ done < "$whitelist"
 
 printf '%s\n' \
   'schema=1' \
+  "kit_version=$kit_version" \
+  "mechanism_revision=$mechanism_revision" \
   'source_repository=https://github.com/sparkler233/project-consistency-kit.git' \
   "source_commit=$source_commit" \
   "source_ref=$source_ref" \
@@ -137,6 +171,7 @@ tar -C "$output_dir" -czf "$archive" project-consistency-kit
 archive_hash=$(checksum_value "$archive")
 printf '%s  %s\n' "$archive_hash" "$(basename "$archive")" > "$archive_checksum"
 
+printf 'build-distribution: kit_version=%s mechanism_revision=%s\n' "$kit_version" "$mechanism_revision"
 printf 'build-distribution: directory=%s\n' "$kit_dir"
 printf 'build-distribution: archive=%s\n' "$archive"
 printf 'build-distribution: checksum=%s\n' "$archive_checksum"

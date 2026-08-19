@@ -1,4 +1,4 @@
-# 一致性机制 version: 2026-08-18
+# 一致性机制 version: 2026-08-19
 interface:
   display_name: "Catch Up"
   short_description: "Restore project context from PROJECT.md and Git"

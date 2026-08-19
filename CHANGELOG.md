@@ -1,13 +1,23 @@
 # 项目一致性机制 · CHANGELOG
 
-> 套件版本 = 各机制文件头部的 `<!-- 一致性机制 version: YYYY-MM-DD -->` 行,套件级统一(设计说明决策 9)。
-> 任何机制文件发生真实变化:全部版本行一起 bump 到当天 + 在此记一节。
+> 正式套件版本以 `一致性机制/VERSION` 的 SemVer 为唯一正本;各机制文件头部的 `一致性机制 version: YYYY-MM-DD` 是统一修订日期(设计说明决策 9/24)。
+> 任何机制文件发生真实变化:判断 SemVer 影响、全部修订日期一起 bump 到当天,并在此记入对应版本。
 > 本文件**套件专属,不随模板进项目**(绿地 rsync 已排除;安装器也不拷它)。
 
-## 2026-08-18
+## v1.1.0 — 2026-08-19
+
+- **统一正式版本标识**(决策 24):新增 `一致性机制/VERSION` 作为套件唯一 SemVer 正本;安装器 Skill metadata、Git `v*` tag 与 versioned schema 1 分发元数据必须一致。原日期版本行保留为文件修订标识,不再承担对外产品版本职责。
+- **版本可见与双向兼容**:安装器会报告自身版本、待安装 Kit 版本、目标项目现有版本、修订日期与来源提交;分发继续使用可扩展的 schema 1 并增加可选版本字段,让 v1.0.0 旧安装器仍能接受 v1.1.0 latest,新版安装器也能识别 v1.0.0 legacy 包。
+- **Codex 本地 Stop hook**(决策 23):新增 `.codex/hooks.json`,与 Claude Code 的 `.claude/settings.json` 共同接入 `一致性机制/hooks/收尾提醒.sh`;共享脚本从 git 根定位项目并按宿主提示 `$wrapup` 或 `/wrapup`,仍只提醒、不自动续跑或修改项目。
+- **安装器增量接线**:安装器会探测 `.codex/hooks.json` 与 `.codex/config.toml` inline hooks,复用现有表示并保留其他配置;两种表示并存时交给用户收敛,新增或变化的 Codex 项目 hook 明确报告待信任状态。
+- **分发与文档对齐**:`.codex/hooks.json` 进入干净 Release 白名单和完整性检查;PROJECT、README、机制索引、设计说明、联动规则与绿地初始化补齐 Codex 本地 hook 边界,Windows `commandWindows` 与 Codex Cloud 仍不在本次范围。
+- **决策轮转**:新增决策 23 后,把最旧的决策 13 从 PROJECT 轮转到套件决策档案,PROJECT 继续保留最近 10 条。
+- 按决策 9 将全部机制版本行及根 / 模板 AGENTS 同步纪律版本推进至 2026-08-19。
+
+## v1.0.0 — 2026-08-18
 
 - **源码与发布面隔离**(决策 22):新增逐文件分发白名单、干净包构建/污染验证脚本和 `v*` 标签 GitHub Release 工作流;发布包携带来源元数据、内部逐文件 SHA-256 与外层压缩包校验,安装器默认获取干净 Release 而不是源码仓库。
-- **决策档案模板隔离**(决策 21):新增空白 `templates/一致性机制/决策档案.md`;安装器与绿地初始化不再复制套件历史。升级时已有档案默认整文件保留;只对已知泄漏的精确记录行提示确认清理,且同版本日期仍比较实际内容以接收同日热修。
+- **决策档案模板隔离**(决策 21):新增空白 `templates/一致性机制/决策档案.md`;安装器与绿地初始化不再复制套件历史。升级时已有档案默认整文件保留;只对已知泄漏的精确记录行提示确认清理,且同一修订日期仍比较实际内容以接收同日热修。
 - **跨 Harness 调用口径**(决策 20):安装器以“给这个项目引入一致性机制”作为统一的用户入口;`project-consistency-installer` 保留为稳定 Skill 标识,显式选择语法由 Harness 决定。
 - **skills.sh 安装器分发**(决策 19):新增 `skills/project-consistency-installer/` 作为机器级安装行为唯一正本,使用标准英文 Skill 标识与 `agents/openai.yaml`,可由 `npx skills add sparkler233/project-consistency-kit --skill project-consistency-installer --global` 安装。
 - **GitHub bootstrap**:安装器新增 `scripts/fetch-kit.sh`,在无本地套件时把规范 GitHub 仓库获取到机器缓存;验证 remote、干净工作区、ref、commit 与必要文件后才交给增量安装流程。

@@ -11,15 +11,15 @@
 
 ## 工作约定
 
-- **单一正本**:项目事实以 `PROJECT.md` 为准;公开说明以 `README.md` 为准;Agent 规则以本文件为准;catchup / wrapup 行为以 `.agents/skills/` 为准;安装行为以 `skills/project-consistency-installer/` 为准;分发白名单与构建行为以 `distribution/manifest.txt`、`scripts/` 和 `.github/workflows/distribution.yml` 为准;`.claude/commands/` 只做 Claude Code 入口适配;机制原理与决策理由以 `一致性机制/机制设计说明.md` 为准;版本变化以 `CHANGELOG.md` 为准。
+- **单一正本**:项目事实以 `PROJECT.md` 为准;公开说明以 `README.md` 为准;Agent 规则以本文件为准;正式套件版本以 `一致性机制/VERSION` 为准;catchup / wrapup 行为以 `.agents/skills/` 为准;安装行为以 `skills/project-consistency-installer/` 为准;收尾提醒逻辑以 `一致性机制/hooks/收尾提醒.sh` 为准;分发白名单与构建行为以 `distribution/manifest.txt`、`scripts/` 和 `.github/workflows/distribution.yml` 为准;`.claude/commands/` 只做 Claude Code 入口适配,`.claude/settings.json` 与 `.codex/hooks.json` 只做宿主 Stop 接线;机制原理与决策理由以 `一致性机制/机制设计说明.md` 为准;版本变化以 `CHANGELOG.md` 为准。
 - **三层分离**:`README.md` 面向 GitHub 用户,`PROJECT.md` 服务项目运行,`AGENTS.md` 服务 Agent harness;三者可以互相引用,不得互相代替。
 - **适配链接**:`CLAUDE.md` 只能是相对链接 `AGENTS.md`;不得维护第二份实体内容,不得建立循环链接或仓库外链接。
-- **机制发版纪律**:任何机制文件发生真实变化,统一推进全部版本行到当天,更新 `CHANGELOG.md`,并检查初始化、安装器、公开文档、模板和设计说明是否联动。
+- **机制发版纪律**:任何机制文件发生真实变化,先判断 SemVer 的 major / minor / patch 影响,同步 `一致性机制/VERSION` 与安装器 metadata,统一推进全部修订日期到当天,更新 `CHANGELOG.md`,并检查初始化、安装器、公开文档、模板和设计说明是否联动。
 - **架构修改**:先讨论设计取舍,再改实现;被推翻的决策在设计说明中保留演进线索。
 - **提交信息**:主题行简短说明“做了什么”,细节留正文;wrapup 只负责本地 commit 与 `synced` tag,不自动 push。
 - **重大决策**:必须在 `PROJECT.md`“关键决策记录”追加一行,操作性内容同步改写到对应正文或机制设计说明。
 
-<!-- 一致性机制:同步纪律 begin (version: 2026-08-18) -->
+<!-- 一致性机制:同步纪律 begin (version: 2026-08-19) -->
 ## 同步纪律(git 驱动)
 
 事件源是 git,不手维护日志。配套 3 条纪律:

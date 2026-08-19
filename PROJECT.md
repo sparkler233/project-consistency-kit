@@ -10,12 +10,12 @@
 | 主题 | 面向长期 AI Agent 协作的项目一致性机制 |
 | 目标 / 交付物 | 一套可分发、可升级的 Git 驱动工具包,让项目能跨会话恢复状态、检查文件联动并安全收尾 |
 | 相关方 | 项目维护者、使用套件的项目负责人及其 AI 协作者 |
-| 体量 / 规格 | 以 Markdown、Skill、Shell、Git 和宿主适配器为主;默认单机工作流;AGENTS 与仓库级 Skill 适配 Codex 及兼容 Harness,Claude Code 另有命令与 hook 适配层 |
+| 体量 / 规格 | 以 Markdown、Skill、Shell、Git 和宿主适配器为主;默认单机工作流;AGENTS 与仓库级 Skill 适配 Codex 及兼容 Harness,Claude Code 与 Codex 本地客户端各有 hook 适配层 |
 | 创作模式 | AI 负责实现、验证与维护建议;项目负责人决定架构、发布与对外动作 |
 
 ## 二、工作流程与里程碑
 
-问题或实战反馈 → 设计讨论与拍板 → 修改机制件及联动文档 → 构建并验证干净分发包 → 统一版本行并更新 CHANGELOG → wrapup 检查 → 本地提交并推进 `synced` → 按需推送远端 / 推送版本标签发布 Release。
+问题或实战反馈 → 设计讨论与拍板 → 修改机制件及联动文档 → 判断 SemVer 并统一修订日期 → 构建验证干净分发包与版本身份 → 更新 CHANGELOG → wrapup 检查 → 本地提交并推进 `synced` → 按需推送远端 / 推送匹配 VERSION 的标签发布 Release。
 
 1. **机制成型**:Git 事件源、catchup、wrapup、联动目录与二进制策略。
 2. **可靠性加固**:独立 `synced` horizon、Stop hook、决策轮转和版本治理。
@@ -33,10 +33,12 @@
 | `README.md` | GitHub 对外主页,不承担运行时项目地图职责 |
 | `.agents/skills/` | catchup / wrapup 的跨 Harness 行为正本与 Codex 仓库级入口 |
 | `skills/project-consistency-installer/` | skills.sh 可发现的机器级安装器行为正本与 GitHub 获取脚本 |
-| `.claude/commands/` | Claude Code 的 `/catchup`、`/wrapup` 与 `/引入一致性机制` 薄适配器 |
+| `.claude/` | Claude Code 的命令薄适配器与 Stop hook 接线 |
+| `.codex/hooks.json` | Codex 本地客户端的 Stop hook 接线 |
 | `.github/workflows/distribution.yml` | 验证每次源码变更,在 `v*` 标签上发布干净 GitHub Release |
 | `distribution/manifest.txt` | 干净分发包逐文件白名单 |
 | `scripts/` | 构建、验证分发包并阻断套件自举状态泄漏 |
+| `一致性机制/VERSION` | 套件唯一正式 SemVer 正本;Release tag 与分发元数据必须和它一致 |
 | `一致性机制/` | 套件自身使用的机制索引、设计说明、真实联动规则、决策档案与 hook |
 | `templates/` | 分发给新项目的 `PROJECT.md`、`AGENTS.md`、联动规则与空白决策档案骨架 |
 | `初始化新项目.md` | 绿地项目接入指南 |
@@ -45,14 +47,12 @@
 
 ## 四、当前阶段
 
-公开版本已具备入向、出向、安装、升级、文档与干净发布体系。2026-08-18 已完成三层文件模型、跨 Harness 工作流、安装器分发与发布面收敛:catchup / wrapup 作为仓库级 Skill 随项目运行,`project-consistency-installer` 作为机器级 Skill 通过 skills.sh 分发并按需获取校验后的 GitHub Release,源码仓库自身的 PROJECT / AGENTS / 决策历史不进入发布包。
+公开版本已具备入向、出向、安装、升级、文档与干净发布体系。2026-08-19 的 v1.1.0 工作集同时补齐跨 Harness 收尾提醒与正式版本身份:Claude Code / Codex 本地客户端通过宿主配置接入同一 Stop hook;安装器以 VERSION、修订日期、ref 与 commit 报告升级来源,并继续从校验后的 GitHub Release 增量写入通用机制件。源码仓库自身的 PROJECT / AGENTS / 决策历史不进入发布包。
 
 ## 五、关键决策记录
 
 > 本节只留最近 ~10 条;超限时 wrapup 把最老条目轮转到 `一致性机制/决策档案.md`。更早的架构取舍及完整理由见 `一致性机制/机制设计说明.md`。
 
-- 2026-08-17:套件公开主页与新项目 README 模板分离(决策 13)
-- 2026-08-18:套件自身 CLAUDE 项目大脑与新项目 CLAUDE 模板分离(决策 14;同日被决策 15 扩展取代)
 - 2026-08-18:运行事实、公开展示与 Agent 指令三层分离;AGENTS 为正本、CLAUDE 为相对链接(决策 15)
 - 2026-08-18:套件真实联动规则与新项目分发骨架分离(决策 16)
 - 2026-08-18:出向命令统一命名为 `/wrapup`,与 `/catchup` 形成入向 / 出向配对(决策 17)
@@ -61,3 +61,5 @@
 - 2026-08-18:安装器以自然语言意图作为跨 Harness 统一入口,显式 Skill 或斜杠语法归宿主适配层(决策 20)
 - 2026-08-18:决策档案拆分为套件实况与空白模板;安装不得复制套件历史,旧泄漏只按精确行确认清理(决策 21)
 - 2026-08-18:源码仓库保留自举状态,分发改由白名单生成并校验的干净 GitHub Release 承担(决策 22)
+- 2026-08-19:收尾提醒采用共享脚本 + 宿主接线;Claude Code 与 Codex 本地客户端分别通过 Stop hook 接入,只提醒不自动 wrapup(决策 23)
+- 2026-08-19:套件以 `一致性机制/VERSION` 的 SemVer 为唯一正式版本,日期版本行降为文件修订标识,Git tag 与向后兼容扩展的 schema 1 分发元数据受一致性门禁约束(决策 24)

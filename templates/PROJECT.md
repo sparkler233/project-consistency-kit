@@ -26,6 +26,8 @@
 | `CLAUDE.md` | 指向 `AGENTS.md` 的 Claude Code 适配链接 |
 | `.agents/skills/` | catchup / wrapup 跨 Harness 工作流正本 |
 | `.claude/` | Claude Code 斜杠命令适配与 hook 接线 |
+| `.codex/hooks.json` | Codex 本地 Stop hook 接线 |
+| `一致性机制/VERSION` | 当前完整安装的 Project Consistency Kit 正式版本 |
 | `一致性机制/` | 联动规则、机制说明、决策档案与收尾提醒 |
 | 〔你的目录〕 | 〔正文、代码、素材或产物,请按项目补充〕 |
 
