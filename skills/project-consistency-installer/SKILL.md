@@ -2,7 +2,7 @@
 name: project-consistency-installer
 description: Fetch Project Consistency Kit from a trusted local source or its verified clean GitHub Release, then safely integrate or upgrade PROJECT.md, AGENTS.md, the CLAUDE.md adapter, catchup and wrapup repository Skills, linkage rules, and hooks without silently overwriting project content. Use when the user asks to install, introduce, bootstrap, migrate, or update the consistency mechanism in the current repository.
 metadata:
-  version: "1.2.0"
+  version: "1.2.1"
 ---
 
 <!-- 一致性机制 version: 2026-08-19 -->

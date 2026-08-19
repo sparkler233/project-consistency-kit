@@ -128,6 +128,9 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 while IFS= read -r relative_path; do
+  # Git for Windows may check the whitelist out with CRLF. Normalize the
+  # record boundary before treating it as a repository-relative path.
+  relative_path=${relative_path%$'\r'}
   case "$relative_path" in
     ''|'#'*) continue ;;
     /*|../*|*/../*|*/..|.|-*) fail "unsafe whitelist entry: $relative_path" ;;

@@ -90,6 +90,8 @@ actual_files="$tmp_dir/actual-files.txt"
 listed_checksums="$tmp_dir/listed-checksums.txt"
 
 while IFS= read -r relative_path; do
+  # Accept a CRLF worktree copy produced by Git for Windows.
+  relative_path=${relative_path%$'\r'}
   case "$relative_path" in
     ''|'#'*) continue ;;
     /*|../*|*/../*|*/..|.|-*) fail "unsafe whitelist entry: $relative_path" ;;

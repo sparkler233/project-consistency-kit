@@ -4,6 +4,12 @@
 > 任何机制文件发生真实变化:判断 SemVer 影响、全部修订日期一起 bump 到当天,并在此记入对应版本。
 > 本文件**套件专属,不随模板进项目**(绿地 rsync 已排除;安装器也不拷它)。
 
+## v1.2.1 — 2026-08-19
+
+- **Windows CI 构建修复**:构建与校验脚本在读取 `distribution/manifest.txt` 时显式剥离 CRLF 的 `\r`,兼容 Git for Windows `core.autocrlf=true` 的源码 checkout;不改变白名单内容、分发格式或目标项目换行策略。
+- **发布纠偏**:`v1.2.0` 的 Linux 验证通过,但 Windows 源码构建因上述行尾问题失败,因此没有生成 GitHub Release;不移动已公开标签,以补丁版本 v1.2.1 重新发布。安装器 metadata 与 VERSION 同步推进到 1.2.1。
+- 全部机制修订标识保持在 2026-08-19;同日补丁由 SemVer、实际 diff 与 source commit 区分。
+
 ## v1.2.0 — 2026-08-19
 
 - **Windows 指令适配**(决策 25):`CLAUDE.md` 从相对 symlink 统一迁为只含 `@AGENTS.md` 的普通文件;它使用 Claude Code 官方项目内导入,继续让 AGENTS 保持唯一规则正本,并消除 Windows Developer Mode / 管理员权限与 Git symlink checkout 差异。

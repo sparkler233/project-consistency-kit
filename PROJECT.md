@@ -48,7 +48,7 @@
 
 ## 四、当前阶段
 
-公开版本已具备入向、出向、安装、升级、文档与干净发布体系。当前 v1.2.0 工作集正在补齐原生 Windows:CLAUDE 改用官方 `@AGENTS.md` 导入,Stop 判断迁到跨平台 Node 正本,Codex 增加 `commandWindows`,安装器增加 PowerShell 入口,CI 增加 Windows 回归并升级 checkout v6。真实 Windows 已通过安装、状态机与 `commandWindows` 命令直测;Codex 0.148.0 的宿主触发仍受上游 Windows hook 缺陷影响,Claude Code 宿主测试受测试机账户状态阻断。GitHub CI 尚待提交后运行,所以本阶段仍标为验证中。源码仓库自身的 PROJECT / AGENTS / 决策历史不进入发布包。
+公开版本已具备入向、出向、安装、升级、文档与干净发布体系。v1.2.0 已补齐原生 Windows 适配,但正式标签的 Windows CI 暴露 `core.autocrlf=true` 让分发白名单路径携带 `\r` 的源码构建缺陷,Release 未生成。当前 v1.2.1 工作集在构建 / 校验读取边界兼容 CRLF,保持安装器 metadata、VERSION 与新标签锁步;真实 Windows 已通过安装、状态机与 `commandWindows` 命令直测,Codex 0.148.0 的宿主触发仍受上游 Windows hook 缺陷影响,Claude Code 宿主测试受测试机账户状态阻断。v1.2.1 GitHub CI 与 Release 通过前,本阶段仍标为验证中。源码仓库自身的 PROJECT / AGENTS / 决策历史不进入发布包。
 
 ## 五、关键决策记录
 
