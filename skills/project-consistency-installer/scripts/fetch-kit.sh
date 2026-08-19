@@ -96,6 +96,16 @@ metadata_optional_value() {
   printf '%s\n' "$value"
 }
 
+version_at_least_1_2() {
+  local version_core="${1%%-*}"
+  local major minor patch
+  IFS=. read -r major minor patch <<EOF
+$version_core
+EOF
+  [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ && "$patch" =~ ^[0-9]+$ ]] || return 1
+  [ "$major" -gt 1 ] || { [ "$major" -eq 1 ] && [ "$minor" -ge 2 ]; }
+}
+
 validate_distribution() {
   local distribution_dir="$1"
   local manifest
@@ -246,6 +256,15 @@ EOF
     if [[ "$validated_ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
       [ "$validated_ref" = "v$validated_version" ] \
         || fail "release ref differs from metadata kit version"
+    fi
+
+    if version_at_least_1_2 "$validated_version"; then
+      for relative_path in \
+        skills/project-consistency-installer/scripts/fetch-kit.ps1 \
+        .agents/hooks/wrapup-reminder.mjs; do
+        [ -f "$distribution_dir/$relative_path" ] \
+          || fail "v1.2+ distribution is incomplete: missing $relative_path"
+      done
     fi
   fi
 

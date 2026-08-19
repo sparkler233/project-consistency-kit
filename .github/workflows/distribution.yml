@@ -20,7 +20,9 @@ jobs:
       contents: read
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+      - name: Test cross-platform Stop hook
+        run: node scripts/test-stop-hook.mjs
       - name: Build and verify
         env:
           SOURCE_REF: ${{ github.ref_name }}
@@ -29,16 +31,43 @@ jobs:
             --output-dir "$RUNNER_TEMP/project-consistency-release" \
             --source-ref "$SOURCE_REF"
 
+  validate-windows:
+    name: Validate Windows adapters
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+      - name: Test cross-platform Stop hook
+        run: node scripts/test-stop-hook.mjs
+      - name: Validate Windows adapters and clean distribution
+        shell: powershell
+        env:
+          SOURCE_REF: ${{ github.ref_name }}
+        run: |
+          if ((Get-Content -LiteralPath .\CLAUDE.md -Raw).Trim() -ne '@AGENTS.md') {
+            throw 'CLAUDE.md is not the cross-platform AGENTS import adapter'
+          }
+          $bash = Join-Path $env:ProgramFiles 'Git\bin\bash.exe'
+          if (-not (Test-Path -LiteralPath $bash)) { throw 'Git Bash is missing' }
+          $outputDir = Join-Path $env:RUNNER_TEMP 'project-consistency-release'
+          $outputDirBash = & $bash -lc 'cygpath -u -- "$1"' -- $outputDir
+          & $bash scripts/build-distribution.sh --output-dir $outputDirBash --source-ref $env:SOURCE_REF
+          if ($LASTEXITCODE -ne 0) { throw 'Windows distribution build failed' }
+          & .\scripts\test-windows-adapters.ps1 `
+            -KitDir (Join-Path $outputDir 'project-consistency-kit')
+
   release:
     name: Publish GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: validate
+    needs: [validate, validate-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Check out release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Build clean release assets
         env:
           SOURCE_REF: ${{ github.ref_name }}

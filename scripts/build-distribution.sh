@@ -167,7 +167,10 @@ if [ "$allow_dirty" -eq 1 ]; then verify_args+=(--allow-dirty); fi
 "$script_dir/verify-distribution.sh" "${verify_args[@]}" "$stage"
 
 mv "$stage" "$kit_dir"
-tar -C "$output_dir" -czf "$archive" project-consistency-kit
+# macOS bsdtar otherwise serializes extended attributes as AppleDouble `._*`
+# entries. They become real unverified files when the archive is extracted on
+# Windows, so disable copyfile metadata for a portable release artifact.
+COPYFILE_DISABLE=1 tar -C "$output_dir" -czf "$archive" project-consistency-kit
 archive_hash=$(checksum_value "$archive")
 printf '%s  %s\n' "$archive_hash" "$(basename "$archive")" > "$archive_checksum"
 

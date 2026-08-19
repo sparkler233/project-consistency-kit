@@ -15,7 +15,7 @@ description: Close a Project Consistency Kit work cycle by recovering current-se
 - 不是 git repo(`git rev-parse --is-inside-work-tree` 失败)→ 提示「项目未纳入 git,一致性机制无法运行」并退出。
 - `一致性机制/文件联动目录.md` 不存在 → 提示「联动目录未建立」并退出。
 - `PROJECT.md` 不存在 → 提示「项目仍是旧版文件模型,请先告诉 Agent“给这个项目引入一致性机制”;也可使用当前 Harness 的显式安装器入口」并退出;不要把决策重新写回 README 或 Agent 指令文件。
-- 检查 `AGENTS.md` 是实体文件、`CLAUDE.md` 是相对链接 `AGENTS.md`;异常计入步骤 4 联动计划,不通过重复维护两份内容来补救。
+- 检查 `AGENTS.md` 是实体文件、`CLAUDE.md` 是只含 `@AGENTS.md` 的普通文件导入适配器;异常计入步骤 4 联动计划,不通过重复维护两份内容来补救。
 
 ## 步骤 1 · B 类事件 safety net
 
@@ -69,7 +69,7 @@ git 只看得见文件改动。**决策、对外对接、口头约定**这类事
 │ 目标文件                      │ 改动                      │ 状态   │
 ├──────────────────────────────┼──────────────────────────┼────────┤
 │ PROJECT.md                    │ +决策记录 1 行(X)        │ 待确认 │
-│ CLAUDE.md                     │ 修复为 → AGENTS.md 链接   │ 待确认 │
+│ CLAUDE.md                     │ 修复为 @AGENTS.md 导入    │ 待确认 │
 │ <某目录>/_manifest.md         │ +2 条新条目               │ 待确认 │
 └──────────────────────────────┴──────────────────────────┴────────┘
 

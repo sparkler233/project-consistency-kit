@@ -23,12 +23,13 @@
 |------|------|
 | `PROJECT.md` | 项目背景、流程、地图、阶段与近期决策(本文件) |
 | `AGENTS.md` | Agent 工作规则与同步纪律正本 |
-| `CLAUDE.md` | 指向 `AGENTS.md` 的 Claude Code 适配链接 |
+| `CLAUDE.md` | 只含 `@AGENTS.md` 的 Claude Code 导入适配器 |
 | `.agents/skills/` | catchup / wrapup 跨 Harness 工作流正本 |
+| `.agents/hooks/` | 跨平台 Stop hook 逻辑正本 |
 | `.claude/` | Claude Code 斜杠命令适配与 hook 接线 |
 | `.codex/hooks.json` | Codex 本地 Stop hook 接线 |
 | `一致性机制/VERSION` | 当前完整安装的 Project Consistency Kit 正式版本 |
-| `一致性机制/` | 联动规则、机制说明、决策档案与收尾提醒 |
+| `一致性机制/` | 联动规则、机制说明、决策档案与旧 hook 兼容包装 |
 | 〔你的目录〕 | 〔正文、代码、素材或产物,请按项目补充〕 |
 
 ## 四、当前阶段

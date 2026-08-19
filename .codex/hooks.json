@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$(git rev-parse --show-toplevel)/一致性机制/hooks/收尾提醒.sh\"",
+            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/wrapup-reminder.mjs\"",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -Command \"& { $root = (git rev-parse --show-toplevel).Trim(); node (Join-Path $root '.agents/hooks/wrapup-reminder.mjs') }\"",
             "timeout": 10
           }
         ]

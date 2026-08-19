@@ -4,6 +4,17 @@
 > 任何机制文件发生真实变化:判断 SemVer 影响、全部修订日期一起 bump 到当天,并在此记入对应版本。
 > 本文件**套件专属,不随模板进项目**(绿地 rsync 已排除;安装器也不拷它)。
 
+## v1.2.0 — 2026-08-19
+
+- **Windows 指令适配**(决策 25):`CLAUDE.md` 从相对 symlink 统一迁为只含 `@AGENTS.md` 的普通文件;它使用 Claude Code 官方项目内导入,继续让 AGENTS 保持唯一规则正本,并消除 Windows Developer Mode / 管理员权限与 Git symlink checkout 差异。
+- **跨平台 Stop hook**:提醒判断迁入全 ASCII 固定路径 `.agents/hooks/wrapup-reminder.mjs`;Claude Code 改用无 shell 的 `command + args`,Codex 增加 `commandWindows` PowerShell 接线;原 `.sh` 只保留为 v1.1 旧接线兼容包装。ASCII 路径同时规避 Windows PowerShell 5.1 / shell 代码页导致的静默路径失真。
+- **Windows 安装入口**:新增 `fetch-kit.ps1`,自动从 Git 安装位置发现 Git for Windows 自带的 Bash、转换 Windows / Git Bash 路径并复用 `fetch-kit.sh` 的下载与校验正本,不复制安全逻辑。
+- **跨系统压缩包可移植性**:构建脚本禁止 macOS `tar` 写入 AppleDouble `._*` 扩展属性条目,避免候选包在 Windows 解压后出现未纳入校验清单的伪文件;PowerShell 包装器在失败时保留底层校验 diff。
+- **双层 Windows 验证**:新增跨平台 Stop 状态机测试和 `windows-latest` CI job,覆盖 CLAUDE 导入形态、Codex `commandWindows`、Windows 构建与 PowerShell 本地分发验证;真实 Windows 10 + PowerShell 5.1 + Git for Windows 已通过安装、状态机和命令适配器直测。Codex 0.148.0 宿主仍受上游 Windows hook 触发缺陷影响;Claude Code 宿主端到端测试受测试账户状态阻断,不把两者误报为套件已端到端通过。
+- **Node 20 弃用提醒清理**:GitHub Actions 的 `actions/checkout` 从 v4 升至 v6,使用当前 Node 24 action runtime;Release job 同时依赖 Linux 与 Windows 验证通过。
+- **版本与分发联动**:正式版本推进到 v1.2.0;新增 Node hook、PowerShell 获取入口和跨平台测试,更新白名单、安装器、catchup / wrapup、模板、初始化指南、公开说明与机制设计。
+- 全部机制修订标识保持在 2026-08-19;同日版本变化由 SemVer、实际 diff 与 source commit 区分。
+
 ## v1.1.0 — 2026-08-19
 
 - **统一正式版本标识**(决策 24):新增 `一致性机制/VERSION` 作为套件唯一 SemVer 正本;安装器 Skill metadata、Git `v*` tag 与 versioned schema 1 分发元数据必须一致。原日期版本行保留为文件修订标识,不再承担对外产品版本职责。

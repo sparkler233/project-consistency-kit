@@ -10,7 +10,7 @@
 | 主题 | 面向长期 AI Agent 协作的项目一致性机制 |
 | 目标 / 交付物 | 一套可分发、可升级的 Git 驱动工具包,让项目能跨会话恢复状态、检查文件联动并安全收尾 |
 | 相关方 | 项目维护者、使用套件的项目负责人及其 AI 协作者 |
-| 体量 / 规格 | 以 Markdown、Skill、Shell、Git 和宿主适配器为主;默认单机工作流;AGENTS 与仓库级 Skill 适配 Codex 及兼容 Harness,Claude Code 与 Codex 本地客户端各有 hook 适配层 |
+| 体量 / 规格 | 以 Markdown、Skill、Node、Shell/PowerShell、Git 和宿主适配器为主;默认单机工作流;AGENTS 与仓库级 Skill 适配 Codex 及兼容 Harness,Claude Code 与 Codex 本地客户端各有跨平台 hook 适配层 |
 | 创作模式 | AI 负责实现、验证与维护建议;项目负责人决定架构、发布与对外动作 |
 
 ## 二、工作流程与里程碑
@@ -29,13 +29,14 @@
 |------|------|
 | `PROJECT.md` | 套件自身的背景、流程、地图、阶段与近期决策(本文件) |
 | `AGENTS.md` | Agent 工作规则与同步纪律的唯一实体正本 |
-| `CLAUDE.md` | 指向 `AGENTS.md` 的 Claude Code 适配链接 |
+| `CLAUDE.md` | 只含 `@AGENTS.md` 的 Claude Code 跨平台导入适配器 |
 | `README.md` | GitHub 对外主页,不承担运行时项目地图职责 |
 | `.agents/skills/` | catchup / wrapup 的跨 Harness 行为正本与 Codex 仓库级入口 |
+| `.agents/hooks/` | 全 ASCII 固定路径的跨平台 Stop hook 逻辑正本 |
 | `skills/project-consistency-installer/` | skills.sh 可发现的机器级安装器行为正本与 GitHub 获取脚本 |
 | `.claude/` | Claude Code 的命令薄适配器与 Stop hook 接线 |
 | `.codex/hooks.json` | Codex 本地客户端的 Stop hook 接线 |
-| `.github/workflows/distribution.yml` | 验证每次源码变更,在 `v*` 标签上发布干净 GitHub Release |
+| `.github/workflows/distribution.yml` | 在 Linux / Windows 验证每次源码变更,在 `v*` 标签上发布干净 GitHub Release |
 | `distribution/manifest.txt` | 干净分发包逐文件白名单 |
 | `scripts/` | 构建、验证分发包并阻断套件自举状态泄漏 |
 | `一致性机制/VERSION` | 套件唯一正式 SemVer 正本;Release tag 与分发元数据必须和它一致 |
@@ -47,13 +48,12 @@
 
 ## 四、当前阶段
 
-公开版本已具备入向、出向、安装、升级、文档与干净发布体系。2026-08-19 的 v1.1.0 工作集同时补齐跨 Harness 收尾提醒与正式版本身份:Claude Code / Codex 本地客户端通过宿主配置接入同一 Stop hook;安装器以 VERSION、修订日期、ref 与 commit 报告升级来源,并继续从校验后的 GitHub Release 增量写入通用机制件。源码仓库自身的 PROJECT / AGENTS / 决策历史不进入发布包。
+公开版本已具备入向、出向、安装、升级、文档与干净发布体系。当前 v1.2.0 工作集正在补齐原生 Windows:CLAUDE 改用官方 `@AGENTS.md` 导入,Stop 判断迁到跨平台 Node 正本,Codex 增加 `commandWindows`,安装器增加 PowerShell 入口,CI 增加 Windows 回归并升级 checkout v6。真实 Windows 已通过安装、状态机与 `commandWindows` 命令直测;Codex 0.148.0 的宿主触发仍受上游 Windows hook 缺陷影响,Claude Code 宿主测试受测试机账户状态阻断。GitHub CI 尚待提交后运行,所以本阶段仍标为验证中。源码仓库自身的 PROJECT / AGENTS / 决策历史不进入发布包。
 
 ## 五、关键决策记录
 
 > 本节只留最近 ~10 条;超限时 wrapup 把最老条目轮转到 `一致性机制/决策档案.md`。更早的架构取舍及完整理由见 `一致性机制/机制设计说明.md`。
 
-- 2026-08-18:运行事实、公开展示与 Agent 指令三层分离;AGENTS 为正本、CLAUDE 为相对链接(决策 15)
 - 2026-08-18:套件真实联动规则与新项目分发骨架分离(决策 16)
 - 2026-08-18:出向命令统一命名为 `/wrapup`,与 `/catchup` 形成入向 / 出向配对(决策 17)
 - 2026-08-18:catchup / wrapup 行为正本迁入仓库级 Skill,Claude Code 斜杠命令降为适配器(决策 18)
@@ -63,3 +63,4 @@
 - 2026-08-18:源码仓库保留自举状态,分发改由白名单生成并校验的干净 GitHub Release 承担(决策 22)
 - 2026-08-19:收尾提醒采用共享脚本 + 宿主接线;Claude Code 与 Codex 本地客户端分别通过 Stop hook 接入,只提醒不自动 wrapup(决策 23)
 - 2026-08-19:套件以 `一致性机制/VERSION` 的 SemVer 为唯一正式版本,日期版本行降为文件修订标识,Git tag 与向后兼容扩展的 schema 1 分发元数据受一致性门禁约束(决策 24)
+- 2026-08-19:Windows 采用 `@AGENTS.md` 通用适配、跨平台 Node hook、PowerShell 安装入口与真实 Windows / CI 双重验证(决策 25)

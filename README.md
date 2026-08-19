@@ -36,19 +36,19 @@ catchup 只读取和汇报，不修改文件。wrapup 会先展示联动计划�
 
 - **跨会话恢复**：Agent harness 自动加载 `AGENTS.md` / `CLAUDE.md` 工作规则，仓库级 catchup Skill 再结合 `PROJECT.md`、中枢文档、Git 历史和未提交文件恢复状态。
 - **跨 Harness 工作流**：catchup / wrapup 的唯一行为正本位于 `.agents/skills/`；Codex 直接发现，Claude Code 通过薄斜杠命令适配。
-- **职责分离**：`PROJECT.md` 保存运行事实，`AGENTS.md` 是 Agent 指令源本，`CLAUDE.md` 仅作为相对链接适配层。
+- **职责分离**：`PROJECT.md` 保存运行事实，`AGENTS.md` 是 Agent 指令正本，`CLAUDE.md` 只用 `@AGENTS.md` 导入同一内容。
 - **同步边界**：用独立的 `synced` 标签记录上次完成联动检查的位置，手工提交过但尚未同步的改动也不会被跳过。
 - **文件联动检查**：在 `一致性机制/文件联动目录.md` 中声明中枢文档和项目规则，改动发生后检查相关说明、决策记录和素材清单是否需要更新。
 - **对话决策落盘**：收尾时回看当前会话，将尚未进入文件的决策、约定和对接结果列给用户确认。
 - **可引导安装**：全局 `project-consistency-installer` Skill 可由 skills.sh 从 GitHub 安装；运行时自动获取套件源、扫描现有 PROJECT / AGENTS / CLAUDE / README，再经确认增量引入。
 - **干净发布面**：源码仓库可以继续用本机制维护自己；`v*` 标签生成的 Release 只包含逐文件白名单批准的通用产品，并携带来源与 SHA-256 校验。
 - **统一版本身份**：`一致性机制/VERSION` 保存唯一正式 SemVer；安装器会同时报告来源 Kit 版本、目标项目版本、修订日期与精确提交。
-- **收尾提醒**：Claude Code 与 Codex 本地客户端通过各自的 Stop 配置调用同一脚本；检测到未同步改动时提醒一次，不自动修改、提交或推送。
+- **跨平台收尾提醒**：Claude Code 与 Codex 本地客户端通过各自的 Stop 配置调用同一 Node 脚本；提醒逻辑支持 macOS、Linux 与原生 Windows，检测到未同步改动时只提醒一次，不自动修改、提交或推送。
 - **二进制资产治理**：可选用 Git LFS 管理栅格图，用 `_manifest.md` 记录设计源、字体和媒体素材的用途、来源与授权信息。
 
 ## 快速开始
 
-支持 Codex、Claude Code 及兼容 `AGENTS.md` / Agent Skills 的 Harness，需要本机安装 Git 和 Node.js；Release 获取与校验还需要 `curl`、`tar` 以及 `sha256sum` 或 `shasum`。
+支持 Codex、Claude Code 及兼容 `AGENTS.md` / Agent Skills 的 Harness，需要本机安装 Git 和 Node.js。macOS / Linux 的 Release 获取与校验还需要 `curl`、`tar` 以及 `sha256sum` 或 `shasum`；原生 Windows 使用 Git for Windows 自带的 Bash 复用同一校验链路。
 
 ### 接入已有项目
 
@@ -66,7 +66,7 @@ CLI 会自动检测可用的 Harness，必要时让你选择；也可以用 `--a
 
 支持显式 Skill 调用的 Harness，也可以通过各自的 Skill 选择方式调用 `project-consistency-installer`。具体入口由 Harness 决定。
 
-安装器会优先使用用户明确提供的本地套件；找不到时，下载最新的干净 GitHub Release 到机器缓存，验证外层压缩包、内部逐文件清单、正式版本、修订日期、规范来源和 source commit 后再展示项目迁移计划。计划会区分升级、同版核对、降级与未标记旧版；只有全部机制件验证成功才最后推进目标项目的 VERSION。下载阶段不修改目标项目，写入仍需单独确认。Codex 项目 hook 写入后还需要用户审查并信任；Codex CLI 可用 `/hooks` 查看状态。
+安装器会优先使用用户明确提供的本地套件；找不到时，下载最新的干净 GitHub Release 到机器缓存，验证外层压缩包、内部逐文件清单、正式版本、修订日期、规范来源和 source commit 后再展示项目迁移计划。计划会区分升级、同版核对、降级与未标记旧版；只有全部机制件验证成功才最后推进目标项目的 VERSION。下载阶段不修改目标项目，写入仍需单独确认。Windows PowerShell 会自动定位 Git for Windows 的 Bash，不要求把 Git Bash 手工加入 PATH。Codex 项目 hook 写入后还需要用户审查并信任；Codex CLI 可用 `/hooks` 查看状态。
 
 ### 干净发布包
 
@@ -94,6 +94,8 @@ ln -sfn "$KIT_DIR/.claude/commands/引入一致性机制.md" \
 
 Claude Code 的 `/引入一致性机制` 只是兼容适配器；安装行为正本仍是同一个 `project-consistency-installer` Skill。套件目录迁移后需要重建这两条本地开发链接。
 
+原生 Windows 的日常安装建议仍使用上面的 skills.sh 命令；如需本地开发接线，可在启用 Developer Mode 后创建符号链接，或直接把本地套件路径通过 `PROJECT_CONSISTENCY_KIT_DIR` 交给安装器，不必复制整套仓库。
+
 ### 创建全新项目
 
 全新项目优先解压干净 Release，再按 [`初始化新项目.md`](初始化新项目.md) 复制模板并建立首个 `synced` 标签；本地开发时也可显式使用源码 checkout。已有项目不要整包复制，使用增量安装器可以保留原有文件结构。
@@ -113,18 +115,21 @@ Claude Code 的 `/引入一致性机制` 只是兼容适配器；安装行为正
 - Git 是事实来源，但对话中的决定只有在当前会话执行 wrapup 时才能被补写，已经丢失的旧会话内容无法自动恢复。
 - 文件联动依赖项目自己的规则质量。安装器会协助发现中枢文档，领域规则仍需要项目维护者确认。
 - `synced` 是本地标签，项目按单机流程设计。多机使用时，需要自行同步标签并处理不同设备的基准差异。
-- Stop hook 通过 `.claude/settings.json` 适配 Claude Code，通过 `.codex/hooks.json` 适配 Codex 本地客户端；Codex Cloud 与其他 Harness 不在当前 hook 支持范围。
+- Stop hook 通过 `.claude/settings.json` 适配 Claude Code，通过 `.codex/hooks.json` 适配 Codex 本地客户端；原生 Windows 使用 Codex `commandWindows` 与无 shell 的 Claude exec-form 接线。Windows 脚本与命令适配器已经真机直测，但宿主是否触发仍取决于具体 Claude Code / Codex 版本；已知 Codex 0.148.0 在 Windows 上可能显示正在运行 Stop hook 却不执行命令，此时仍可主动运行 `$wrapup`。Codex Cloud 与其他 Harness 不在当前 hook 支持范围。
 - skills.sh 只分发全局安装器 Skill；PROJECT、AGENTS、hooks 和两个仓库级 Skill 由安装器从经验证的干净 GitHub Release 增量写入。默认使用 latest，也可用 `--release <v-tag>` 固定版本；校验失败不会静默回退到源码 `main`。
-- `CLAUDE.md -> AGENTS.md` 当前按仓库内相对符号链接设计并已在 macOS/Codex 验证；Windows checkout 与 harness 行为尚待单独测试。
+- `CLAUDE.md` 是只含 `@AGENTS.md` 的普通文件。它是 Claude Code 官方支持的同仓库导入形式，不依赖 Windows 的 symlink 权限；`AGENTS.md` 仍是唯一规则正本。
 - wrapup 不自动推送远端，也不会在未确认时修改文件或创建提交。
 
 ## 源码仓库结构
 
 ```text
 .
-├── .agents/skills/
-│   ├── catchup/               # 跨 Harness 入向工作流正本
-│   └── wrapup/                # 跨 Harness 出向工作流正本
+├── .agents/
+│   ├── skills/
+│   │   ├── catchup/           # 跨 Harness 入向工作流正本
+│   │   └── wrapup/            # 跨 Harness 出向工作流正本
+│   └── hooks/
+│       └── wrapup-reminder.mjs # 跨平台 Stop 判断正本
 ├── .claude/
 │   ├── commands/               # Claude Code 薄适配器 + /引入一致性机制
 │   └── settings.json           # Stop hook 接线
@@ -141,7 +146,7 @@ Claude Code 的 `/引入一致性机制` 只是兼容适配器；安装行为正
 │   └── project-consistency-installer/ # skills.sh 可分发的机器级安装器
 ├── 一致性机制/
 │   ├── VERSION                # 套件唯一正式 SemVer 正本
-│   ├── hooks/收尾提醒.sh
+│   ├── hooks/收尾提醒.sh       # 旧 Unix 接线兼容包装
 │   ├── 机制设计说明.md
 │   ├── 文件联动目录.md         # 套件源码面真实规则（不进 Release）
 │   └── 决策档案.md             # 套件源码面真实历史（不进 Release）
@@ -154,7 +159,7 @@ Claude Code 的 `/引入一致性机制` 只是兼容适配器；安装行为正
 │       └── 决策档案.md          # 新项目使用的空白决策档案
 ├── PROJECT.md                  # 套件源码面自身事实（不进 Release）
 ├── AGENTS.md                   # 套件源码面指令正本（不进 Release）
-├── CLAUDE.md -> AGENTS.md      # 套件源码面适配链接（不进 Release）
+├── CLAUDE.md                   # @AGENTS.md 导入适配器（不进 Release）
 ├── 初始化新项目.md              # 全新项目接入指南
 └── CHANGELOG.md                # 套件版本记录
 ```

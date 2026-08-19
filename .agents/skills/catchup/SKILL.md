@@ -5,19 +5,20 @@ description: Restore a repository's project context from PROJECT.md, Git history
 
 <!-- 一致性机制 version: 2026-08-19 -->
 
-新对话开局,把项目当前状态完整装载进来再继续工作。Agent harness 已经注入 `AGENTS.md`(Codex)或其适配链接 `CLAUDE.md`(Claude Code),**不要再次读取这两份指令文件**。
+新对话开局,把项目当前状态完整装载进来再继续工作。Agent harness 已经注入 `AGENTS.md`(Codex)或通过 `CLAUDE.md` 导入的同一文件(Claude Code),**不要再次读取这两份指令文件**。
 
 > 配套出向工作流是 `wrapup`(Codex: `$wrapup`;Claude Code: `/wrapup`)。机制见 `一致性机制/机制设计说明.md`。
 
 ## 第一层:项目事实
 
 1. 完整读取 `PROJECT.md`——背景、流程、地图、阶段与近期决策的唯一正本。
-2. 只检查适配入口的**文件类型与目标**,不读取内容:
+2. 只检查适配入口的**文件类型与精确形态**,不展开读取 AGENTS 内容:
    ```bash
    test -f AGENTS.md
-   test -L CLAUDE.md && readlink CLAUDE.md
+   test ! -L CLAUDE.md
+   test "$(tr -d '\r\n' < CLAUDE.md)" = "@AGENTS.md"
    ```
-   健康状态:`AGENTS.md` 是实体文件,`CLAUDE.md` 是相对链接 `AGENTS.md`。
+   健康状态:`AGENTS.md` 是实体文件,`CLAUDE.md` 是只含 `@AGENTS.md` 的普通文件导入适配器。
 3. `PROJECT.md` 不存在时进入**旧版兼容模式**:读取 `README.md` 判断项目概况,并在报告中明确提示“缺少 PROJECT.md,建议迁移”;不要把 README 永久认定为项目事实正本。
 
 ## 第二层:项目状态(git 是事件源)
@@ -95,5 +96,5 @@ ls -A
 
 - 不凭印象作答,结论必须来自 PROJECT、Git 与读过的焦点文件。
 - 若 PROJECT 与目录或 Git 状态不一致,用“⚑ 一致性提醒”标出。
-- 若 `AGENTS.md` 不是实体、`CLAUDE.md` 不是指向 `AGENTS.md` 的相对链接,标为适配入口异常;不要自行读取两份内容来掩盖问题。
+- 若 `AGENTS.md` 不是实体、`CLAUDE.md` 不是精确的一行 `@AGENTS.md` 导入适配器,标为适配入口异常;不要自行读取两份内容来掩盖问题。
 - catchup 只读取和汇报,不修改文件。

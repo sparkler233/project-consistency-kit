@@ -5,7 +5,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/一致性机制/hooks/收尾提醒.sh\"",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.agents/hooks/wrapup-reminder.mjs"
+            ],
             "timeout": 10
           }
         ]

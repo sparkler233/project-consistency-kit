@@ -5,6 +5,7 @@
 .agents/skills/catchup/agents/openai.yaml
 .agents/skills/wrapup/SKILL.md
 .agents/skills/wrapup/agents/openai.yaml
+.agents/hooks/wrapup-reminder.mjs
 .codex/hooks.json
 .claude/commands/catchup.md
 .claude/commands/wrapup.md
@@ -18,6 +19,7 @@ README.md
 docs/example-session.md
 skills/project-consistency-installer/SKILL.md
 skills/project-consistency-installer/agents/openai.yaml
+skills/project-consistency-installer/scripts/fetch-kit.ps1
 skills/project-consistency-installer/scripts/fetch-kit.sh
 templates/AGENTS.md
 templates/PROJECT.md
