@@ -4,6 +4,13 @@
 > 任何机制文件发生真实变化:判断 SemVer 影响、全部修订日期一起 bump 到当天,并在此记入对应版本。
 > 本文件**套件专属,不随模板进项目**(绿地 rsync 已排除;安装器也不拷它)。
 
+## v1.2.2 — 2026-08-20
+
+- **Windows Codex Stop 修复**(决策 26):`commandWindows` 不再嵌入含 `$root` 的二层 PowerShell 字符串;新增 `.agents/hooks/wrapup-reminder.ps1` 薄适配器,只从 git 根定位 Node 正本、转发 Stop JSON 并失败开放,不复制状态机逻辑。Node 输出的中文与 emoji 在 JSON 传输层改用标准 `\uXXXX` 转义,避免 Windows PowerShell 5.1 多层管道按本地代码页损坏 UTF-8;宿主解析后的用户文案不变。
+- **根因纠正**:桌面端实测证明 Codex 已经调度 Hook;旧配置失效是因为会话 PowerShell 先将内层双引号中的 `$root` 展开为空,不是先前误判的宿主未执行。
+- **回归门禁**:Windows 测试新增“外层会话 PowerShell → `commandWindows` → `.ps1` → Node”整链路,覆盖子目录启动、stdin 转发与 `$wrapup` `systemMessage`;安装器和分发校验从 v1.2.2 起必须携带该适配器,同时保留对旧版 Release 的反向校验兼容。Windows 10 + PowerShell 5.1 自动化、测试仓库命令直测与 Codex 0.148.0 桌面端真实 Stop 均已通过;桌面端以项目 Hook 通知浮层显示“5 个文件”与 `$wrapup`。
+- **版本定位**:这是对既有 Windows Codex 能力的向后兼容修复,因此正式版本升为 v1.2.2;全部机制修订标识推进到 2026-08-20。
+
 ## v1.2.1 — 2026-08-19
 
 - **Windows CI 构建修复**:构建与校验脚本在读取 `distribution/manifest.txt` 时显式剥离 CRLF 的 `\r`,兼容 Git for Windows `core.autocrlf=true` 的源码 checkout;不改变白名单内容、分发格式或目标项目换行策略。

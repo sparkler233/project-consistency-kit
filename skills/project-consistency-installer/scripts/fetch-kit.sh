@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-08-19
+# 一致性机制 version: 2026-08-20
 set -euo pipefail
 
 canonical_repository="https://github.com/sparkler233/project-consistency-kit.git"
@@ -104,6 +104,19 @@ $version_core
 EOF
   [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ && "$patch" =~ ^[0-9]+$ ]] || return 1
   [ "$major" -gt 1 ] || { [ "$major" -eq 1 ] && [ "$minor" -ge 2 ]; }
+}
+
+version_at_least_1_2_2() {
+  local version_core="${1%%-*}"
+  local major minor patch
+  IFS=. read -r major minor patch <<EOF
+$version_core
+EOF
+  [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ && "$patch" =~ ^[0-9]+$ ]] || return 1
+  [ "$major" -gt 1 ] || {
+    [ "$major" -eq 1 ] \
+      && { [ "$minor" -gt 2 ] || { [ "$minor" -eq 2 ] && [ "$patch" -ge 2 ]; }; }
+  }
 }
 
 validate_distribution() {
@@ -265,6 +278,10 @@ EOF
         [ -f "$distribution_dir/$relative_path" ] \
           || fail "v1.2+ distribution is incomplete: missing $relative_path"
       done
+    fi
+    if version_at_least_1_2_2 "$validated_version"; then
+      [ -f "$distribution_dir/.agents/hooks/wrapup-reminder.ps1" ] \
+        || fail "v1.2.2+ distribution is incomplete: missing .agents/hooks/wrapup-reminder.ps1"
     fi
   fi
 

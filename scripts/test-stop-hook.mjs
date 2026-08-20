@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-08-19
+// 一致性机制 version: 2026-08-20
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -41,6 +41,7 @@ function invoke(session, { cwd = fixture, claude = false } = {}) {
     env,
     input: JSON.stringify({ session_id: session }),
   });
+  assert.equal(Buffer.byteLength(output, "utf8"), output.length, "hook JSON transport must be ASCII-safe");
   return output ? JSON.parse(output) : null;
 }
 

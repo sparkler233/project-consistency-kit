@@ -32,7 +32,7 @@
 | `CLAUDE.md` | 只含 `@AGENTS.md` 的 Claude Code 跨平台导入适配器 |
 | `README.md` | GitHub 对外主页,不承担运行时项目地图职责 |
 | `.agents/skills/` | catchup / wrapup 的跨 Harness 行为正本与 Codex 仓库级入口 |
-| `.agents/hooks/` | 全 ASCII 固定路径的跨平台 Stop hook 逻辑正本 |
+| `.agents/hooks/` | 跨平台 Stop hook 的 Node 逻辑正本与 Windows Codex 薄适配器 |
 | `skills/project-consistency-installer/` | skills.sh 可发现的机器级安装器行为正本与 GitHub 获取脚本 |
 | `.claude/` | Claude Code 的命令薄适配器与 Stop hook 接线 |
 | `.codex/hooks.json` | Codex 本地客户端的 Stop hook 接线 |
@@ -48,13 +48,12 @@
 
 ## 四、当前阶段
 
-公开版本已具备入向、出向、安装、升级、文档与干净发布体系。v1.2.0 已补齐原生 Windows 适配,但正式标签的 Windows CI 暴露 `core.autocrlf=true` 让分发白名单路径携带 `\r` 的源码构建缺陷,Release 未生成。当前 v1.2.1 工作集在构建 / 校验读取边界兼容 CRLF,保持安装器 metadata、VERSION 与新标签锁步;真实 Windows 已通过安装、状态机与 `commandWindows` 命令直测,Codex 0.148.0 的宿主触发仍受上游 Windows hook 缺陷影响,Claude Code 宿主测试受测试机账户状态阻断。v1.2.1 GitHub CI 与 Release 通过前,本阶段仍标为验证中。源码仓库自身的 PROJECT / AGENTS / 决策历史不进入发布包。
+公开版本已具备入向、出向、安装、升级、文档与干净发布体系。v1.2.0 已补齐原生 Windows 适配,但正式标签的 Windows CI 暴露 `core.autocrlf=true` 让分发白名单路径携带 `\r` 的源码构建缺陷,因此保留为未生成 Release 的失败构建记录。v1.2.1 已在构建 / 校验读取边界兼容 CRLF,安装器 metadata、VERSION 与正式标签锁步;Linux、Windows 与 Release 工作流全部通过,公开产物也已由安装器反向下载并完成内外层校验,本阶段发布完成。真实 Windows 已通过安装、状态机与 `commandWindows` 命令直测;Claude Code 2.1.220 已完成真实 `Stop` 宿主端到端验证并返回正确的 `/wrapup` 提醒。Codex 0.148.0 已完成真实交互宿主验证:项目 hook 能被发现、信任并触发 `Stop`,但正式配置把内联 PowerShell 再交给会话 PowerShell 解析,双引号脚本中的 `$root` 会在内层进程启动前被外层展开为空,导致 Node 脚本路径失效;不同调用包装可表现为状态 1,也可能因 PowerShell 非终止错误而空输出退出 0。同一环境的工作目录、`git`、`node` 与脚本可见性均正常,改用临时 `.ps1` 适配器后端到端通过并正确返回 `$wrapup` 提醒。该修复已正式落入 v1.2.2 候选:新增仓库内 PowerShell 薄适配器,并把 Windows CI 提升为外层会话 Shell 到 Node 的整链路验证;本地状态机、干净分发构建、安装器反向校验与 v1.2.1 向后兼容已通过;Windows PowerShell 5.1 真机又通过分发校验、状态机、外层 Shell 整链路与测试仓库 `commandWindows` 直测,并据此补上 ASCII-safe JSON 传输以规避多层 PowerShell 代码页损坏。Codex 0.148.0 桌面端重新信任变更后的项目 Hook 后,真实 Stop 已通过项目 Hook 通知浮层正确显示“5 个文件”与 `$wrapup`,v1.2.2 候选的 Windows Codex 端到端闭环完成。Windows 桌面端测试仓库已补齐完整测试上下文和仓库级 `catchup` / `wrapup` Skills;重启后 Codex 桌面端成功发现并显式执行 `$catchup`,正确读取 PROJECT、Git、`synced` 与未跟踪焦点文件,最初报告的中枢文档缺失来自测试夹具漏放正式安装应包含的机制设计说明,现已补齐。源码仓库自身的 PROJECT / AGENTS / 决策历史不进入发布包。后续改进聚焦两项仍未解决的边界:同一仓库多个 Session 并行时缺少 Session 级改动归属和独立同步边界;对话决策的识别与落盘仍依赖模型的语义判断,确定性程序只能提醒、检查文件并要求用户确认,不能完全替代模型判断和人工复核。
 
 ## 五、关键决策记录
 
 > 本节只留最近 ~10 条;超限时 wrapup 把最老条目轮转到 `一致性机制/决策档案.md`。更早的架构取舍及完整理由见 `一致性机制/机制设计说明.md`。
 
-- 2026-08-18:套件真实联动规则与新项目分发骨架分离(决策 16)
 - 2026-08-18:出向命令统一命名为 `/wrapup`,与 `/catchup` 形成入向 / 出向配对(决策 17)
 - 2026-08-18:catchup / wrapup 行为正本迁入仓库级 Skill,Claude Code 斜杠命令降为适配器(决策 18)
 - 2026-08-18:安装器重构为 skills.sh 可分发的 `project-consistency-installer`,可从 GitHub 获取套件后增量引入项目(决策 19)
@@ -64,3 +63,4 @@
 - 2026-08-19:收尾提醒采用共享脚本 + 宿主接线;Claude Code 与 Codex 本地客户端分别通过 Stop hook 接入,只提醒不自动 wrapup(决策 23)
 - 2026-08-19:套件以 `一致性机制/VERSION` 的 SemVer 为唯一正式版本,日期版本行降为文件修订标识,Git tag 与向后兼容扩展的 schema 1 分发元数据受一致性门禁约束(决策 24)
 - 2026-08-19:Windows 采用 `@AGENTS.md` 通用适配、跨平台 Node hook、PowerShell 安装入口与真实 Windows / CI 双重验证(决策 25)
+- 2026-08-20:Windows Codex 的 Stop 接线改用仓库内 PowerShell 薄适配器,避免内联变量在外层会话 Shell 中被提前展开(决策 26)

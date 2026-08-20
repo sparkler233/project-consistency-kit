@@ -3,7 +3,7 @@ name: catchup
 description: Restore a repository's project context from PROJECT.md, Git history, pending changes, and focus files, then report what is done, in progress, blocked, and next. Use when the user asks to catch up, resume prior work, load project state, understand where a project stopped, or begin a new session in a repository using Project Consistency Kit.
 ---
 
-<!-- 一致性机制 version: 2026-08-19 -->
+<!-- 一致性机制 version: 2026-08-20 -->
 
 新对话开局,把项目当前状态完整装载进来再继续工作。Agent harness 已经注入 `AGENTS.md`(Codex)或通过 `CLAUDE.md` 导入的同一文件(Claude Code),**不要再次读取这两份指令文件**。
 

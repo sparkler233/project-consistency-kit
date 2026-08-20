@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-08-19
+// 一致性机制 version: 2026-08-20
 // Project Consistency Kit cross-platform Stop hook.
 // Always fails open: it only emits one systemMessage per dirty cycle.
 
@@ -57,6 +57,12 @@ function readInput() {
   }
 }
 
+function asciiJson(value) {
+  return JSON.stringify(value).replace(/[\u007f-\uffff]/g, (character) =>
+    `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
+}
+
 function main() {
   const input = readInput();
   const isClaude = Boolean(process.env.CLAUDE_PROJECT_DIR);
@@ -97,7 +103,7 @@ function main() {
 
   const entry = isClaude ? "/wrapup" : "$wrapup";
   process.stdout.write(
-    JSON.stringify({
+    asciiJson({
       systemMessage: `⚠️ 一致性机制:${count} 个文件自上次同步后有改动,收尾前建议执行 ${entry}`,
     }),
   );

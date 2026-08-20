@@ -65,7 +65,7 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 | `.agents/skills/catchup/` | 定义如何恢复项目状态 |
 | `.agents/skills/wrapup/` | 定义如何检查联动、确认提交并推进 `synced` |
 | `一致性机制/文件联动目录.md` | 记录哪些文件变化时需要一起检查其他内容 |
-| `.agents/hooks/` 和宿主配置 | 检测到未同步改动时提醒运行 wrapup |
+| `.agents/hooks/` 和宿主配置 | 检测到未同步改动时提醒运行 wrapup;Windows Codex 通过薄 PowerShell 适配器转到同一 Node 逻辑 |
 | `一致性机制/VERSION` | 记录项目当前安装的套件版本 |
 
 `synced` 是一个本地 Git 标签，表示上一次已经完成联动检查的位置。它和 `HEAD` 分开，因此中途手工提交过的改动不会被 wrapup 跳过。
@@ -75,7 +75,7 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 - Codex 可以直接发现仓库级 catchup 和 wrapup Skill；项目 Stop hook 通过 `.codex/hooks.json` 接入，首次使用或配置变化后需要用户审查并信任。
 - Claude Code 通过 `/catchup`、`/wrapup` 和 `CLAUDE.md` 适配同一套规则，Stop hook 配置位于 `.claude/settings.json`。
 - 其他能读取 `AGENTS.md` 或 Agent Skills 的运行环境可以复用项目规则和工作流；如果没有等价的生命周期 hook，就不会获得自动收尾提醒。
-- 核心脚本支持 macOS、Linux 和原生 Windows。我们测试的 Codex 0.148.0 在 Windows 上存在宿主 hook 可能显示运行却没有执行命令的问题，此时主动运行 `$wrapup` 仍然有效。
+- 核心脚本支持 macOS、Linux 和原生 Windows。Windows Codex 使用仓库内 `.ps1` 薄适配器，避免会话 PowerShell 预先展开内联命令中的变量；Hook 还需用户完成项目与命令信任。
 
 ## 它不会做什么
 

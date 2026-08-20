@@ -7,7 +7,7 @@
           {
             "type": "command",
             "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/wrapup-reminder.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -Command \"& { $root = (git rev-parse --show-toplevel).Trim(); node (Join-Path $root '.agents/hooks/wrapup-reminder.mjs') }\"",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path (git rev-parse --show-toplevel) '.agents/hooks/wrapup-reminder.ps1')",
             "timeout": 10
           }
         ]

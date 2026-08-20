@@ -1,6 +1,6 @@
 # 一致性机制 —— catchup / wrapup 自我维护系统
 
-<!-- 一致性机制 version: 2026-08-19 -->
+<!-- 一致性机制 version: 2026-08-20 -->
 
 > 本目录把「项目的自我维护机制」(会话切换、上下文加载、改动落盘)和「项目本身的内容」分开收纳。
 > **想了解或修改这套机制,从这里看起。**
@@ -11,7 +11,7 @@
 
 - **入向**:新会话用 catchup Skill 把项目状态加载回来;
 - **出向**:收尾用 wrapup Skill 按联动规则把改动落盘、提交、推进 `synced` 标记;
-- **兜底**:跨平台 Stop hook(`../.agents/hooks/wrapup-reminder.mjs`)在有未同步改动时提醒收尾,Claude Code 与 Codex 本地客户端分别显示自己的 wrapup 入口;
+- **兜底**:跨平台 Stop hook(`../.agents/hooks/wrapup-reminder.mjs`)在有未同步改动时提醒收尾,Windows Codex 经 `.ps1` 薄适配器转发,Claude Code 与 Codex 本地客户端分别显示自己的 wrapup 入口;
 - **底座**:git 是唯一事件源,二进制走选择性处理(可选 LFS)。
 
 完整设计动机见 [`机制设计说明.md`](机制设计说明.md)。
@@ -25,6 +25,7 @@
 | [`机制设计说明.md`](机制设计说明.md) | 整套设计的「为什么」:每个决策的动机与取舍。给人 / 接手 AI 看 |
 | [`文件联动目录.md`](文件联动目录.md) | 当前项目的真实联动规则(中枢文档 + 例外)。分发骨架在套件 `templates/` |
 | [`.agents/hooks/wrapup-reminder.mjs`](../.agents/hooks/wrapup-reminder.mjs) | 出向兜底 hook 跨平台逻辑正本:AI 回答结束时若有未同步改动,提醒用户执行当前宿主的 wrapup 入口 |
+| [`.agents/hooks/wrapup-reminder.ps1`](../.agents/hooks/wrapup-reminder.ps1) | Windows Codex 薄适配器:从 git 根定位 Node 正本并转发 Stop JSON,不包含状态机逻辑 |
 | [`hooks/收尾提醒.sh`](hooks/收尾提醒.sh) | v1.1 Unix 旧接线兼容包装,只转发到 Node 逻辑正本 |
 | [`决策档案.md`](决策档案.md) | PROJECT 决策记录的历史档案:超限条目由 `/wrapup` 轮转进来(规则 6);不进 Part A,按需查 |
 | `LICENSE.project-consistency-kit`(安装后) | 套件 MIT 许可副本,放机制子目录以免被误解为目标项目整体许可证 |

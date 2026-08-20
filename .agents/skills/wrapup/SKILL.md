@@ -3,7 +3,7 @@ name: wrapup
 description: Close a Project Consistency Kit work cycle by recovering current-session decisions, comparing all changes since the synced horizon, checking linkage rules, updating approved files, and preparing a user-confirmed local commit and synced tag. Use when the user asks to wrap up, synchronize project records, reconcile linked documentation, checkpoint completed work, or finish a repository session.
 ---
 
-<!-- 一致性机制 version: 2026-08-19 -->
+<!-- 一致性机制 version: 2026-08-20 -->
 
 把「上次同步以来发生的一切」系统性收尾:捕获改动 → 补 B 类事件 → 查联动 → 用户确认 → 落盘 → 提交。
 
