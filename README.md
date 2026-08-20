@@ -1,58 +1,43 @@
 # Project Consistency Kit
 
-> 一套面向长期 AI Agent 协作的项目一致性机制。它用 Git 记录项目变化，通过 catchup 恢复跨会话状态，再用 wrapup 检查文档联动、完成本地提交并推进同步边界。
+> 让 Agent 在新会话里接得上进度，并在收尾时把项目状态、决策和相关文档一起更新。
 
 [![Latest release](https://img.shields.io/github/v/release/sparkler233/project-consistency-kit)](https://github.com/sparkler233/project-consistency-kit/releases/latest)
 [![Distribution](https://github.com/sparkler233/project-consistency-kit/actions/workflows/distribution.yml/badge.svg?branch=main)](https://github.com/sparkler233/project-consistency-kit/actions/workflows/distribution.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f6f4e.svg)](LICENSE)
 
-## 为什么做这个项目
+## 它解决什么
 
-长期和 AI Agent 一起维护项目时，问题通常不在单次生成，而在会话之间：新会话不知道上次做到哪里，代码或内容已经变化，项目状态、决策记录和素材清单却还停在旧状态。
+本项目旨在解决人与 Agent 在长程工作协作下切换 Session 和 Harness 并压缩上下文的过程中带来的项目内部文档与信息的漂移问题。我们借助 Git 来实现了项目的状态保存与内部文件联动。
 
-Project Consistency Kit 把这些状态交给仓库本身管理。Git 负责记录已发生的变化，项目文档负责保存背景和规则，`synced` 标签标记上一次完成联动检查的位置。Agent 可以据此恢复工作，也能在收尾时找到可能遗漏的文档更新。
+情景：当你和 Agent 推进一个项目几天后，仓库里通常会同时出现两种状态：代码或内容已经变了，项目进度、决策记录和素材清单仍停在旧版本。如果切换 Harness 和 Session，Agent 需要重新判断项目进度、哪些决定已经确认、哪些文档需要补写。
 
-## 工作方式
+Project Consistency Kit 把这些信息留在仓库里。Git 记录当前项目发生过什么，`PROJECT.md` 保存项目现在处于什么状态，`AGENTS.md` 告诉 Agent 应该遵守哪些规则。新会话用 catchup Skill 恢复现场，工作结束时用 wrapup Skill 检查还有哪些状态或文档需要一起更新。
 
-```mermaid
-flowchart LR
-    A["新会话"] --> B["catchup"]
-    B --> C["读取项目文档"]
-    B --> D["检查 Git 历史与工作区"]
-    C --> E["恢复当前任务状态"]
-    D --> E
-    E --> F["继续工作"]
-    F --> G["wrapup"]
-    G --> H["捕获本轮决策"]
-    G --> I["按联动规则检查文档与素材"]
-    H --> J["用户确认更新计划"]
-    I --> J
-    J --> K["写入、提交并推进 synced"]
+## 怎么工作
+
+```text
+catchup  ->  正常工作  ->  wrapup
+恢复现场                    检查联动并提交
 ```
 
-catchup 只读取和汇报，不修改文件。wrapup 会先展示联动计划和待提交范围，获得确认后才写入文件或提交；它不会自动推送远端。Codex 使用 `$catchup` / `$wrapup` 或自然语言触发，Claude Code 使用 `/catchup` / `/wrapup`。
+1. 在一个新 Session 或压缩上下文之后开始工作时运行 catchup。它读取 `PROJECT.md`、Git 历史和当前工作区，汇报已经完成、正在进行、遇到的卡点和建议的下一步。这个过程只读，不修改文件。
+2. 中间照常和 Agent 协作。代码、内容、决策和项目状态将会在对话中不断积累。
+3. 此轮 Session 或上下文接近上限准备收尾时运行 wrapup。它比较自上次 `synced` 以来的全部改动，按项目自己的联动规则检查遗漏。用户确认更新计划、提交范围和提交说明后，它才写入文件、创建本地提交并推进 `synced` 标签。
 
-## 核心能力
+| 运行环境 | 会话初始化引入 | 会话收尾 |
+| --- | --- | --- |
+| Codex | `$catchup` | `$wrapup` |
+| Claude Code | `/catchup` | `/wrapup` |
+| 其他 Harness | 调用 catchup Skill | 调用 wrapup Skill |
 
-- **跨会话恢复**：Agent harness 自动加载 `AGENTS.md` / `CLAUDE.md` 工作规则，仓库级 catchup Skill 再结合 `PROJECT.md`、中枢文档、Git 历史和未提交文件恢复状态。
-- **跨 Harness 工作流**：catchup / wrapup 的唯一行为正本位于 `.agents/skills/`；Codex 直接发现，Claude Code 通过薄斜杠命令适配。
-- **职责分离**：`PROJECT.md` 保存运行事实，`AGENTS.md` 是 Agent 指令正本，`CLAUDE.md` 只用 `@AGENTS.md` 导入同一内容。
-- **同步边界**：用独立的 `synced` 标签记录上次完成联动检查的位置，手工提交过但尚未同步的改动也不会被跳过。
-- **文件联动检查**：在 `一致性机制/文件联动目录.md` 中声明中枢文档和项目规则，改动发生后检查相关说明、决策记录和素材清单是否需要更新。
-- **对话决策落盘**：收尾时回看当前会话，将尚未进入文件的决策、约定和对接结果列给用户确认。
-- **可引导安装**：全局 `project-consistency-installer` Skill 可由 skills.sh 从 GitHub 安装；运行时自动获取套件源、扫描现有 PROJECT / AGENTS / CLAUDE / README，再经确认增量引入。
-- **干净发布面**：源码仓库可以继续用本机制维护自己；`v*` 标签生成的 Release 只包含逐文件白名单批准的通用产品，并携带来源与 SHA-256 校验。
-- **统一版本身份**：`一致性机制/VERSION` 保存唯一正式 SemVer；安装器会同时报告来源 Kit 版本、目标项目版本、修订日期与精确提交。
-- **跨平台收尾提醒**：Claude Code 与 Codex 本地客户端通过各自的 Stop 配置调用同一 Node 脚本；提醒逻辑支持 macOS、Linux 与原生 Windows，检测到未同步改动时只提醒一次，不自动修改、提交或推送。
-- **二进制资产治理**：可选用 Git LFS 管理栅格图，用 `_manifest.md` 记录设计源、字体和媒体素材的用途、来源与授权信息。
+同样也可以直接告诉 Agent“帮我恢复项目状态”或“检查联动并收尾”。显式命令只是入口，实际流程由仓库里的 Skill 定义。
 
-## 快速开始
+## 安装
 
-支持 Codex、Claude Code 及兼容 `AGENTS.md` / Agent Skills 的 Harness，需要本机安装 Git 和 Node.js。macOS / Linux 的 Release 获取与校验还需要 `curl`、`tar` 以及 `sha256sum` 或 `shasum`；原生 Windows 使用 Git for Windows 自带的 Bash 复用同一校验链路。
+需要 Git 和 Node.js。macOS、Linux 用户还需要 `curl`、`tar` 以及 `sha256sum` 或 `shasum`；Windows 用户需要 Git for Windows。
 
-### 接入已有项目
-
-通过 skills.sh 将安装器装到用户级 Skill 目录：
+先把安装器装到用户级 Skill 目录：
 
 ```bash
 npx skills add sparkler233/project-consistency-kit \
@@ -60,111 +45,73 @@ npx skills add sparkler233/project-consistency-kit \
   --global
 ```
 
-CLI 会自动检测可用的 Harness，必要时让你选择；也可以用 `--agent codex` 或 `--agent claude-code` 显式指定。安装完成后，进入目标项目，直接告诉 Agent：
+CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` 或 `--agent claude-code`。安装完成后，进入目标项目并告诉 Agent：
 
 > 给这个项目引入一致性机制。
 
-支持显式 Skill 调用的 Harness，也可以通过各自的 Skill 选择方式调用 `project-consistency-installer`。具体入口由 Harness 决定。
+安装器会扫描项目现有的 `README.md`、`PROJECT.md`、`AGENTS.md` 和 `CLAUDE.md`，再展示迁移计划。它不会在确认前覆盖原有内容，也不会因为模板更标准就重排用户文档。
 
-安装器会优先使用用户明确提供的本地套件；找不到时，下载最新的干净 GitHub Release 到机器缓存，验证外层压缩包、内部逐文件清单、正式版本、修订日期、规范来源和 source commit 后再展示项目迁移计划。计划会区分升级、同版核对、降级与未标记旧版；只有全部机制件验证成功才最后推进目标项目的 VERSION。下载阶段不修改目标项目，写入仍需单独确认。Windows PowerShell 会自动定位 Git for Windows 的 Bash，不要求把 Git Bash 手工加入 PATH。Codex 项目 hook 写入后还需要用户审查并信任；Codex CLI 可用 `/hooks` 查看状态。
+本机没有套件源码时，安装器会下载最新的 GitHub Release，并校验压缩包、内部文件清单、版本、来源仓库和精确提交。校验全部通过后，它才会继续安装。Windows 的 PowerShell 入口会自动找到 Git for Windows 自带的 Bash，不要求手工修改 PATH。
 
-### 干净发布包
+全新项目也可以从干净 Release 开始，完整步骤见[《在新项目里启用 Project Consistency Kit》](初始化新项目.md)。
 
-本仓库 `main` 是源码与自举面，因此会包含维护套件自身所需的 `PROJECT.md`、`AGENTS.md`、`CLAUDE.md`、真实联动规则和决策档案；它不是可直接整包复制的项目模板。
+## 主要会给项目加什么
 
-`v*` 标签会通过 GitHub Actions 生成 `project-consistency-kit.tar.gz` 和对应 `.sha256`。正式版本取自 `一致性机制/VERSION`，发布标签必须精确等于 `v<VERSION>`；Release 包、安装器 Skill metadata 和分发元数据也必须一致。Release 包只包含 [源码仓库分发白名单](https://github.com/sparkler233/project-consistency-kit/blob/main/distribution/manifest.txt) 明确列出的产品文件，并额外生成来源元数据与内部逐文件校验清单。最新稳定版本和发布说明见 [GitHub Releases](https://github.com/sparkler233/project-consistency-kit/releases/latest)；手工下载可直接使用 [发布包](https://github.com/sparkler233/project-consistency-kit/releases/latest/download/project-consistency-kit.tar.gz) 和 [SHA-256 校验文件](https://github.com/sparkler233/project-consistency-kit/releases/latest/download/project-consistency-kit.tar.gz.sha256)，通常直接使用安装器即可。
+| 内容 | 用途 |
+| --- | --- |
+| `PROJECT.md` | 保存项目背景、当前阶段、文件地图和近期决策 |
+| `AGENTS.md` | 保存所有 Agent 共用的项目规则 |
+| `CLAUDE.md` | 用 `@AGENTS.md` 让 Claude Code 读取同一份规则 |
+| `.agents/skills/catchup/` | 定义如何恢复项目状态 |
+| `.agents/skills/wrapup/` | 定义如何检查联动、确认提交并推进 `synced` |
+| `一致性机制/文件联动目录.md` | 记录哪些文件变化时需要一起检查其他内容 |
+| `.agents/hooks/` 和宿主配置 | 检测到未同步改动时提醒运行 wrapup |
+| `一致性机制/VERSION` | 记录项目当前安装的套件版本 |
 
-### 本地开发接线
+`synced` 是一个本地 Git 标签，表示上一次已经完成联动检查的位置。它和 `HEAD` 分开，因此中途手工提交过的改动不会被 wrapup 跳过。
 
-维护套件或需要离线使用时，可以先 clone，再把本地安装器 Skill 链接到用户目录：
+## 支持范围
 
-```bash
-git clone https://github.com/sparkler233/project-consistency-kit.git
-cd project-consistency-kit
-KIT_DIR="$PWD"
+- Codex 可以直接发现仓库级 catchup 和 wrapup Skill；项目 Stop hook 通过 `.codex/hooks.json` 接入，首次使用或配置变化后需要用户审查并信任。
+- Claude Code 通过 `/catchup`、`/wrapup` 和 `CLAUDE.md` 适配同一套规则，Stop hook 配置位于 `.claude/settings.json`。
+- 其他能读取 `AGENTS.md` 或 Agent Skills 的运行环境可以复用项目规则和工作流；如果没有等价的生命周期 hook，就不会获得自动收尾提醒。
+- 核心脚本支持 macOS、Linux 和原生 Windows。我们测试的 Codex 0.148.0 在 Windows 上存在宿主 hook 可能显示运行却没有执行命令的问题，此时主动运行 `$wrapup` 仍然有效。
 
-mkdir -p ~/.agents/skills
-ln -sfn "$KIT_DIR/skills/project-consistency-installer" \
-  ~/.agents/skills/project-consistency-installer
+## 它不会做什么
 
-mkdir -p ~/.claude/commands
-ln -sfn "$KIT_DIR/.claude/commands/引入一致性机制.md" \
-  ~/.claude/commands/引入一致性机制.md
-```
+- wrapup 不会自动推送远端，也不会在用户确认前修改文件或创建提交。
+- catchup 只能从仓库恢复已经落盘的信息，无法找回早已丢失的旧会话内容。
+- 文件联动规则需要结合项目实际情况维护，安装器无法替项目决定所有领域关系。
+- `synced` 默认是本地标签。多台机器共同使用时，需要自行同步标签并处理不同设备的基准差异。
 
-Claude Code 的 `/引入一致性机制` 只是兼容适配器；安装行为正本仍是同一个 `project-consistency-installer` Skill。套件目录迁移后需要重建这两条本地开发链接。
+## 仍未解决的问题
 
-原生 Windows 的日常安装建议仍使用上面的 skills.sh 命令；如需本地开发接线，可在启用 Developer Mode 后创建符号链接，或直接把本地套件路径通过 `PROJECT_CONSISTENCY_KIT_DIR` 交给安装器，不必复制整套仓库。
+### 多个 Session 并行工作
 
-### 创建全新项目
+当前机制默认一个项目在同一时间只有一条主要工作线。多个 Session 直接在同一工作区运行时会共享未提交文件，却各自持有不同的上下文。一个 Session 可能在另一个 Session 尚未收尾时提交文件或推进 `synced`，这会让改动归属、联动范围和决策顺序变得难以判断。
 
-全新项目优先解压干净 Release，再按 [`初始化新项目.md`](初始化新项目.md) 复制模板并建立首个 `synced` 标签；本地开发时也可显式使用源码 checkout。已有项目不要整包复制，使用增量安装器可以保留原有文件结构。
+Git 分支或 worktree 可以隔离文件改动，但各个 Session 仍然围绕同一个项目级 `synced` 标签和同一套状态文档工作。如何为每个 Session 建立独立的同步边界，再安全地汇总项目状态和决策，目前还没有完成设计。
 
-## 一次典型使用
+### 决策落盘仍然依赖模型
 
-假设一个内容生产项目刚调整了章节结构，并新增两张图片。工作区里已经有正文和素材改动，但 PROJECT 的进度、图片清单和决策记录还没有更新。
+Git 和脚本能够检查文件是否发生变化，却无法仅凭确定性程序判断一段对话里是否产生了应该保存的决策。当前机制依靠 Agent 识别决策并写入 `PROJECT.md` 或对应文档，wrapup 只能在当前会话中再检查一次是否有遗漏。
 
-1. 新会话执行 catchup（Codex：`$catchup`；Claude Code：`/catchup`），Agent 会读取 Git 状态和相关文件，指出上次停在章节调整与图片接入。
-2. 完成工作后执行 wrapup（Codex：`$wrapup`；Claude Code：`/wrapup`），机制会根据联动目录提出更新 PROJECT、素材清单和决策记录的计划；README 只有承载受影响的公开契约时才联动。
-3. 用户确认计划与提交范围后，机制执行更新、创建本地提交，并把 `synced` 移到该提交。
+模型可能漏掉决策、错误理解某项决策，也可能以为某项决定已经保存，而实际并未落盘。这是一种无法由现有机制彻底排除的决策保存幻觉。Hook、固定流程和用户确认可以降低风险，但无法把自然语言中的决策识别完全交给确定性程序。在找到更可靠的记录和验证方式之前，重要决策仍需要用户检查最终落盘的内容。
 
-更完整的输入和输出示意见 [`docs/example-session.md`](docs/example-session.md)。
+## 发布与升级
 
-## 设计边界
+源码仓库的 `main` 包含维护套件自身所需的项目状态和决策历史，不适合作为模板整包复制。正式 Release 只包含分发白名单批准的通用文件，并附带外层 SHA-256、内部逐文件校验和来源元数据。
 
-- Git 是事实来源，但对话中的决定只有在当前会话执行 wrapup 时才能被补写，已经丢失的旧会话内容无法自动恢复。
-- 文件联动依赖项目自己的规则质量。安装器会协助发现中枢文档，领域规则仍需要项目维护者确认。
-- `synced` 是本地标签，项目按单机流程设计。多机使用时，需要自行同步标签并处理不同设备的基准差异。
-- Stop hook 通过 `.claude/settings.json` 适配 Claude Code，通过 `.codex/hooks.json` 适配 Codex 本地客户端；原生 Windows 使用 Codex `commandWindows` 与无 shell 的 Claude exec-form 接线。Windows 脚本与命令适配器已经真机直测，但宿主是否触发仍取决于具体 Claude Code / Codex 版本；已知 Codex 0.148.0 在 Windows 上可能显示正在运行 Stop hook 却不执行命令，此时仍可主动运行 `$wrapup`。Codex Cloud 与其他 Harness 不在当前 hook 支持范围。
-- skills.sh 只分发全局安装器 Skill；PROJECT、AGENTS、hooks 和两个仓库级 Skill 由安装器从经验证的干净 GitHub Release 增量写入。默认使用 latest，也可用 `--release <v-tag>` 固定版本；校验失败不会静默回退到源码 `main`。
-- `CLAUDE.md` 是只含 `@AGENTS.md` 的普通文件。它是 Claude Code 官方支持的同仓库导入形式，不依赖 Windows 的 symlink 权限；`AGENTS.md` 仍是唯一规则正本。
-- wrapup 不自动推送远端，也不会在未确认时修改文件或创建提交。
+安装器默认使用[最新稳定版本](https://github.com/sparkler233/project-consistency-kit/releases/latest)，也可以固定到指定的 `v*` 标签。校验失败时不会静默回退到源码 `main`。
 
-## 源码仓库结构
+## 进一步阅读
 
-```text
-.
-├── .agents/
-│   ├── skills/
-│   │   ├── catchup/           # 跨 Harness 入向工作流正本
-│   │   └── wrapup/            # 跨 Harness 出向工作流正本
-│   └── hooks/
-│       └── wrapup-reminder.mjs # 跨平台 Stop 判断正本
-├── .claude/
-│   ├── commands/               # Claude Code 薄适配器 + /引入一致性机制
-│   └── settings.json           # Stop hook 接线
-├── .codex/
-│   └── hooks.json              # Codex 本地 Stop hook 接线
-├── .github/workflows/
-│   └── distribution.yml        # 验证构建；v* 标签发布干净 Release
-├── distribution/
-│   └── manifest.txt            # 干净分发包逐文件白名单
-├── scripts/
-│   ├── build-distribution.sh   # 构建目录、tar.gz 与外层校验
-│   └── verify-distribution.sh  # 验证文件边界、来源与内部校验
-├── skills/
-│   └── project-consistency-installer/ # skills.sh 可分发的机器级安装器
-├── 一致性机制/
-│   ├── VERSION                # 套件唯一正式 SemVer 正本
-│   ├── hooks/收尾提醒.sh       # 旧 Unix 接线兼容包装
-│   ├── 机制设计说明.md
-│   ├── 文件联动目录.md         # 套件源码面真实规则（不进 Release）
-│   └── 决策档案.md             # 套件源码面真实历史（不进 Release）
-├── docs/example-session.md     # 使用示例
-├── templates/
-│   ├── PROJECT.md              # 新项目使用的事实与地图模板
-│   ├── AGENTS.md               # 新项目使用的 Agent 规则模板
-│   └── 一致性机制/
-│       ├── 文件联动目录.md      # 新项目使用的联动规则模板
-│       └── 决策档案.md          # 新项目使用的空白决策档案
-├── PROJECT.md                  # 套件源码面自身事实（不进 Release）
-├── AGENTS.md                   # 套件源码面指令正本（不进 Release）
-├── CLAUDE.md                   # @AGENTS.md 导入适配器（不进 Release）
-├── 初始化新项目.md              # 全新项目接入指南
-└── CHANGELOG.md                # 套件版本记录
-```
-
-机制设计与取舍见 [`一致性机制/机制设计说明.md`](一致性机制/机制设计说明.md)，版本变化见 [`CHANGELOG.md`](CHANGELOG.md)。
+- [完整使用示例](docs/example-session.md)
+- [全新项目初始化](初始化新项目.md)
+- [机制文件索引](一致性机制/README.md)
+- [机制设计与决策理由](一致性机制/机制设计说明.md)
+- [版本变化](CHANGELOG.md)
+- [GitHub Releases](https://github.com/sparkler233/project-consistency-kit/releases)
 
 ## 许可证
 
