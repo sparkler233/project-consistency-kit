@@ -1,15 +1,18 @@
-# 一致性机制 version: 2026-08-20
+# 一致性机制 version: 2026-08-22
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [string]$KitDir,
 
-    [string]$HookTestScript = (Join-Path $PSScriptRoot "test-stop-hook.mjs")
+    [string]$HookTestScript = (Join-Path $PSScriptRoot "test-stop-hook.mjs"),
+
+    [string]$GuardTestScript = (Join-Path $PSScriptRoot "test-synced-guard.mjs")
 )
 
 $ErrorActionPreference = "Stop"
 $kit = (Resolve-Path -LiteralPath $KitDir).Path
 $hookTest = (Resolve-Path -LiteralPath $HookTestScript).Path
+$guardTest = (Resolve-Path -LiteralPath $GuardTestScript).Path
 
 $codexHooks = Get-Content -LiteralPath (Join-Path $kit ".codex\hooks.json") -Raw -Encoding UTF8 | ConvertFrom-Json
 $handler = $codexHooks.hooks.Stop[0].hooks[0]
@@ -37,14 +40,22 @@ if ((Resolve-Path -LiteralPath $verifiedPath).Path -ne $kit) {
     throw "PowerShell fetch adapter returned a different distribution path: $verifiedPath"
 }
 
-$hookCandidates = @(Get-ChildItem -LiteralPath $kit -Recurse -File -Filter "*.mjs")
-if ($hookCandidates.Count -ne 1) {
-    throw "Expected exactly one distributed .mjs hook, found $($hookCandidates.Count)"
+$hook = Join-Path $kit ".agents\hooks\wrapup-reminder.mjs"
+if (-not (Test-Path -LiteralPath $hook -PathType Leaf)) {
+    throw "cross-platform Stop hook is missing from the distribution"
 }
-$hook = $hookCandidates[0].FullName
 & node $hookTest $hook
 if ($LASTEXITCODE -ne 0) {
     throw "Windows Stop hook state-machine test failed"
+}
+
+$guard = Join-Path $kit ".agents\skills\wrapup\scripts\synced-guard.mjs"
+if (-not (Test-Path -LiteralPath $guard -PathType Leaf)) {
+    throw "synced guard is missing from the distribution"
+}
+& node $guardTest $guard
+if ($LASTEXITCODE -ne 0) {
+    throw "Windows synced guard test failed"
 }
 
 $fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("project-consistency-windows-hook-{0}" -f [guid]::NewGuid().ToString("N"))

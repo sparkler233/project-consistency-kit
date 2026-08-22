@@ -3,7 +3,7 @@ name: catchup
 description: Restore a repository's project context from PROJECT.md, Git history, pending changes, and focus files, then report what is done, in progress, blocked, and next. Use when the user asks to catch up, resume prior work, load project state, understand where a project stopped, or begin a new session in a repository using Project Consistency Kit.
 ---
 
-<!-- 一致性机制 version: 2026-08-20 -->
+<!-- 一致性机制 version: 2026-08-22 -->
 
 新对话开局,把项目当前状态完整装载进来再继续工作。Agent harness 已经注入 `AGENTS.md`(Codex)或通过 `CLAUDE.md` 导入的同一文件(Claude Code),**不要再次读取这两份指令文件**。
 
@@ -23,23 +23,26 @@ description: Restore a repository's project context from PROJECT.md, Git history
 
 ## 第二层:项目状态(git 是事件源)
 
-1. 已沉淀事件:
+1. 先调用与 wrapup 共用的只读 guard,由它确定 current / canonical branch 与正确检查基线,不要在 catchup 里维护第二套 branch / merge-base 判断:
+   ```bash
+   node .agents/skills/wrapup/scripts/synced-guard.mjs inspect
+   ```
+   - canonical branch:`scope_base = synced`;
+   - 非 canonical branch:`scope_base = HEAD 与 canonical 的唯一最佳 merge-base`;
+   - `canonical_unconfigured`、无共同祖先、多个最佳 merge-base、detached 或 `synced_not_ancestor` → 在报告中明确列为同步边界异常,不要退回 `git diff synced` 猜范围。
+2. 已沉淀事件:
    ```bash
    git log --oneline -20
    ```
-2. 尚未收尾的工作:
+3. 尚未收尾的工作:
    ```bash
    git status --short
    ```
-3. 自上次 wrapup 以来的完整范围(含已 commit 未同步):
-   ```bash
-   if git rev-parse -q --verify refs/tags/synced >/dev/null; then
-     d=$(git diff --stat synced); [ -n "$d" ] && printf '%s\n' "$d" || echo "(已同步:synced 已在 HEAD,无新改动)"
-   else
-     echo "(无 synced tag,尚未执行过 wrapup)"
-   fi
-   ```
-4. 完整读取 `PROJECT.md` 之外的中枢文档(见 `一致性机制/文件联动目录.md` Part A)。`AGENTS.md` / `CLAUDE.md` 已由 harness 注入,跳过内容读取;README 只有列入 Part A 或处于旧版兼容模式时才读。
+4. 自该 branch 正确基线以来的完整范围(含已 commit 未同步):
+   - inspect 返回 `scope_base` → `git diff --stat <scope_base>`;输出为空时说明该 branch 相对基线无新改动;
+   - canonical 且 `synced` 不存在 → 报「无 synced tag,尚未建立首次 horizon」;
+   - inspect 没有可靠 `scope_base` → 报同步边界异常,不输出可能失真的 diff。
+5. 完整读取 `PROJECT.md` 之外的中枢文档(见 `一致性机制/文件联动目录.md` Part A)。`AGENTS.md` / `CLAUDE.md` 已由 harness 注入,跳过内容读取;README 只有列入 Part A 或处于旧版兼容模式时才读。
 
 > 不是 git repo → 报“项目未纳入 git,一致性机制未生效”,退回只读现有文件判断状态。
 
@@ -96,5 +99,6 @@ ls -A
 
 - 不凭印象作答,结论必须来自 PROJECT、Git 与读过的焦点文件。
 - 若 PROJECT 与目录或 Git 状态不一致,用“⚑ 一致性提醒”标出。
+- 报告当前 branch、canonical branch 与使用的 `scope_base`;非 canonical branch 明确说明这里只能形成 branch checkpoint,项目级 `synced` 要在合并回 canonical 后推进。
 - 若 `AGENTS.md` 不是实体、`CLAUDE.md` 不是精确的一行 `@AGENTS.md` 导入适配器,标为适配入口异常;不要自行读取两份内容来掩盖问题。
 - catchup 只读取和汇报,不修改文件。

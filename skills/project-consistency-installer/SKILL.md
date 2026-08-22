@@ -2,10 +2,10 @@
 name: project-consistency-installer
 description: Fetch Project Consistency Kit from a trusted local source or its verified clean GitHub Release, then safely integrate or upgrade PROJECT.md, AGENTS.md, the CLAUDE.md adapter, catchup and wrapup repository Skills, linkage rules, and hooks without silently overwriting project content. Use when the user asks to install, introduce, bootstrap, migrate, or update the consistency mechanism in the current repository.
 metadata:
-  version: "1.2.2"
+  version: "1.3.0"
 ---
 
-<!-- 一致性机制 version: 2026-08-20 -->
+<!-- 一致性机制 version: 2026-08-22 -->
 
 # Project Consistency Installer
 
@@ -64,7 +64,7 @@ metadata:
    - `templates/AGENTS.md`
    - `templates/一致性机制/文件联动目录.md`
    - `templates/一致性机制/决策档案.md`
-   versioned 分发包或当前源码 checkout 还必须包含 `.codex/hooks.json` 与 `一致性机制/VERSION`;v1.2.0+ 还必须包含 `fetch-kit.ps1` 与 `.agents/hooks/wrapup-reminder.mjs`;v1.2.2+ 还必须包含 `.agents/hooks/wrapup-reminder.ps1`;旧包按各自版本的最低集合验证,不得用新版本文件要求反向否决 v1.0.0 / v1.1.0 / v1.2.0 / v1.2.1。
+   versioned 分发包或当前源码 checkout 还必须包含 `.codex/hooks.json` 与 `一致性机制/VERSION`;v1.2.0+ 还必须包含 `fetch-kit.ps1` 与 `.agents/hooks/wrapup-reminder.mjs`;v1.2.2+ 还必须包含 `.agents/hooks/wrapup-reminder.ps1`;v1.3.0+ 还必须包含 `.agents/skills/wrapup/scripts/synced-guard.mjs`;旧包按各自版本的最低集合验证,不得用新版本文件要求反向否决旧 Release。
 6. 记录版本与来源并在计划和最终报告回显:
    - 干净分发目录必须有 `DISTRIBUTION-METADATA.txt` 与 `DISTRIBUTION-MANIFEST.sha256`;记录其中的 `kit_version`、`mechanism_revision`、规范仓库、release ref 与 source commit;缺少版本字段的 schema 1 旧包标为 `legacy`,版本可从 `vX.Y.Z` release ref 派生展示,但必须标明不是包内 VERSION;
    - 本地源码 checkout 必须是 Git 仓库;读取 `一致性机制/VERSION` 为 `SOURCE_VERSION`,读取源内安装器 `metadata.version`,两者必须一致;另记录统一修订日期、`git rev-parse HEAD` 与当前 ref,有未提交改动时明确标出;
@@ -82,9 +82,10 @@ git rev-parse -q --verify HEAD
 git rev-parse -q --verify refs/tags/synced
 git status --short 2>/dev/null
 cat 一致性机制/VERSION 2>/dev/null
-grep -hE '^(<!-- |# )一致性机制 version:' \
+grep -hE '^(<!-- |# |// )一致性机制 version:' \
   .agents/skills/*/SKILL.md \
   .agents/skills/*/agents/openai.yaml \
+  .agents/skills/*/scripts/*.mjs \
   .agents/hooks/*.mjs \
   .agents/hooks/*.ps1 \
   .claude/commands/*.md \
@@ -152,7 +153,7 @@ test -L CLAUDE.md && readlink CLAUDE.md
 │ .codex hooks                     │ 增量接线 Stop hook + 提示信任           │ …      │
 │ 项目自定中枢 / 领域规则          │ 扫描候选后询问                          │ …      │
 │ .gitignore / .gitattributes      │ 按项目二进制类型询问                    │ …      │
-│ synced tag                       │ 不存在时打在当前 HEAD                   │ …      │
+│ canonical / synced              │ 确认本地配置;由 guard 建立初始 horizon   │ …      │
 └──────────────────────────────────┴────────────────────────────────────────┴────────┘
 ```
 
@@ -261,12 +262,15 @@ Codex 本地客户端使用同一份 `.agents/hooks/wrapup-reminder.mjs`,但接�
 5. 询问稳定的“改 A 必查 B”规则,确认后写入项目自定规则区。
 6. 含图片 / 设计稿 / 字体 / 媒体 → 只增补缺失的 ignore / LFS 规则;纯代码 / 纯文字项目跳过 LFS。
 
-## 步骤 7 · 建立 synced horizon
+## 步骤 7 · 配置 canonical branch 并建立 synced horizon
 
 - 不是 Git repo → 只有用户同意才初始化 Git;
-- 有 commit 且无 `synced` → 把 tag 打在当前 HEAD,既往历史不追溯联动;
-- 无 commit → 先展示提交范围和 message,用户确认后才首 commit + tag;
-- 已有 `synced` → 不动。
+- 读取 `git config --local --get projectConsistency.canonicalBranch`;缺失时显示当前 branch,询问用户是否把它设为项目 canonical branch,只有确认后才写入本地 Git config,不静默猜 `main` 或 `origin/HEAD`;
+- 所有自动创建或推进 `synced` 的入口统一委托目标项目 `.agents/skills/wrapup/scripts/synced-guard.mjs`,安装器不得另写 `git tag` 逻辑;
+- 有 commit 且无 `synced` → 用户确认初始 horizon 后调用 guard `advance`,把当前 canonical HEAD 建为 baseline。首次创建允许工作区已有 staged / unstaged / untracked 变化,它们仍完整留在 baseline 之后等待 wrapup;
+- 无 commit → 先展示提交范围和 message,用户确认后才首 commit,再调用 guard 建立 `synced`;
+- 已有 `synced` → 不移动;调用 guard `inspect` 报告 current / canonical branch、正确 `scope_base` 与安全状态;
+- 当前不在已确认的 canonical branch、detached、冲突或历史无可靠共同祖先 → 不切 branch、不创建 tag,报告 canonical setup / horizon pending,交给用户整理。
 
 ## 步骤 8 · 报告与验证
 
@@ -275,6 +279,7 @@ Codex 本地客户端使用同一份 `.agents/hooks/wrapup-reminder.mjs`,但接�
 - PROJECT 可独立说明背景、地图、阶段与近期决策;
 - AGENTS 是实体正本,CLAUDE 是只含 `@AGENTS.md` 的普通文件适配器;
 - catchup / wrapup 两个仓库级 Skill 存在且通过 Skill 校验;
+- synced guard 存在并通过行为测试;catchup 与 wrapup 都消费它给出的 branch / `scope_base`,安装器与 wrapup 不保留第二套自动 tag 迁移逻辑;
 - catchup 不重复读取 Agent 指令;
 - Claude 的 catchup / wrapup 文件只是薄适配器;
 - Claude Code 与 Codex 本地客户端的 Stop 配置都最终指向同一份跨平台 Node 收尾提醒逻辑;Codex 含不内联变量脚本的 `commandWindows`,并安装 `.ps1` 薄适配器,且没有重复的 JSON / TOML hook 表示;

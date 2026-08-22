@@ -49,4 +49,4 @@ catchup 到这里停止，只汇报状态，等待下一步指令。
  M images/ch03/_manifest.md
 ```
 
-用户确认联动计划和提交范围后，机制才会写入文件、询问提交说明、创建本地提交，并推进 `synced` 标签。远端推送仍由用户手动完成。
+用户确认联动计划和提交范围后，机制才会写入文件、询问提交说明并创建本地提交。canonical branch 通过确定性 guard 后才推进 `synced`;feature branch 只保存 checkpoint,合并回 canonical 后再完成项目级同步。远端推送仍由用户手动完成。

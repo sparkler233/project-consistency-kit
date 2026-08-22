@@ -1,6 +1,6 @@
 # 一致性机制 —— catchup / wrapup 自我维护系统
 
-<!-- 一致性机制 version: 2026-08-20 -->
+<!-- 一致性机制 version: 2026-08-22 -->
 
 > 本目录把「项目的自我维护机制」(会话切换、上下文加载、改动落盘)和「项目本身的内容」分开收纳。
 > **想了解或修改这套机制,从这里看起。**
@@ -10,7 +10,7 @@
 一套让 AI 协作能跨会话连续工作、并自动维护文件一致性的系统:
 
 - **入向**:新会话用 catchup Skill 把项目状态加载回来;
-- **出向**:收尾用 wrapup Skill 按联动规则把改动落盘、提交、推进 `synced` 标记;
+- **出向**:收尾用 wrapup Skill 按 guard 给出的 branch 基线检查联动、提交;只有 canonical branch 能推进 `synced` 标记;
 - **兜底**:跨平台 Stop hook(`../.agents/hooks/wrapup-reminder.mjs`)在有未同步改动时提醒收尾,Windows Codex 经 `.ps1` 薄适配器转发,Claude Code 与 Codex 本地客户端分别显示自己的 wrapup 入口;
 - **底座**:git 是唯一事件源,二进制走选择性处理(可选 LFS)。
 
@@ -36,6 +36,7 @@
 |------|----------|----------------------|
 | catchup 行为正本 | `.agents/skills/catchup/` | Codex 与兼容 Harness 从仓库级 Skill 发现;Claude Code 命令也转发到这里 |
 | wrapup 行为正本 | `.agents/skills/wrapup/` | 同上 |
+| synced guard | `.agents/skills/wrapup/scripts/synced-guard.mjs` | wrapup 内部的确定性 helper;给 canonical / feature 计算基线并独占自动 tag 状态迁移 |
 | 安装器行为正本 | `skills/project-consistency-installer/` | skills.sh 从 GitHub 发现并分发;含 GitHub 获取脚本,机器级使用,不进入目标项目 |
 | 干净分发白名单 | `distribution/manifest.txt` | 发布边界必须独立于套件源码目录,新增产品文件需显式评审 |
 | 分发构建与验证 | `scripts/build-distribution.sh`、`scripts/verify-distribution.sh` | 源码工具,负责生成 Release 资产并阻断自举状态泄漏 |
@@ -49,7 +50,8 @@
 | Agent 指令正本 | `AGENTS.md`(仓库根) | Codex 等 harness 按固定文件名自动加载 |
 | Claude 适配入口 | `CLAUDE.md`(仓库根,内容仅 `@AGENTS.md`) | Claude Code 按固定文件名加载并导入 AGENTS;跨平台复用同一正本 |
 | 同步纪律 | `AGENTS.md` 的“同步纪律”节 | 必须随 harness 自动注入;catchup 不再重复读取 |
-| sync horizon | git tag `synced` | git 对象,不是文件 |
+| canonical branch | 本地 Git config `projectConsistency.canonicalBranch` | 当前 clone 的运行状态,由用户确认;worktree 共享,不写进 PROJECT |
+| sync horizon | git tag `synced` | canonical 项目级 Git ref;guard 原子创建或推进,feature 只用 merge-base 检查自身变化 |
 | hook 接线(Stop → 收尾提醒) | `.claude/settings.json`(仓库根) | Claude Code 只从 settings.json 读 hooks 配置;脚本本体住本目录,接线必须钉在那里 |
 | Codex hook 接线(Stop → 收尾提醒) | `.codex/hooks.json`(仓库根) | Codex 本地客户端从项目 `.codex` 层发现;首次或变更后需要用户审查并信任 |
 | `/引入一致性机制` 全局命令 | `~/.claude/commands/引入一致性机制.md`(可选符号链接 → 套件适配器) | **机器级兼容入口**:只用于本地开发接线;skills.sh 用户直接使用安装器 Skill,不需要此链接 |

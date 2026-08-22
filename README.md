@@ -23,7 +23,7 @@ catchup  ->  正常工作  ->  wrapup
 
 1. 在一个新 Session 或压缩上下文之后开始工作时运行 catchup。它读取 `PROJECT.md`、Git 历史和当前工作区，汇报已经完成、正在进行、遇到的卡点和建议的下一步。这个过程只读，不修改文件。
 2. 中间照常和 Agent 协作。代码、内容、决策和项目状态将会在对话中不断积累。
-3. 此轮 Session 或上下文接近上限准备收尾时运行 wrapup。它比较自上次 `synced` 以来的全部改动，按项目自己的联动规则检查遗漏。用户确认更新计划、提交范围和提交说明后，它才写入文件、创建本地提交并推进 `synced` 标签。
+3. 此轮 Session 或上下文接近上限准备收尾时运行 wrapup。canonical branch 比较自上次 `synced` 以来的全部改动;并行 feature branch 改用它与 canonical 的 merge-base,避免全局 tag 前进后把其他分支变化反向算入。用户确认更新计划、提交范围和提交说明后，它才写入文件和创建本地提交;只有 canonical branch 能通过确定性 guard 推进 `synced`。
 
 | 运行环境 | 会话初始化引入 | 会话收尾 |
 | --- | --- | --- |
@@ -68,7 +68,7 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 | `.agents/hooks/` 和宿主配置 | 检测到未同步改动时提醒运行 wrapup;Windows Codex 通过薄 PowerShell 适配器转到同一 Node 逻辑 |
 | `一致性机制/VERSION` | 记录项目当前安装的套件版本 |
 
-`synced` 是一个本地 Git 标签，表示上一次已经完成联动检查的位置。它和 `HEAD` 分开，因此中途手工提交过的改动不会被 wrapup 跳过。
+`synced` 是一个本地 Git 标签，表示 canonical branch 上一次已经完成项目级联动检查的位置。它和 `HEAD` 分开，因此中途手工提交过的改动不会被 wrapup 跳过。canonical branch 由用户确认后保存在当前 clone 的 Git config;guard 会检查 branch、祖先关系、冲突和工作区状态,再用原子 ref 更新推进 tag。非 canonical branch 可以保存 branch checkpoint,但不会移动项目级 horizon。
 
 ## 支持范围
 
@@ -86,11 +86,11 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 
 ## 仍未解决的问题
 
-### 多个 Session 并行工作
+### 多个 Session 并行工作的边界
 
-当前机制默认一个项目在同一时间只有一条主要工作线。多个 Session 直接在同一工作区运行时会共享未提交文件，却各自持有不同的上下文。一个 Session 可能在另一个 Session 尚未收尾时提交文件或推进 `synced`，这会让改动归属、联动范围和决策顺序变得难以判断。
+v1.3.0 起,并行工作应使用独立 branch + worktree。非 canonical branch 的 catchup / wrapup 以 `merge-base(HEAD, canonical)` 为检查基线,可以完成本分支联动与 checkpoint commit,但 guard 会禁止它推进项目级 `synced`;合并回 canonical 后再执行最终 wrapup。这样不需要 per-session tag、Session registry 或自研 merge 系统。
 
-Git 分支或 worktree 可以隔离文件改动，但各个 Session 仍然围绕同一个项目级 `synced` 标签和同一套状态文档工作。如何为每个 Session 建立独立的同步边界，再安全地汇总项目状态和决策，目前还没有完成设计。
+两个 Session 直接操作同一个 worktree 仍不受支持:它们会共享未提交文件和索引,机制无法可靠判断改动归属。Stop hook 第一版仍保守读取全局 `synced`,所以旧 feature worktree 在 canonical 前进后可能收到一次多余提醒;提醒是 fail-open 的低风险 false positive,不影响 guard / wrapup 使用正确基线。
 
 ### 决策落盘仍然依赖模型
 

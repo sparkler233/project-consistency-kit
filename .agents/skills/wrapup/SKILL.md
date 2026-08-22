@@ -1,9 +1,9 @@
 ---
 name: wrapup
-description: Close a Project Consistency Kit work cycle by recovering current-session decisions, comparing all changes since the synced horizon, checking linkage rules, updating approved files, and preparing a user-confirmed local commit and synced tag. Use when the user asks to wrap up, synchronize project records, reconcile linked documentation, checkpoint completed work, or finish a repository session.
+description: Close a Project Consistency Kit work cycle by recovering current-session decisions, comparing changes from the branch-safe Git baseline, checking linkage rules, updating approved files, and preparing a user-confirmed local commit; only the canonical branch may advance the project synced horizon. Use when the user asks to wrap up, synchronize project records, reconcile linked documentation, checkpoint completed work, or finish a repository session.
 ---
 
-<!-- 一致性机制 version: 2026-08-20 -->
+<!-- 一致性机制 version: 2026-08-22 -->
 
 把「上次同步以来发生的一切」系统性收尾:捕获改动 → 补 B 类事件 → 查联动 → 用户确认 → 落盘 → 提交。
 
@@ -16,6 +16,12 @@ description: Close a Project Consistency Kit work cycle by recovering current-se
 - `一致性机制/文件联动目录.md` 不存在 → 提示「联动目录未建立」并退出。
 - `PROJECT.md` 不存在 → 提示「项目仍是旧版文件模型,请先告诉 Agent“给这个项目引入一致性机制”;也可使用当前 Harness 的显式安装器入口」并退出;不要把决策重新写回 README 或 Agent 指令文件。
 - 检查 `AGENTS.md` 是实体文件、`CLAUDE.md` 是只含 `@AGENTS.md` 的普通文件导入适配器;异常计入步骤 4 联动计划,不通过重复维护两份内容来补救。
+- 运行本 Skill 随附的确定性 helper,后续 Git 范围与 `synced` 状态迁移以它的输出为准,Skill 不重复猜 branch / merge-base:
+  ```bash
+  node .agents/skills/wrapup/scripts/synced-guard.mjs inspect
+  ```
+- `canonical_unconfigured` → 显示当前 branch,询问用户是否将它设为项目 canonical branch;只有确认后才执行 `git config --local projectConsistency.canonicalBranch <branch>` 并重新 inspect,不静默猜 `main` 或 `origin/HEAD`。
+- 当前不是 canonical → 只要 `scope_base` 存在,允许完成本分支联动检查与 commit,但本轮只报告为 branch checkpoint,**不得推进项目级 `synced`**。`scope_base` 不存在(无共同祖先、多个最佳 merge-base、detached 或 Git 状态异常)→ 停止并请用户先整理历史。
 
 ## 步骤 1 · B 类事件 safety net
 
@@ -27,25 +33,23 @@ git 只看得见文件改动。**决策、对外对接、口头约定**这类事
 
 > 局限:safety net 只够得到**当前会话**的对话。跨会话未落盘的 B 类事件捞不回——所以结束会话前建议执行一次 wrapup。
 
-## 步骤 2 · 确定本轮同步范围(horizon = `synced`)
+## 步骤 2 · 确定本轮检查范围
 
-**sync horizon 不是 HEAD,是上次已同步的提交**,用 git tag `synced` 标记。这样即便用户中途手工 commit 过,那些改动仍会被本轮联动检查到(不会被 HEAD 吞掉)。
+项目级 sync horizon 仍是 `synced`,但并行 feature branch 不能直接用移动后的全局 tag 作基线。步骤 0 的 guard 已按 Git 历史确定 `scope_base`:
 
-1. 检查 `synced` tag 是否存在:
+1. 当前 branch = canonical → `scope_base = synced`;`synced` 必须是 HEAD ancestor。
+2. 当前 branch ≠ canonical → `scope_base = git merge-base --all HEAD <canonical>`;必须且只能得到一个最佳共同祖先。
+3. `scope_base` 存在 → 本轮范围 = 自该提交以来工作区的全部改动:
    ```bash
-   git rev-parse -q --verify refs/tags/synced
+   git diff --stat <scope_base>
+   git diff --name-status <scope_base>
+   git status --short
    ```
-2. **存在** → 本轮范围 = 自 `synced` 以来工作区的全部改动:
-   ```bash
-   git diff --stat synced        # 概览
-   git diff --name-status synced # 逐文件(含已 commit 未同步的 + 未 commit 的)
-   git status --short            # 兜底看未跟踪文件
-   ```
-3. **不存在**(首次同步)→ 范围 = 全部已跟踪改动 + 未跟踪文件:
+4. canonical 上 `synced` 不存在(首次建立 horizon)→ 范围 = 全部已跟踪改动 + 未跟踪文件:
    ```bash
    git status --short
    ```
-4. 范围为空 → 报「无改动可同步」并退出(除非步骤 1 已补写了文件)。
+5. 范围为空 → canonical 且 `HEAD == synced` 时报告「无改动可同步」并退出;feature branch 没有自身变化时同样退出。除非步骤 1 已补写了文件。
 
 ## 步骤 3 · 查联动目录 + manifest 对账
 
@@ -86,19 +90,21 @@ git 只看得见文件改动。**决策、对外对接、口头约定**这类事
 
 确认后**逐项执行**,写入前按防重复策略检查;单项结果分 ✅ 成功 / ⏭️ 跳过(已存在) / ❌ 失败,单项失败不影响其他项。
 
-## 步骤 5 · 提交 + 推进 horizon
+## 步骤 5 · 提交 + 条件推进 horizon
 
 > 决策 7:commit 是单向动作,**message 由用户确认**,不自动提交。
 
-1. 先回显 `git status --short`,让用户看清**将入库的全部文件**——本次 commit 含**自 `synced` 以来的全部改动**,不止步骤 4 计划表里的联动项(计划表只列"要回头改哪些文档",收尾把整轮 delta 一起提交);工作区里若有不想入库的半成品 / 杂物,此刻喊停或先挪走。然后 `git add -A`。被 `.gitignore` 排除的二进制(设计源 / PDF / 字体 / 媒体 / `_drafts/`)不会进;若项目配了 LFS,栅格图会经 `.gitattributes` 进 LFS——这是预期行为。
-2. AI 起草一句话 commit message,询问用户:「这个 message 行吗?还是你给一个?」
-3. 用户确认后:
+1. 先回显 `git status --short`,让用户看清**将入库的全部文件**——本次 commit 含当前 worktree 的完整 delta,不止步骤 4 计划表里的联动项。明确询问「以上是将进入本次提交的完整范围,是否确认提交?」;只有用户确认后才 `git add -A`。被 `.gitignore` 排除的二进制不会进;若项目配了 LFS,栅格图会经 `.gitattributes` 进 LFS。
+2. `git add -A` 后检查 staged changes。存在 → AI 起草一句话 commit message并询问用户确认;不存在但 `HEAD != scope_base` → 说明已有 commit 无需再制造空 commit,经用户确认后继续同步边界检查;两者都没有 → 报无变化退出。
+3. staged changes 的 message 经用户确认后执行 commit。commit 失败立即停止,不得调用 guard。
+4. commit 后重新运行 inspect。canonical branch 只有在 guard 报告可推进时才执行:
    ```bash
-   git commit -m "<确认后的 message>"
-   git tag -f synced            # ★ 推进 horizon 到这次提交
+   node .agents/skills/wrapup/scripts/synced-guard.mjs advance
    ```
-   > **push 由用户手动负责**:本机制按**单机**设计,wrapup 到此为止——只本地 commit + 推进本地 `synced`,**不自动 push**。要云端备份就自己跑 `git push`;多机协作时 `synced` 是本地 tag,移动后需 `git push --force origin synced` 才能让远端 horizon 跟上,否则各机的 `git diff synced` 基准会不一致。
-4. 输出报告:
+   guard 会再次确认 canonical branch、祖先关系、冲突、干净工作区与旧 tag 未被其他进程移动,再用带 reflog 的原子 ref 更新创建或推进 `synced`;不提供 `--force`。首次没有 `synced` 时允许把当前 HEAD 建为 baseline,即使工作区已有变化——这些变化仍留在新 baseline 之后;已有 `synced` 的推进必须完全干净。
+5. 非 canonical branch 到 commit 即止,报告「branch checkpoint 已保存,项目级 synced 未推进;合并回 canonical 后执行最终 wrapup」。
+6. **push 由用户手动负责**:wrapup 不自动 push。多机协作若要共享 horizon,仍需用户显式推送移动后的 `synced` tag。
+7. 输出报告:
 
 ```
 wrapup 完成。
@@ -113,7 +119,8 @@ wrapup 完成。
 
 - **绝不**在用户未确认前改任何文件、不自动 commit。
 - `git add -A` 前**必先回显 `git status --short`**——用户确认的不只是 message,还有入库范围。
-- horizon 永远用 `synced` tag,**不要**用裸 HEAD ——否则用户的手工 commit 会被漏掉联动。
+- canonical 的 horizon 永远用 `synced` tag;feature 的检查基线永远用它与 canonical 的唯一最佳 merge-base。不要在 feature 上直接 `git diff synced`,也不得推进全局 tag。
+- 自动创建或推进 `synced` 只能委托本 Skill 的 `synced-guard.mjs`;Skill、安装器和宿主适配器不得另写 `git tag` 状态迁移逻辑。
 - 联动目录未覆盖时**不自创规则**,只提示用户补 `文件联动目录.md`。
 - 防重复 grep 读不到文件时按「失败」处理,不算「成功」。
 - manifest 对账是**条件触发**的:本轮没动素材 / 大文件目录就别跑,避免给每次同步加空转的可靠性税。决策记录轮转同理(规则 6):未超 10 条不动。

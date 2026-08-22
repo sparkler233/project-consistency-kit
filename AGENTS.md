@@ -19,7 +19,7 @@
 - **提交信息**:主题行简短说明“做了什么”,细节留正文;wrapup 只负责本地 commit 与 `synced` tag,不自动 push。
 - **重大决策**:必须在 `PROJECT.md`“关键决策记录”追加一行,操作性内容同步改写到对应正文或机制设计说明。
 
-<!-- 一致性机制:同步纪律 begin (version: 2026-08-20) -->
+<!-- 一致性机制:同步纪律 begin (version: 2026-08-22) -->
 ## 同步纪律(git 驱动)
 
 事件源是 git,不手维护日志。配套 3 条纪律:
@@ -28,5 +28,5 @@
 2. **二进制按类处理**:需要版本史的栅格图走 Git LFS 进 git(规则见 `.gitattributes`);设计源 / PDF / Office / 字体 / 媒体由 `.gitignore` 排除。含二进制的素材 / 大文件目录放 `_manifest.md`,只记用途 / 来源 / 授权或版权;纯文档目录不要 manifest。破例纳入被忽略二进制时,先 `git lfs track "<路径>"`,再 `git add -f`。〔纯代码 / 纯文字项目可简化本条〕
 3. **草稿双轨(仅二进制)**:试稿放 `_drafts/`(已 gitignore),定稿挪上级目录 + 更新 manifest / 让 LFS 接管。
 
-> 入向加载用 catchup(Codex: `$catchup`;Claude Code: `/catchup`):读取 `PROJECT.md`、Git 状态与当前焦点,不重复读取 harness 已注入的本文件。出向收尾用 wrapup(Codex: `$wrapup`;Claude Code: `/wrapup`):git diff → 查联动目录 → 用户确认 → 落盘 → commit + 推进 `synced` tag。
+> 入向加载用 catchup(Codex: `$catchup`;Claude Code: `/catchup`):读取 `PROJECT.md`、Git 状态与当前焦点,不重复读取 harness 已注入的本文件。出向收尾用 wrapup(Codex: `$wrapup`;Claude Code: `/wrapup`):guard 确定当前 branch 基线 → 查联动目录 → 用户确认 → 落盘 → commit;只有 canonical branch 可推进项目级 `synced`。
 <!-- 一致性机制:同步纪律 end -->

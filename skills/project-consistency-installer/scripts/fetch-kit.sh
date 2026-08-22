@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-08-20
+# 一致性机制 version: 2026-08-22
 set -euo pipefail
 
 canonical_repository="https://github.com/sparkler233/project-consistency-kit.git"
@@ -117,6 +117,16 @@ EOF
     [ "$major" -eq 1 ] \
       && { [ "$minor" -gt 2 ] || { [ "$minor" -eq 2 ] && [ "$patch" -ge 2 ]; }; }
   }
+}
+
+version_at_least_1_3() {
+  local version_core="${1%%-*}"
+  local major minor patch
+  IFS=. read -r major minor patch <<EOF
+$version_core
+EOF
+  [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ && "$patch" =~ ^[0-9]+$ ]] || return 1
+  [ "$major" -gt 1 ] || { [ "$major" -eq 1 ] && [ "$minor" -ge 3 ]; }
 }
 
 validate_distribution() {
@@ -282,6 +292,10 @@ EOF
     if version_at_least_1_2_2 "$validated_version"; then
       [ -f "$distribution_dir/.agents/hooks/wrapup-reminder.ps1" ] \
         || fail "v1.2.2+ distribution is incomplete: missing .agents/hooks/wrapup-reminder.ps1"
+    fi
+    if version_at_least_1_3 "$validated_version"; then
+      [ -f "$distribution_dir/.agents/skills/wrapup/scripts/synced-guard.mjs" ] \
+        || fail "v1.3+ distribution is incomplete: missing synced guard"
     fi
   fi
 

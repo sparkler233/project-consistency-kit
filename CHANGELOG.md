@@ -4,6 +4,15 @@
 > 任何机制文件发生真实变化:判断 SemVer 影响、全部修订日期一起 bump 到当天,并在此记入对应版本。
 > 本文件**套件专属,不随模板进项目**(绿地 rsync 已排除;安装器也不拷它)。
 
+## v1.3.0 — 2026-08-22
+
+- **确定性 synced guard**(决策 27):新增 wrapup 内部 Node helper,由用户确认的本地 Git config 保存 canonical branch。guard 检查 branch、祖先关系、冲突、工作区和旧 ref,再用带 reflog 的 `git update-ref` 比较并交换创建或推进 `synced`;installer、首次 wrapup 与日常 wrapup 不再各自维护 `git tag` 逻辑。
+- **并行 branch 正确基线**:canonical 使用项目级 `synced`;非 canonical 使用 `HEAD` 与 canonical 的唯一最佳 merge-base,可以完成本分支 B 类事件、联动检查与 checkpoint commit,但永远不得推进全局 horizon。无共同祖先、多个最佳 merge-base、detached 或同步历史分叉时 fail closed。
+- **提交边界加固**:wrapup 在 `git add -A` 前新增明确的完整范围确认;已有 commit 未同步且没有 staged changes 时不制造空 commit。已有 `synced` 的推进必须工作区完全干净;首次 baseline 允许工作区已有变化,这些变化仍留在 horizon 之后。
+- **跨入口统一**:catchup 消费 guard 的 `scope_base`,避免 feature 上 `git diff synced` 失真;安装器负责询问 canonical branch,实际初始 tag 操作委托 guard。新增 Linux / Windows guard 行为测试、分发白名单与 v1.3.0 包完整性检查;统一修订日期扫描补识别 Node 文件的 `//` 标记,避免新 helper 逃逸混合版本检测。
+- **克制边界**:没有新增 Session registry、per-branch tag、checkpoint 命令或共享模块;Stop hook 第一版保持 fail-open 全局提醒,并记录 feature worktree 可能产生低风险 false positive。同一 worktree 多 Session 并发仍不支持。
+- 这是新增兼容安全能力和用户可见的并行 branch 行为,正式版本升为 v1.3.0;全部机制修订标识推进到 2026-08-22。
+
 ## v1.2.2 — 2026-08-20
 
 - **Windows Codex Stop 修复**(决策 26):`commandWindows` 不再嵌入含 `$root` 的二层 PowerShell 字符串;新增 `.agents/hooks/wrapup-reminder.ps1` 薄适配器,只从 git 根定位 Node 正本、转发 Stop JSON 并失败开放,不复制状态机逻辑。Node 输出的中文与 emoji 在 JSON 传输层改用标准 `\uXXXX` 转义,避免 Windows PowerShell 5.1 多层管道按本地代码页损坏 UTF-8;宿主解析后的用户文案不变。
