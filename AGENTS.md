@@ -11,13 +11,14 @@
 
 ## 工作约定
 
-- **单一正本**:项目事实以 `PROJECT.md` 为准;公开说明以 `README.md` 为准;Agent 规则以本文件为准;正式套件版本以 `一致性机制/VERSION` 为准;catchup / wrapup 行为以 `.agents/skills/` 为准;安装行为以 `skills/project-consistency-installer/` 为准;收尾提醒逻辑以 `.agents/hooks/wrapup-reminder.mjs` 为准,`.agents/hooks/wrapup-reminder.ps1` 只做 Windows Codex 薄适配;分发白名单与构建行为以 `distribution/manifest.txt`、`scripts/` 和 `.github/workflows/distribution.yml` 为准;`.claude/commands/` 只做 Claude Code 入口适配,`.claude/settings.json` 与 `.codex/hooks.json` 只做宿主 Stop 接线;机制原理与决策理由以 `一致性机制/机制设计说明.md` 为准;版本变化以 `CHANGELOG.md` 为准。
+- **单一正本**:项目事实以 `PROJECT.md` 为准;公开说明以 `README.md` 为准;Agent 规则以本文件为准;正式套件版本以 `一致性机制/VERSION` 为准;catchup / wrapup 行为以 `.agents/skills/` 为准;安装行为以 `skills/project-consistency-installer/` 为准;收尾提醒逻辑以 `.agents/hooks/wrapup-reminder.mjs` 为准,`.agents/hooks/wrapup-reminder.ps1` 只做 Windows Codex 薄适配;分发白名单与构建行为以 `distribution/manifest.txt`、`scripts/` 和 `.github/workflows/distribution.yml` 为准;`.claude/commands/` 只做 Claude Code 入口适配,`.claude/settings.json` 与 `.codex/hooks.json` 只做宿主 Stop 接线;机制原理与决策理由以 `一致性机制/机制设计说明.md` 为准;版本变化以 `CHANGELOG.md` 为准;决策 45 起的决策全文与过程历史以 git 提交正文为准。
 - **三层分离**:`README.md` 面向 GitHub 用户,`PROJECT.md` 服务项目运行,`AGENTS.md` 服务 Agent harness;三者可以互相引用,不得互相代替。
 - **Claude 适配**:`CLAUDE.md` 只能是普通文件且内容精确为 `@AGENTS.md`;不得复制规则正文、附加第二份指令或导入仓库外文件。
 - **机制发版纪律**:任何机制文件发生真实变化,先判断 SemVer 的 major / minor / patch 影响,同步 `一致性机制/VERSION` 与安装器 metadata,统一推进全部修订日期到当天,更新 `CHANGELOG.md`,并检查初始化、安装器、公开文档、模板和设计说明是否联动。
 - **架构修改**:先讨论设计取舍,再改实现;被推翻的决策在设计说明中保留演进线索。
-- **提交信息**:主题行简短说明“做了什么”,细节留正文;wrapup 只负责本地 commit 与 `synced` tag,不自动 push。
-- **重大决策**:必须在 `PROJECT.md`“关键决策记录”追加一行,操作性内容同步改写到对应正文或机制设计说明。
+- **提交信息**:主题行说明“做了什么”并写明状态变化(如“已实现但未接入”),细节留正文;正文不用提交哈希互相引用;wrapup 只负责本地 commit 与 `synced` tag,不自动 push。
+- **不重复记录**:已有正本(git 提交正文、`CHANGELOG.md`、主题文档、本文件)的内容,`PROJECT.md` 不再复述,只给指针;主题文档写当前做法,由决策产生的标注 `(决策 N)`。
+- **重大决策**(本仓库试行):拍板时立即在 `PROJECT.md`「待提交」区写全文(决定 / 理由 / 否掉的方案 / 限定 / 取代),编号取现有最大 + 1;提交前可直接改写。wrapup 时的迁出按联动目录规则 2、6。
 
 <!-- 一致性机制:同步纪律 begin (version: 2026-08-22) -->
 ## 同步纪律(git 驱动)
