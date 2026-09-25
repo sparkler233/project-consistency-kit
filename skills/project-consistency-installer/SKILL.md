@@ -2,10 +2,10 @@
 name: project-consistency-installer
 description: Fetch Project Consistency Kit from a trusted local source or its verified clean GitHub Release, then safely integrate or upgrade PROJECT.md, AGENTS.md, the CLAUDE.md adapter, catchup and wrapup repository Skills, linkage rules, and hooks without silently overwriting project content. Use when the user asks to install, introduce, bootstrap, migrate, or update the consistency mechanism in the current repository.
 metadata:
-  version: "1.3.0"
+  version: "2.0.0-preview.1"
 ---
 
-<!-- 一致性机制 version: 2026-08-22 -->
+<!-- 一致性机制 version: 2026-09-25 -->
 
 # Project Consistency Installer
 
@@ -15,7 +15,7 @@ metadata:
 
 1. **先定位源,再分析目标。** 套件源只读;当前工作目录才是目标项目。
 2. **先计划、后确认、再写入。** 不静默覆盖已有内容,不擅自初始化 Git、commit 或 push。
-3. **职责分离。** PROJECT 保存项目事实,AGENTS 保存 Agent 规则,README 保持用户自有,CLAUDE 只用 `@AGENTS.md` 导入唯一规则正本。
+3. **职责分离。** PROJECT 是项目入口(目标与边界、总体状态、阅读入口、关键决策),AGENTS 保存项目自己的 Agent 规则,机制怎么运行只写在 `一致性机制/运行规则.md`(机制文件),README 保持用户自有,CLAUDE 只用 `@AGENTS.md` 导入唯一规则正本。
 4. **行为只有一个正本。** 本 Skill 是安装工作流正本;宿主命令只允许做薄适配。
 5. **正式版本只有一个。** `一致性机制/VERSION` 是 Kit SemVer 正本;本 Skill 的 `metadata.version` 必须与它一致,日期版本行只表示机制文件修订日期。
 
@@ -63,8 +63,7 @@ metadata:
    - `templates/PROJECT.md`
    - `templates/AGENTS.md`
    - `templates/一致性机制/文件联动目录.md`
-   - `templates/一致性机制/决策档案.md`
-   versioned 分发包或当前源码 checkout 还必须包含 `.codex/hooks.json` 与 `一致性机制/VERSION`;v1.2.0+ 还必须包含 `fetch-kit.ps1` 与 `.agents/hooks/wrapup-reminder.mjs`;v1.2.2+ 还必须包含 `.agents/hooks/wrapup-reminder.ps1`;v1.3.0+ 还必须包含 `.agents/skills/wrapup/scripts/synced-guard.mjs`;旧包按各自版本的最低集合验证,不得用新版本文件要求反向否决旧 Release。
+   versioned 分发包或当前源码 checkout 还必须包含 `.codex/hooks.json` 与 `一致性机制/VERSION`;v1.2.0+ 还必须包含 `fetch-kit.ps1` 与 `.agents/hooks/wrapup-reminder.mjs`;v1.2.2+ 还必须包含 `.agents/hooks/wrapup-reminder.ps1`;v1.3.0+ 还必须包含 `.agents/skills/wrapup/scripts/synced-guard.mjs`;v1.3.0 及更早的包还含 `templates/一致性机制/决策档案.md`;v2.0.0-preview.1+ 还必须包含 `一致性机制/运行规则.md`、`.agents/skills/wrapup/scripts/scope.mjs`、`.agents/skills/wrapup/scripts/decisions.mjs`、`.agents/skills/wrapup/references/document-maintenance.md` 与本 Skill 的 `references/upgrade-from-v1.3.md`;旧包按各自版本的最低集合验证,不得用新版本文件要求反向否决旧 Release。
 6. 记录版本与来源并在计划和最终报告回显:
    - 干净分发目录必须有 `DISTRIBUTION-METADATA.txt` 与 `DISTRIBUTION-MANIFEST.sha256`;记录其中的 `kit_version`、`mechanism_revision`、规范仓库、release ref 与 source commit;缺少版本字段的 schema 1 旧包标为 `legacy`,版本可从 `vX.Y.Z` release ref 派生展示,但必须标明不是包内 VERSION;
    - 本地源码 checkout 必须是 Git 仓库;读取 `一致性机制/VERSION` 为 `SOURCE_VERSION`,读取源内安装器 `metadata.version`,两者必须一致;另记录统一修订日期、`git rev-parse HEAD` 与当前 ref,有未提交改动时明确标出;
@@ -86,6 +85,7 @@ grep -hE '^(<!-- |# |// )一致性机制 version:' \
   .agents/skills/*/SKILL.md \
   .agents/skills/*/agents/openai.yaml \
   .agents/skills/*/scripts/*.mjs \
+  .agents/skills/*/references/*.md \
   .agents/hooks/*.mjs \
   .agents/hooks/*.ps1 \
   .claude/commands/*.md \
@@ -103,10 +103,13 @@ test -L CLAUDE.md && readlink CLAUDE.md
 
 把目标 `一致性机制/VERSION` 记为 `TARGET_VERSION`:不存在时标为“旧版或未标记”,不得从日期行反推 SemVer。`SOURCE_VERSION > TARGET_VERSION` 是升级,相等时仍检查实际 diff,`SOURCE_VERSION < TARGET_VERSION` 是降级请求,必须单独提示并再次确认;目标缺少版本时使用统一修订日期和实际内容规划迁移。
 
+升级只支持从 v1.3.0 开始:`TARGET_VERSION` 为 1.3.0 时,完整读取本 Skill 的 [v1.3.0 升级细则](references/upgrade-from-v1.3.md),后续步骤中凡细则另有规定的按细则执行;目标早于 1.3.0,或未标记版本但已有机制痕迹时,停止并建议先用 `--release v1.3.0` 升到 1.3.0 再升级。首次引入不读升级细则。
+
 完整读取现有 PROJECT、实体 AGENTS、实体 CLAUDE 与 README 的相关结构,建立内容归属表:
 
-- 背景、流程、地图、阶段、近期决策 → PROJECT;
-- 工作约定、质量规则、权限边界、同步纪律 → AGENTS;
+- 目标与边界、总体状态、各类资料在哪里、决策 → PROJECT(入口式;主题细节归主题文档);
+- 项目自己的工作约定、质量规则、权限边界 → AGENTS;
+- 机制怎么运行 → `一致性机制/运行规则.md`(机制文件,不写进 AGENTS);
 - 面向用户的介绍、安装、API、使用说明 → README 原位保留;
 - 无法可靠分类 → 列给用户决定,不擅自移动。
 
@@ -115,7 +118,7 @@ test -L CLAUDE.md && readlink CLAUDE.md
 | 当前状态 | 计划 |
 |---|---|
 | AGENTS / CLAUDE 都不存在 | 从模板创建 AGENTS,再创建只含 `@AGENTS.md` 的 CLAUDE 适配器 |
-| 只有实体 AGENTS | 保留内容并补同步纪律;创建 CLAUDE 导入适配器 |
+| 只有实体 AGENTS | 保留内容并补接入块(引用运行规则);创建 CLAUDE 导入适配器 |
 | CLAUDE 只含 `@AGENTS.md` | 验证 AGENTS 是实体正本;缺什么补什么 |
 | 只有其他实体 CLAUDE | 事实迁入 PROJECT、规则迁入 AGENTS;核对后以导入适配器替换 CLAUDE |
 | 两者都是实体 | diff + 语义合并;AGENTS 留规则,事实进 PROJECT;核对后替换 CLAUDE |
@@ -139,14 +142,16 @@ test -L CLAUDE.md && readlink CLAUDE.md
 ┌──────────────────────────────────┬────────────────────────────────────────┬────────┐
 │ 目标                             │ 动作                                   │ 状态   │
 ├──────────────────────────────────┼────────────────────────────────────────┼────────┤
-│ PROJECT.md                       │ 新建或合并项目事实                      │ …      │
-│ AGENTS.md                        │ 新建或合并工作规则 + 同步纪律           │ …      │
+│ PROJECT.md                       │ 新建;首次引入补入口结构;升级完整改造 │ …      │
+│ AGENTS.md                        │ 新建或合并工作规则 + 接入块             │ …      │
 │ CLAUDE.md                        │ 核对后替换为一行 @AGENTS.md             │ …      │
 │ README.md                        │ 默认不动;仅判断是否加入 Part A          │ 跳过   │
 │ .agents/skills/(catchup/wrapup)  │ 新建或按版本更新行为正本                │ …      │
 │ .claude/commands/(catchup/wrapup)│ 新建或迁移为 Claude Code 薄适配器       │ …      │
 │ 旧版中文出向命令                 │ 对账定制后迁移并移除旧入口              │ …      │
-│ 一致性机制/(文档 + hooks)        │ 从套件新建或按版本更新                  │ …      │
+│ 一致性机制/(运行规则、文档、hooks)│ 从套件新建或按版本更新                  │ …      │
+│ 决策档案(仅升级)                │ 全文写入升级提交正文后删除,或保留只读  │ …      │
+│ 升级提交(仅升级)                │ 展示提交说明全文,确认后提交            │ …      │
 │ 一致性机制/VERSION               │ 全部机制件验证成功后最后写入             │ …      │
 │ 文件联动目录.md                  │ 从分发模板新建或逐条合并通用规则        │ …      │
 │ .claude/settings.json            │ 增量接线 Stop hook                     │ …      │
@@ -162,21 +167,23 @@ test -L CLAUDE.md && readlink CLAUDE.md
 - 无法分类的旧内容放哪里;
 - README 是否承载需同步维护的公开契约;
 - 项目是否含图片、设计稿、字体或媒体;
-- 不是 Git 仓库时是否允许 `git init`。
+- 不是 Git 仓库时是否允许 `git init`;
+- 升级时:决策档案删除还是保留;PROJECT、AGENTS、联动目录改造中的每一项删除(写明删什么、原文去哪)。
 
 ## 步骤 4 · 建立 PROJECT、AGENTS 与 CLAUDE 适配
 
 **PROJECT.md**
 
-- 已存在 → 保留结构,只补缺失事实类别;
-- 不存在但旧 CLAUDE / README 有事实 → 基于现有内容新建并标明来源,README 原文不动;
-- 无可迁移事实 → 从套件 `templates/PROJECT.md` 新建,按实际仓库预填可确认内容;
-- 决策规范落点固定为 PROJECT“关键决策记录”。
+- 不存在但旧 CLAUDE / README 有事实 → 按套件 `templates/PROJECT.md` 的结构新建,基于现有内容填写并标明来源,README 原文不动;
+- 无可迁移事实 → 从 `templates/PROJECT.md` 新建,按实际仓库预填可确认内容;
+- 已存在(首次引入)→ 保留已有内容,按模板补齐入口结构,至少补出「关键决策」下的「待提交」「最近决策」两个小节(wrapup 的决策脚本按这两个小节读取);超出补齐的结构调整,按套件 `.agents/skills/wrapup/references/document-maintenance.md` 提出,经用户确认;
+- 升级自 v1.3.0 → 按升级细则完整改为入口式;
+- 决策落点:「关键决策」下的「待提交」(拍板时写全文)与「最近决策」(每条一行索引)。
 
 **AGENTS.md**
 
 - 不存在 → 从 `templates/AGENTS.md` 新建,再合并旧规则;
-- 已存在实体 → 原结构不动;按模板 begin/end marker 增量补或更新同步纪律;
+- 已存在实体 → 原结构不动;按模板 begin/end marker(`一致性机制:接入`)补上或整块替换接入块(块内只引用运行规则并给出压缩后指令);v1.3.0 的旧块 marker 为 `一致性机制:同步纪律`,整块换成新 marker 的接入块,不留旧块;块内有项目自加内容时先展示,移到块外保留;升级时,v1.3.0 模板在块外带来的旧机制条款按升级细则处理;
 - 已是链接 → 先解析实际内容,不得叠加链接;
 - catchup 必须明确不重复读取 harness 已注入的 AGENTS / CLAUDE。
 
@@ -200,11 +207,10 @@ test -L CLAUDE.md && readlink CLAUDE.md
 
 从已验证的套件源读取。不存在才新建;已存在时比较统一版本行、实际内容和项目定制,用户确认后更新。版本行相同不等于内容相同:同日热修仍须做 diff;只有规范内容确实一致才能跳过,差异中含项目定制时先拆分归属,不得整文件覆盖:
 
-- `.agents/skills/catchup/`、`.agents/skills/wrapup/`(完整目录,含 `SKILL.md` 与 `agents/openai.yaml`);
+- `.agents/skills/catchup/`、`.agents/skills/wrapup/`(完整目录,含 `SKILL.md`、`agents/openai.yaml`、`scripts/` 与 `references/`);
 - `.claude/commands/catchup.md`、`.claude/commands/wrapup.md`;
-- `一致性机制/机制设计说明.md`、`一致性机制/README.md`;
+- `一致性机制/运行规则.md`(机制文件,整体替换,项目不手改)、`一致性机制/机制设计说明.md`、`一致性机制/README.md`;
 - `.agents/hooks/wrapup-reminder.mjs`(ASCII 固定路径的跨平台逻辑正本)、`.agents/hooks/wrapup-reminder.ps1`(Windows Codex 薄适配器,只定位并转发到 Node)与 `一致性机制/hooks/收尾提醒.sh`(旧 Unix 接线兼容包装;随后 `chmod +x`);
-- `一致性机制/决策档案.md`(目标不存在时从 `templates/一致性机制/决策档案.md` 新建;已有归档绝不覆盖;不得复制套件根的实况档案);
 - `一致性机制/LICENSE.project-consistency-kit`(从套件根 LICENSE 新建,已有不覆盖)。
 
 `一致性机制/VERSION` 不参与内容合并,但只能在本轮用户批准的机制件全部写入并通过步骤 8 验证后,最后原样写入 `SOURCE_VERSION`。用户跳过任一必需升级、出现未解决冲突或验证失败时不得推进 VERSION;报告目标处于 mixed / pending 状态,避免把部分安装伪装成完整版本。
@@ -219,18 +225,9 @@ test -L CLAUDE.md && readlink CLAUDE.md
 
 完成后验证完整流程只存在于 `.agents/skills/`,Claude 命令不复制步骤正文。
 
-`一致性机制/文件联动目录.md` 必须来自套件的 `templates/一致性机制/文件联动目录.md`,不是套件自身真实规则。目标已存在时只逐条补缺,保留项目自定内容。
+`一致性机制/文件联动目录.md` 必须来自套件的 `templates/一致性机制/文件联动目录.md`,不是套件自身真实规则。首次引入且目标已存在时只逐条补缺,保留项目自定内容;升级时按升级细则改造。
 
-`一致性机制/决策档案.md` 必须从套件的 `templates/一致性机制/决策档案.md` 新建,不得复制套件自身已经轮转的历史。目标已存在时整文件跳过,不合并、不覆盖。
-
-兼容决策 21 之前的泄漏版本时,只检查下面两条**完整且逐字相同**的已知套件记录,不得按日期、决策编号或模糊文本扩大匹配:
-
-```text
-- 2026-06-11:启用套件级统一版本行与 CHANGELOG 治理(决策 9)
-- 2026-06-12:加入 Stop 收尾提醒与决策记录轮转归档(决策 10/11)
-```
-
-命中时先展示记录及上下文并标为“疑似套件历史泄漏”;只有用户确认后才删除命中的精确整行。档案中的其他文字和项目记录原位保留,不得用空白模板重写整个文件;未命中则完全跳过。
+新版不再创建 `一致性机制/决策档案.md`:决策全文在 git 提交正文,「最近决策」超限的最老行由 wrapup 的决策脚本删除并逐字写入提交正文。升级时已有的档案按升级细则处理。
 
 `.claude/settings.json` 已存在时只向 `hooks.Stop` 追加收尾提醒 entry;已有同类 entry 就跳过,不覆盖其他 hooks。
 
@@ -276,7 +273,9 @@ Codex 本地客户端使用同一份 `.agents/hooks/wrapup-reminder.mjs`,但接�
 
 报告 `BOOTSTRAP_VERSION`、`SOURCE_VERSION`、安装前 `TARGET_VERSION`、安装后版本状态、统一修订日期、套件源 URL、release/ref、source commit、来源类型,以及新建、合并、迁移、跳过、失败和待填项。至少验证:
 
-- PROJECT 可独立说明背景、地图、阶段与近期决策;
+- PROJECT 为入口式:目标与边界、总体状态、阅读入口(写出各位置的具体主题)、关键决策(「待提交」「最近决策」);`node .agents/skills/wrapup/scripts/decisions.mjs plan` 不报 `section_not_found`;
+- `一致性机制/运行规则.md` 存在,AGENTS 接入块引用它,且不再有 `一致性机制:同步纪律` 旧块;`node .agents/skills/wrapup/scripts/scope.mjs --overview` 可运行;
+- 升级时:决策档案已按用户选择处理;v1.3.0 模板带来的旧机制条款已不在 AGENTS;升级提交已按确认完成或明确报告未提交;
 - AGENTS 是实体正本,CLAUDE 是只含 `@AGENTS.md` 的普通文件适配器;
 - catchup / wrapup 两个仓库级 Skill 存在且通过 Skill 校验;
 - synced guard 存在并通过行为测试;catchup 与 wrapup 都消费它给出的 branch / `scope_base`,安装器与 wrapup 不保留第二套自动 tag 迁移逻辑;
@@ -295,11 +294,11 @@ Codex 本地客户端使用同一份 `.agents/hooks/wrapup-reminder.mjs`,但接�
 - 发布包外层 SHA-256、内部逐文件清单、来源元数据或缓存完整性任一失败时停止,不得静默回退到源码仓库。
 - 用户明确提供的本地源码 checkout 可以作为开发来源;非规范远端不得由下载脚本静默获取。
 - 不从不受信任的 fork 静默获取;非规范来源必须由用户以本地路径明确提供。
-- 不丢旧内容,不因模板更标准而重排用户文档。
+- 不丢旧内容。首次引入不因模板更标准而重排用户文档;升级时的改造按升级细则进行,删除须经用户确认。
 - README 默认不写、不创建、不作为项目地图。
-- AGENTS 是唯一指令正本;CLAUDE 只用 `@AGENTS.md` 做导入适配。
-- PROJECT 是项目事实与近期决策正本。
+- AGENTS 是项目自己的指令正本,机制规则只在 `一致性机制/运行规则.md`;CLAUDE 只用 `@AGENTS.md` 做导入适配。
+- PROJECT 是项目入口;决策全文先在「待提交」,wrapup 后在 git 提交正文。
 - catchup / wrapup 以目标仓库 `.agents/skills/` 为行为正本。
 - 收尾提醒以 `.agents/hooks/wrapup-reminder.mjs` 为跨平台逻辑正本;`.agents/hooks/wrapup-reminder.ps1` 只做 Windows Codex 路径定位与 stdin 转发,`一致性机制/hooks/收尾提醒.sh` 只兼容旧 Unix 接线,宿主配置只做接线。
 - `一致性机制/VERSION` 是正式套件版本正本;日期版本行只用于修订与混合版本检测。
-- 不擅自 `git init`、commit 或 push。
+- 不擅自 `git init`、commit 或 push;升级提交只在用户看过提交说明全文并确认后进行。

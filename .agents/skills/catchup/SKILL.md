@@ -1,104 +1,57 @@
 ---
 name: catchup
-description: Restore a repository's project context from PROJECT.md, Git history, pending changes, and focus files, then report what is done, in progress, blocked, and next. Use when the user asks to catch up, resume prior work, load project state, understand where a project stopped, or begin a new session in a repository using Project Consistency Kit.
+description: Restore task-relevant project context from the project entry, current artifacts and Git without modifying the repository. Use when asked to catch up, recover prior work or load project state before continuing a task.
 ---
 
-<!-- 一致性机制 version: 2026-08-22 -->
+<!-- 一致性机制 version: 2026-09-25 -->
 
-新对话开局,把项目当前状态完整装载进来再继续工作。Agent harness 已经注入 `AGENTS.md`(Codex)或通过 `CLAUDE.md` 导入的同一文件(Claude Code),**不要再次读取这两份指令文件**。
+恢复本次范围内足以判断下一步的信息。只读，不修改文档、修复入口、运行测试或实验，不操作提交或 synced。不要将局部恢复报告为全项目一致性核验。
 
-> 配套出向工作流是 `wrapup`(Codex: `$wrapup`;Claude Code: `/wrapup`)。机制见 `一致性机制/机制设计说明.md`。
+## 1. 读入口，确定范围
 
-## 第一层:项目事实
+完整读取作为简短入口的 `PROJECT.md`，取得全局边界、总体状态和阅读入口；完整读取机制运行规则 `一致性机制/运行规则.md`(不依赖宿主 `@` 导入)。遵守宿主实际适用规则；已可靠加载且仍适用的内容不重复读，未加载的必要规则按宿主方式补读，不因磁盘存在某文件就假定已注入。不检查或强制 AGENTS / CLAUDE 的文件形态。
 
-1. 完整读取 `PROJECT.md`——背景、流程、地图、阶段与近期决策的唯一正本。
-2. 只检查适配入口的**文件类型与精确形态**,不展开读取 AGENTS 内容:
-   ```bash
-   test -f AGENTS.md
-   test ! -L CLAUDE.md
-   test "$(tr -d '\r\n' < CLAUDE.md)" = "@AGENTS.md"
-   ```
-   健康状态:`AGENTS.md` 是实体文件,`CLAUDE.md` 是只含 `@AGENTS.md` 的普通文件导入适配器。
-3. `PROJECT.md` 不存在时进入**旧版兼容模式**:读取 `README.md` 判断项目概况,并在报告中明确提示“缺少 PROJECT.md,建议迁移”;不要把 README 永久认定为项目事实正本。
+用户给出任务时沿该任务恢复。只说 catchup 或只要项目概况时，默认以 PROJECT 和 Git 概况完成恢复；入口列出的方向只用于报告有哪些工作，不视为授权逐项展开。可以按判断补读与概况直接相关的资料、实现或测试内容以核对现状；读取应有实际核对价值，避免逐项展开全部方向或开放式审计。阅读实现不等于授权实施任务或运行测试；详细进度未核对就按入口记载表述。未提交文件不是当前任务归属的证明。
 
-## 第二层:项目状态(git 是事件源)
+## 2. 查看 Git 概况
 
-1. 先调用与 wrapup 共用的只读 guard,由它确定 current / canonical branch 与正确检查基线,不要在 catchup 里维护第二套 branch / merge-base 判断:
-   ```bash
-   node .agents/skills/wrapup/scripts/synced-guard.mjs inspect
-   ```
-   - canonical branch:`scope_base = synced`;
-   - 非 canonical branch:`scope_base = HEAD 与 canonical 的唯一最佳 merge-base`;
-   - `canonical_unconfigured`、无共同祖先、多个最佳 merge-base、detached 或 `synced_not_ancestor` → 在报告中明确列为同步边界异常,不要退回 `git diff synced` 猜范围。
-2. 已沉淀事件:
-   ```bash
-   git log --oneline -20
-   ```
-3. 尚未收尾的工作:
-   ```bash
-   git status --short
-   ```
-4. 自该 branch 正确基线以来的完整范围(含已 commit 未同步):
-   - inspect 返回 `scope_base` → `git diff --stat <scope_base>`;输出为空时说明该 branch 相对基线无新改动;
-   - canonical 且 `synced` 不存在 → 报「无 synced tag,尚未建立首次 horizon」;
-   - inspect 没有可靠 `scope_base` → 报同步边界异常,不输出可能失真的 diff。
-5. 完整读取 `PROJECT.md` 之外的中枢文档(见 `一致性机制/文件联动目录.md` Part A)。`AGENTS.md` / `CLAUDE.md` 已由 harness 注入,跳过内容读取;README 只有列入 Part A 或处于旧版兼容模式时才读。
-
-> 不是 git repo → 报“项目未纳入 git,一致性机制未生效”,退回只读现有文件判断状态。
-
-## 第三层:当前焦点
-
-`git status` 中未提交 / 未跟踪的文件是最高优先级焦点。逐个完整读取,弄清上次写到哪里。
-
-| 线索 | 跟进动作 |
-|------|----------|
-| 某文本文件被改 | 直接读该文件 |
-| 最近 commit 提到某主题 | 找对应文件 / 目录 |
-| 二进制目录有变化 | 读取对应 `_manifest.md` |
-
-- 工作区有未提交文件 → 直接读它们。
-- 工作区干净但要续上一个方向 → 看最近提交及对应文件。
-- 完全无线索 → 报告中写“未识别到当前焦点文件”。
-
-## 第四层:全景扫描
-
-从仓库实际状态派生,不维护固定目录清单:
+运行一个脚本取得全部 Git 概况，输出为 JSON，直接使用其中的值，不自行抄写哈希、不另算基线：
 
 ```bash
-git rev-parse -q --verify HEAD >/dev/null 2>&1 \
-  && git -c core.quotepath=false ls-tree -d --name-only HEAD
-ls -A
+node .agents/skills/wrapup/scripts/scope.mjs --overview
 ```
 
-对每个非隐藏顶层目录查看实际内容,区分有实质产物与占位目录,并与 `PROJECT.md` 项目地图核对。
+- `base`、`commits_since_base`、`committed_since_base`、`worktree`：自上次收尾以来的提交、这些提交改过的文件、尚未提交的工作区改动。未提交与未跟踪文件只列出(脚本已附行数、大小；未跟踪目录附文件数与示例)，不读内容。
+- `recent_commits`：最近 15 条提交标题。标题只说明当时的事，现状以 `PROJECT.md` 为准；正文默认不读，标题与任务相关时再 `git show`。
+- `tree`、`top_files`：已跟踪顶层目录及其下一层名称，只看名称。
+- `anomalies`：其他工作区、未合入当前分支的分支、领先或落后上游；为空则不报。
 
-## 输出 catchup 报告
+相关 diff 和更早历史按明确需要再展开，需要基线时用输出中的 `base` 原值。
 
-每节简短,3–5 行内:
+guard 不可用、未配置 canonical、没有首次提交或基线异常时，不猜替代同步基线；仍可恢复现有资料，说明版本比较限制。`can_advance=false` 不等于无法读取；非 canonical 分支不能推进项目级 synced。
 
-### 项目快照
-一句话概括主题与当前阶段(取自 PROJECT)。
+## 3. 沿入口读取必要资料
 
-### 已完成
-按 PROJECT 的流程 / 里程碑列关键产物。
+先读当前要求和限制，再看相关成果、差距与验证依据。以完整适用章节为单位，保留条件与例外，不只摘取命中关键词的一句。
 
-### 进行中
-基于未提交文件和焦点文件说明上次最后在做什么;无线索写“暂无记录”。
+普通背景或历史链接不自动递归展开；当前任务明确依赖的约束必须读。读取足以判断下一步的相关实现、数据或稿件，不要求提前理解全部实现细节。联动目录是收尾检查依据，不自动成为恢复全文必读清单。
 
-### 卡点 / 待决策
-列 TODO、开放问题、链接异常或未覆盖联动;没有写“无”。
+## 4. 只针对具体缺口补读
 
-### 下一步建议
-给 2–3 个按优先级排序的自然下一步。
+- 缺少要求或完成标准：查对应正本及必要依赖。
+- 资料与成果不符：核对相关成果、局部 diff 或必要历史。
+- 依赖验证结论但适用范围不清：核对对应报告、输入、相关版本及覆盖范围。
 
-报告结尾问:
+先沿明确入口查找，再针对性搜索。无法消除的关键缺口如实报告，不猜、不无限翻历史。要求80而实现50是差距，不必判定其中一份过时；旧条件测试通过不能证明满足新要求；没有发现变化不等于重新验证。
 
-> catchup 完成。继续上次的工作,还是有新方向?
+入口缺失或链接失效，可利用已有 README、项目说明和针对性查找恢复可确定部分，报告入口缺口而不自行修复。必要规则冲突时展示冲突及影响，不擅自选较新的一份。
 
-## 守则
+## 5. 停止与报告
 
-- 不凭印象作答,结论必须来自 PROJECT、Git 与读过的焦点文件。
-- 若 PROJECT 与目录或 Git 状态不一致,用“⚑ 一致性提醒”标出。
-- 报告当前 branch、canonical branch 与使用的 `scope_base`;非 canonical branch 明确说明这里只能形成 branch checkpoint,项目级 `synced` 要在合并回 canonical 后推进。
-- 若 `AGENTS.md` 不是实体、`CLAUDE.md` 不是精确的一行 `@AGENTS.md` 导入适配器,标为适配入口异常;不要自行读取两份内容来掩盖问题。
-- catchup 只读取和汇报,不修改文件。
+能回答以下问题即可结束：现在要求什么、有哪些限制；相关工作做到哪里、哪些未核对或未验证；下一步可以做什么或被什么缺口挡住。
+
+报告保持简短，给出本次范围、关键结论及其依据、下一步或阻塞，并注明 Git 分支/基线状态和必要未覆盖项。
+
+无论是否给出任务，报告都固定包含“自上次收尾以来”一段(canonical 以 `synced` 为准，其他分支以 guard 的 `scope_base` 为准)：基线之后的新提交(列标题)、未提交与未跟踪改动、`PROJECT.md`「待提交」区中尚未迁出的决策；都没有时只写一行“无变化”。这段只提醒绕过 wrapup 的变化；已经 wrapup 的变化体现在 PROJECT 中，不重复提醒。基线不可靠时说明无法比较，不猜替代基线。有顶层目录在 `PROJECT.md` 与 `AGENTS.md` 中都未提及时，报告一行提醒，不自行修改入口。`anomalies` 中每项各报一行，为空不写。未核对成果时使用“文档记载”，不升级为已验证；只说“本次范围内未发现阻塞”。
+
+只调用 catchup 则报告后结束；同时已授权后续任务且不存在阻塞，则结束只读恢复后继续任务，不固定追问是否继续。关键缺口未解时，不执行依赖它的后续动作。

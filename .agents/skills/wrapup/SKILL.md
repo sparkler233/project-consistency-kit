@@ -1,127 +1,106 @@
 ---
 name: wrapup
-description: Close a Project Consistency Kit work cycle by recovering current-session decisions, comparing changes from the branch-safe Git baseline, checking linkage rules, updating approved files, and preparing a user-confirmed local commit; only the canonical branch may advance the project synced horizon. Use when the user asks to wrap up, synchronize project records, reconcile linked documentation, checkpoint completed work, or finish a repository session.
+description: Reconcile project records and necessary linkage within the branch-safe Git scope, then prepare a user-confirmed local commit. Use for wrapup, project record synchronization or a repository checkpoint; add document restructuring only when explicitly requested.
 ---
 
-<!-- 一致性机制 version: 2026-08-22 -->
+<!-- 一致性机制 version: 2026-09-25 -->
 
-把「上次同步以来发生的一切」系统性收尾:捕获改动 → 补 B 类事件 → 查联动 → 用户确认 → 落盘 → 提交。
+默认在已有结构内完成必要记录和联动，不例行整理全项目。用户明确要求文档整理时，才读取 [文档整理细则](references/document-maintenance.md)，按其中的目的与范围提出整理计划，复用本流程确认、执行与提交；有日常工作要收尾时，先完成日常提交，再整理并单独提交。
 
-> 机制动机见 `一致性机制/机制设计说明.md`,联动规则见 `一致性机制/文件联动目录.md`。
-> `wrapup` 是**兜底工具,不是流程门禁**——用户可随时手工改 / commit;本工作流只把漏的联动补上、把改动收尾。
+## 1. 收集变化与边界
 
-## 步骤 0 · 前置检查
+遵守当前任务授权、只读和禁改路径。复用已可靠加载的规则；机制运行规则 `一致性机制/运行规则.md` 不在当前上下文时先读取。按需读取 PROJECT 的信息归属和项目联动目录；不审查或重排 AGENTS / CLAUDE 的文件形态。
 
-- 不是 git repo(`git rev-parse --is-inside-work-tree` 失败)→ 提示「项目未纳入 git,一致性机制无法运行」并退出。
-- `一致性机制/文件联动目录.md` 不存在 → 提示「联动目录未建立」并退出。
-- `PROJECT.md` 不存在 → 提示「项目仍是旧版文件模型,请先告诉 Agent“给这个项目引入一致性机制”;也可使用当前 Harness 的显式安装器入口」并退出;不要把决策重新写回 README 或 Agent 指令文件。
-- 检查 `AGENTS.md` 是实体文件、`CLAUDE.md` 是只含 `@AGENTS.md` 的普通文件导入适配器;异常计入步骤 4 联动计划,不通过重复维护两份内容来补救。
-- 运行本 Skill 随附的确定性 helper,后续 Git 范围与 `synced` 状态迁移以它的输出为准,Skill 不重复猜 branch / merge-base:
-  ```bash
-  node .agents/skills/wrapup/scripts/synced-guard.mjs inspect
-  ```
-- `canonical_unconfigured` → 显示当前 branch,询问用户是否将它设为项目 canonical branch;只有确认后才执行 `git config --local projectConsistency.canonicalBranch <branch>` 并重新 inspect,不静默猜 `main` 或 `origin/HEAD`。
-- 当前不是 canonical → 只要 `scope_base` 存在,允许完成本分支联动检查与 commit,但本轮只报告为 branch checkpoint,**不得推进项目级 `synced`**。`scope_base` 不存在(无共同祖先、多个最佳 merge-base、detached 或 Git 状态异常)→ 停止并请用户先整理历史。
+回看当前仍可见对话，找已确认但未写入文件的内容：决策应已在 `PROJECT.md`「待提交」区，发现漏写的列入计划补写；其他约定按归属补写。纯讨论不默认写文件，未确认想法不升级为有效要求。用户明确要求保留的备选按备选记录。已授权实施任务的必要文档维护属于交付，普通任务授权不包含 Git 提交或推送。没有原始对话的信息不凭空恢复。
 
-## 步骤 1 · B 类事件 safety net
+用一个脚本取得全部范围，输出为 JSON，直接使用其中的值，不自行抄写哈希、不另算基线：
 
-git 只看得见文件改动。**决策、对外对接、口头约定**这类事发生在对话里,不直接产生文件 → 先补这一层。
-
-1. 回看**本次对话历史**,找「已发生 B 类事件、但还没写进任何文件」的。
-2. 列清单问用户:「这些要补写吗?」对**决策**类,规范落点是 `PROJECT.md` 关键决策记录(联动目录规则 2)。
-3. 用户确认后**立刻写入目标文件**——这样它们就变成下一步 git 能看见的改动。
-
-> 局限:safety net 只够得到**当前会话**的对话。跨会话未落盘的 B 类事件捞不回——所以结束会话前建议执行一次 wrapup。
-
-## 步骤 2 · 确定本轮检查范围
-
-项目级 sync horizon 仍是 `synced`,但并行 feature branch 不能直接用移动后的全局 tag 作基线。步骤 0 的 guard 已按 Git 历史确定 `scope_base`:
-
-1. 当前 branch = canonical → `scope_base = synced`;`synced` 必须是 HEAD ancestor。
-2. 当前 branch ≠ canonical → `scope_base = git merge-base --all HEAD <canonical>`;必须且只能得到一个最佳共同祖先。
-3. `scope_base` 存在 → 本轮范围 = 自该提交以来工作区的全部改动:
-   ```bash
-   git diff --stat <scope_base>
-   git diff --name-status <scope_base>
-   git status --short
-   ```
-4. canonical 上 `synced` 不存在(首次建立 horizon)→ 范围 = 全部已跟踪改动 + 未跟踪文件:
-   ```bash
-   git status --short
-   ```
-5. 范围为空 → canonical 且 `HEAD == synced` 时报告「无改动可同步」并退出;feature branch 没有自身变化时同样退出。除非步骤 1 已补写了文件。
-
-## 步骤 3 · 查联动目录 + manifest 对账
-
-对步骤 2 列出的每个变化文件,按 `一致性机制/文件联动目录.md`:
-
-1. **Part A 中枢清单**:这个改动是否影响某份中枢文档的内容?
-2. **Part B 例外规则**:路径 / 情况是否命中某条规则?
-3. 都没命中的,临场判断是否仍有隐性联动(兜底,非保证)。
-4. **manifest 对账(条件触发,规则 5)**:**仅当本轮改动落在素材 / 大文件目录**(任何含二进制的目录,或 LFS 指针变了)时,才 `ls` 相关文件夹、与其 `_manifest.md` 对比,差异计入待办。纯文字同步**整步跳过**。manifest 只管 用途 / 来源 / 授权(版权)(美术 / 设计项目可加风格基准引用),不管版本(版本归 git/LFS)。
-5. **决策记录轮转检查(条件触发,规则 6)**:`PROJECT.md`「关键决策记录」**超过 10 条** → 把「最老条目剪切到 `一致性机制/决策档案.md`(时间升序),PROJECT 留最近 10 条 + 指针行」列入步骤 4 计划;未超**整步跳过**。
-
-某改动找不到任何对应规则、又判断不出联动 → 标「联动目录未覆盖」,步骤 4 一并展示,提示同步后补 `文件联动目录.md`。
-
-## 步骤 4 · 拟订计划 → 用户确认 → 执行
-
-汇总所有联动动作为一张表:
-
-```
-待执行联动清单
-┌──────────────────────────────┬──────────────────────────┬────────┐
-│ 目标文件                      │ 改动                      │ 状态   │
-├──────────────────────────────┼──────────────────────────┼────────┤
-│ PROJECT.md                    │ +决策记录 1 行(X)        │ 待确认 │
-│ CLAUDE.md                     │ 修复为 @AGENTS.md 导入    │ 待确认 │
-│ <某目录>/_manifest.md         │ +2 条新条目               │ 待确认 │
-└──────────────────────────────┴──────────────────────────┴────────┘
-
-⚠️ 联动目录未覆盖:改动「Y」—— 建议同步后补 文件联动目录.md
+```bash
+node .agents/skills/wrapup/scripts/scope.mjs
 ```
 
-询问:
+`base` 之后的 `commits_since_base`、`committed_since_base`(已提交的文件)与 `worktree`(暂存、未暂存、未跟踪)就是本次检查范围。已提交的文件只需检查联动，不再列入本次提交清单；拟提交的只有 `worktree` 中的改动与本次维护新改的文件。需要看具体 diff 时用输出中的 `base` 原值。
 
-> 这份计划是否执行?
-> - 全部执行 → 「是 / go」
-> - 否决某项 → 「跳过第 N 行 / 不要 X」
-> - 补一项 → 「再加:<改动描述>」
-> - 全部取消 → 「取消」
+检查范围含基线后的已提交变化及工作区变化、未跟踪文件，不限于当前 Session 自己的编辑。变化可能属于其他工作，检查不授予修改或提交权限。
 
-确认后**逐项执行**,写入前按防重复策略检查;单项结果分 ✅ 成功 / ⏭️ 跳过(已存在) / ❌ 失败,单项失败不影响其他项。
+分支、基线与引用保护只用既有 guard(脚本已内含 guard 的 inspect 结果)。canonical 未配置时，明确请求确认后才写 `projectConsistency.canonicalBranch` 并重新 inspect。无可靠基线不得猜测同步范围；可提出资料维护计划，但不能声称范围检查完整或推进 synced。canonical 首次无 synced 时按状态检查改动，并明确历史未设同步基线。无 Git 时可按授权维护资料，但不能完成 Git 同步。
 
-## 步骤 5 · 提交 + 条件推进 horizon
+未跟踪文件必须检查，按档节省读取：本次会话自己建的或改过的，已知内容，不重读；来历不明的，先看脚本给的 `head`(开头 3 行)与行数；仍认不出且文件小，才读全文；大文件、二进制与整个未跟踪目录不读全文，列出名称、大小与示例，交用户决定纳入提交、先不管或加入 `.gitignore`。
 
-> 决策 7:commit 是单向动作,**message 由用户确认**,不自动提交。
+PROJECT 或联动目录缺失时报告缺口，利用已知归属拟订最小补救，不自动安装或重组项目。未能确认必要检查范围时不推进 synced。
 
-1. 先回显 `git status --short`,让用户看清**将入库的全部文件**——本次 commit 含当前 worktree 的完整 delta,不止步骤 4 计划表里的联动项。明确询问「以上是将进入本次提交的完整范围,是否确认提交?」;只有用户确认后才 `git add -A`。被 `.gitignore` 排除的二进制不会进;若项目配了 LFS,栅格图会经 `.gitattributes` 进 LFS。
-2. `git add -A` 后检查 staged changes。存在 → AI 起草一句话 commit message并询问用户确认;不存在但 `HEAD != scope_base` → 说明已有 commit 无需再制造空 commit,经用户确认后继续同步边界检查;两者都没有 → 报无变化退出。
-3. staged changes 的 message 经用户确认后执行 commit。commit 失败立即停止,不得调用 guard。
-4. commit 后重新运行 inspect。canonical branch 只有在 guard 报告可推进时才执行:
-   ```bash
-   node .agents/skills/wrapup/scripts/synced-guard.mjs advance
-   ```
-   guard 会再次确认 canonical branch、祖先关系、冲突、干净工作区与旧 tag 未被其他进程移动,再用带 reflog 的原子 ref 更新创建或推进 `synced`;不提供 `--force`。首次没有 `synced` 时允许把当前 HEAD 建为 baseline,即使工作区已有变化——这些变化仍留在新 baseline 之后;已有 `synced` 的推进必须完全干净。
-5. 非 canonical branch 到 commit 即止,报告「branch checkpoint 已保存,项目级 synced 未推进;合并回 canonical 后执行最终 wrapup」。
-6. **push 由用户手动负责**:wrapup 不自动 push。多机协作若要共享 horizon,仍需用户显式推送移动后的 `synced` tag。
-7. 输出报告:
+## 2. 拟定一份计划
 
-```
-wrapup 完成。
-- ✅ 联动成功:N 项(列出)
-- ⏭️ 跳过:M 项(原因)
-- ❌ 失败:K 项(原因 + 建议)
-- ⚠️ 联动目录未覆盖:Q 项(建议补 文件联动目录.md)
-- 📌 已提交 <短 hash>,horizon `synced` 已推进
+展开基线范围内每项变化所需的依据，按项目已有联动规则检查受影响资料；中枢清单用于判断是否受影响，不要求全文读所有中枢。处理已发现的直接依赖，不开放式递归审计全库。查业务联动时优先搜索相关路径，按需要选择检索方式，减少无关输出。搜索偶然命中整理细则不等于启用整理流程，不能据此扩大已授权的维护范围。明确依赖尚未检查时必须完成或报告缺口，不以“轻量”为由跳过。
+
+将对话补写、正文更新、引用修正与必要联动合成一份计划，说明改哪里、改什么、为什么。优先已有维护位置；要求、实际成果、验证范围分别表达。不刷新日期凑记录。原始证据不改写；必要替代原因就近保留。
+
+决策：「待提交」区有决策时，先运行
+
+```bash
+node .agents/skills/wrapup/scripts/decisions.mjs plan
 ```
 
-## 守则
+脚本按位置读取「待提交」，给出要迁出的决策、提交正文(`body`，含全文与 trailer)、「最近决策」追加与删除的行及迁出后条数(`recent_count_after`)，对 git 中没有全文的旧行自动逐字写入正文。行数与删除由脚本决定，不自行数行。`mentions_undecided` 列出新决策提到、仍在「最近决策」中的旧编号：判断是推翻、部分调整还是仅提及——推翻加 `--supersede 新:旧`，部分调整加 `--partial 新:旧`，仅提及不处理；带上选项重跑 `plan` 确认结果。`problems` 非空时先解决。`collisions` 列出撞号的编号与提到它的文件：把后来的那条改成下一个空号，逐个文件判断引用指的是哪一条再改。计划中写明脚本给出的迁出后条数与删除的行。
 
-- **绝不**在用户未确认前改任何文件、不自动 commit。
-- `git add -A` 前**必先回显 `git status --short`**——用户确认的不只是 message,还有入库范围。
-- canonical 的 horizon 永远用 `synced` tag;feature 的检查基线永远用它与 canonical 的唯一最佳 merge-base。不要在 feature 上直接 `git diff synced`,也不得推进全局 tag。
-- 自动创建或推进 `synced` 只能委托本 Skill 的 `synced-guard.mjs`;Skill、安装器和宿主适配器不得另写 `git tag` 状态迁移逻辑。
-- 联动目录未覆盖时**不自创规则**,只提示用户补 `文件联动目录.md`。
-- 防重复 grep 读不到文件时按「失败」处理,不算「成功」。
-- manifest 对账是**条件触发**的:本轮没动素材 / 大文件目录就别跑,避免给每次同步加空转的可靠性税。决策记录轮转同理(规则 6):未超 10 条不动。
-- 被 gitignore 的二进制(设计源 / PDF / 字体)git 看不见,其 用途/来源/授权 靠 manifest 记;栅格图的版本归 LFS,manifest 不重复记版本。
+在非 canonical 分支上，脚本输出 `branch_mode`：分支上不迁出，决策留在「待提交」随检查点提交，合并回 canonical 后再迁出。
+
+素材清单、二进制或其他特定检查只按项目实际规则和本次变化触发，不向所有项目强加一种文件策略。找不到落点或归属冲突时提出最小调整；超范围整理仅报告，不自动升级为整理模式。
+
+## 3. 一次确认
+
+默认只确认一次。一起展示：
+
+- 维护计划：改哪里、改什么、为什么；
+- 实际拟提交的文件清单，每个文件用文字标明状态(已修改、新建未跟踪、已删除等)，不贴 git 状态代号；标出计划外的文件；本次会话之前就存在的未提交改动注明来历，不说成本次所做；
+- 提交说明全文，原样贴出，不能只给标题或概述：自写的标题(带脚本给的 `title_tag`)与可选说明段，后接脚本给的 `body`；
+- synced 能否推进及条件。
+
+用户一句确认即执行维护、提交，并在条件满足时推进 synced。同一事项已有明确授权则沿用，不重复询问。以下情况才补充确认：实际拟提交范围超出计划(如混有其他工作的改动)、执行中计划改变、新增实质改动、超范围或授权冲突。用户确认时追加要求(如“再记一条决策”)也算计划改变：新增或改写的决策原文会进入提交正文，先展示再确认。批准记录某方案不等于批准实施方案。只要求保存不提交时，确认的只是维护计划，到报告为止。
+
+## 4. 执行、核对与提交
+
+按批准范围局部更新，读取修改后相关正文或检查实际 diff，核对直接引用、必要联动和事实类别。每项结果分为完成、跳过、失败、必要但未完成；读取或写入失败不算成功。“跳过”只用于已存在或无需改动的项；必要的改动因禁改、未授权或执行失败而没做，一律算“必要但未完成”，不算跳过。
+
+不借收尾修改业务、重跑大型实验或扩大整理范围。资料维护完成与业务完成分开：业务未完成但记录准确可以收尾；必要维护失败不能报维护完成。
+
+执行后实际改动与确认时不一致(文件清单或提交说明需实质改变)时先补确认。按批准路径或已核对的内容暂存；只有明确批准整个工作区 delta 时才可 `git add -A`。检查实际 staged diff 与授权范围一致，保留已有暂存内容；混有其他工作、无法分离时停下解决范围，不擅自提交或重置。commit 失败立即停止 Git 后续动作。
+
+没有新改动不制造空提交。已有 commit 尚未检查同步时，完整检查后可经授权处理 horizon。必要维护失败时可经明确授权提交部分成果，但不能推进 synced。
+
+有决策迁出或处于 `branch_mode` 时，其余维护完成后运行 `decisions.mjs apply`(分支上它不改 PROJECT，只写提交说明文件)，选项与确认时的 `plan` 相同，并用 `--title` 传入确认过的标题(可选 `--intro` 说明段)；宿主要求的额外 trailer(如 `Co-Authored-By`)用 `--trailer "键: 值"` 传入。脚本把完整提交说明写成 UTF-8 文件，直接用它提交，不经 shell 管道拼接，bash、PowerShell 写法相同：
+
+```bash
+git commit -F <apply 输出的 message_file>
+node .agents/skills/wrapup/scripts/decisions.mjs check
+```
+
+`check` 的 `ok` 为 false 时，列入“必要但未完成”，不推进 synced。
+
+只有以下条件全部满足才调用 `advance`：必要维护进入将标记的提交、“必要但未完成”为空、基线检查范围没有遗漏、用户授权成立、canonical 分支、工作区干净且重新 inspect 允许推进。首次创建 synced 也不借 guard 允许脏工作区的能力绕过本流程的维护要求。
+
+```bash
+node .agents/skills/wrapup/scripts/synced-guard.mjs inspect
+node .agents/skills/wrapup/scripts/synced-guard.mjs advance
+```
+
+两条命令按条件顺序执行，不能无条件连跑。`can_advance` 只证明 Git 条件，不证明内容维护完成。引用创建或推进只能委托 guard，不另写 git tag 逻辑。feature 只形成 branch checkpoint，不推进项目级 synced；合并回 canonical 后再做最终检查。不得自动合并或 push。
+
+## 5. 报告
+
+固定使用以下格式，没有的项写“无”：
+
+```
+wrapup 结果
+- ✅ 已完成:<各项>
+- ⏭️ 跳过:<仅限已存在或无需改动的项>
+- ❌ 失败:<各项、原因与建议>
+- ⚠️ 必要但未完成:<必要改动因禁改、未授权或失败而没做的各项及原因>
+- ❓ 未核对范围 / 联动目录未覆盖:<各项>
+- 📌 提交:<短 hash 或未提交>;synced:<已推进 / 未推进及全部原因 / branch checkpoint>
+- 业务遗留:<各项>
+```
+
+“必要但未完成”不为空时，不得写“维护完成”，也不得推进 synced。
+
+收尾过程中顺带注意到文档可以整理的地方(不准确、不好找、重复或过碎，见整理细则的目的)，或 `scope.mjs` 输出了 `hints`(大量重复的行、没有被任何文档引用的文档)并判断值得一提时，在报告末尾加“可以整理的地方”，列 1–3 条并各用一句话说明，问用户是否接着整理；不为此另行扫描，没有就不写。无需维护则直接说明，不制造记录或提交来满足流程。
