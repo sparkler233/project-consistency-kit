@@ -7,7 +7,7 @@ source_root=$(cd "$script_dir/.." && pwd)
 whitelist="$source_root/distribution/manifest.txt"
 version_file="$source_root/一致性机制/VERSION"
 installer_skill="$source_root/skills/project-consistency-installer/SKILL.md"
-design_doc="$source_root/一致性机制/机制设计说明.md"
+revision_doc="$source_root/一致性机制/运行规则.md"  # 2.0 起包的修订日期取自运行规则(设计说明不再分发)
 output_dir=""
 source_ref=""
 allow_dirty=0
@@ -67,7 +67,7 @@ case "$output_dir" in /*) ;; *) fail "output directory must be absolute" ;; esac
 [ -f "$whitelist" ] || fail "distribution whitelist is missing: $whitelist"
 [ -f "$version_file" ] || fail "kit version file is missing: $version_file"
 [ -f "$installer_skill" ] || fail "installer skill is missing: $installer_skill"
-[ -f "$design_doc" ] || fail "mechanism design document is missing: $design_doc"
+[ -f "$revision_doc" ] || fail "runtime rules document is missing: $revision_doc"
 duplicate_entry=$(awk 'NF && $1 !~ /^#/ { print }' "$whitelist" | LC_ALL=C sort | uniq -d)
 [ -z "$duplicate_entry" ] || fail "duplicate whitelist entry: $duplicate_entry"
 git -C "$source_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
@@ -80,7 +80,7 @@ installer_version=$(sed -n 's/^  version: "\([^"]*\)"$/\1/p' "$installer_skill")
 [ -n "$installer_version" ] || fail "installer skill metadata.version is missing"
 [ "$installer_version" = "$kit_version" ] \
   || fail "installer version $installer_version does not match kit version $kit_version"
-mechanism_revision=$(sed -n 's/^<!-- 一致性机制 version: \([0-9][0-9-]*\) -->$/\1/p' "$design_doc")
+mechanism_revision=$(sed -n 's/^<!-- 一致性机制 version: \([0-9][0-9-]*\) -->$/\1/p' "$revision_doc")
 [[ "$mechanism_revision" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
   || fail "mechanism revision is missing or invalid"
 revision_values=$(

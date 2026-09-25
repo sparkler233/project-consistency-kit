@@ -251,8 +251,6 @@ skills/project-consistency-installer/scripts/fetch-kit.sh
 templates/PROJECT.md
 templates/AGENTS.md
 templates/一致性机制/文件联动目录.md
-一致性机制/README.md
-一致性机制/机制设计说明.md
 一致性机制/hooks/收尾提醒.sh
 LICENSE'
   while IFS= read -r relative_path; do
@@ -279,8 +277,9 @@ EOF
       "$distribution_dir/skills/project-consistency-installer/SKILL.md")
     [ "$installer_version" = "$validated_version" ] \
       || fail "installer version differs from metadata kit version"
-    packaged_revision=$(sed -n 's/^<!-- 一致性机制 version: \([0-9][0-9-]*\) -->$/\1/p' \
-      "$distribution_dir/一致性机制/机制设计说明.md")
+    revision_doc="$distribution_dir/一致性机制/机制设计说明.md"
+    if version_at_least_2_0 "$validated_version"; then revision_doc="$distribution_dir/一致性机制/运行规则.md"; fi
+    packaged_revision=$(sed -n 's/^<!-- 一致性机制 version: \([0-9][0-9-]*\) -->$/\1/p' "$revision_doc")
     [ "$packaged_revision" = "$validated_revision" ] \
       || fail "packaged revision differs from metadata mechanism revision"
     if [[ "$validated_ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
@@ -317,8 +316,13 @@ EOF
     fi
   fi
   if [ "$validated_profile" != "versioned" ] || ! version_at_least_2_0 "$validated_version"; then
-    [ -f "$distribution_dir/templates/一致性机制/决策档案.md" ] \
-      || fail "distribution is incomplete: missing templates/一致性机制/决策档案.md"
+    for relative_path in \
+      templates/一致性机制/决策档案.md \
+      一致性机制/README.md \
+      一致性机制/机制设计说明.md; do
+      [ -f "$distribution_dir/$relative_path" ] \
+        || fail "distribution is incomplete: missing $relative_path"
+    done
   fi
 
   for relative_path in \

@@ -149,7 +149,8 @@ test -L CLAUDE.md && readlink CLAUDE.md
 │ .agents/skills/(catchup/wrapup)  │ 新建或按版本更新行为正本                │ …      │
 │ .claude/commands/(catchup/wrapup)│ 新建或迁移为 Claude Code 薄适配器       │ …      │
 │ 旧版中文出向命令                 │ 对账定制后迁移并移除旧入口              │ …      │
-│ 一致性机制/(运行规则、文档、hooks)│ 从套件新建或按版本更新                  │ …      │
+│ 一致性机制/(运行规则、hooks)     │ 从套件新建或按版本更新                  │ …      │
+│ 旧机制文档(仅升级)              │ 设计说明与机制 README 确认后删除        │ …      │
 │ 决策档案(仅升级)                │ 全文写入升级提交正文后删除,或保留只读  │ …      │
 │ 升级提交(仅升级)                │ 展示提交说明全文,确认后提交            │ …      │
 │ 一致性机制/VERSION               │ 全部机制件验证成功后最后写入             │ …      │
@@ -209,7 +210,7 @@ test -L CLAUDE.md && readlink CLAUDE.md
 
 - `.agents/skills/catchup/`、`.agents/skills/wrapup/`(完整目录,含 `SKILL.md`、`agents/openai.yaml`、`scripts/` 与 `references/`);
 - `.claude/commands/catchup.md`、`.claude/commands/wrapup.md`;
-- `一致性机制/运行规则.md`(机制文件,整体替换,项目不手改)、`一致性机制/机制设计说明.md`、`一致性机制/README.md`;
+- `一致性机制/运行规则.md`(机制文件,整体替换,项目不手改);机制设计说明与机制 README 只留在套件仓库,不装进项目;
 - `.agents/hooks/wrapup-reminder.mjs`(ASCII 固定路径的跨平台逻辑正本)、`.agents/hooks/wrapup-reminder.ps1`(Windows Codex 薄适配器,只定位并转发到 Node)与 `一致性机制/hooks/收尾提醒.sh`(旧 Unix 接线兼容包装;随后 `chmod +x`);
 - `一致性机制/LICENSE.project-consistency-kit`(从套件根 LICENSE 新建,已有不覆盖)。
 
