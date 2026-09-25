@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-08-22
+# 一致性机制 version: 2026-09-25
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -85,7 +85,8 @@ mechanism_revision=$(sed -n 's/^<!-- 一致性机制 version: \([0-9][0-9-]*\) -
   || fail "mechanism revision is missing or invalid"
 revision_values=$(
   {
-    git -C "$source_root" grep -hE '^(<!-- |# |// )一致性机制 version: [0-9]{4}-[0-9]{2}-[0-9]{2}'
+    # 实验证据中的快照保持原样,不参与修订日期一致性检查
+    git -C "$source_root" grep -hE '^(<!-- |# |// )一致性机制 version: [0-9]{4}-[0-9]{2}-[0-9]{2}' -- . ':!docs/experiments'
     grep -hE '^<!-- 一致性机制:接入 begin \(version: [0-9]{4}-[0-9]{2}-[0-9]{2}\) -->$' \
       "$source_root/AGENTS.md" "$source_root/templates/AGENTS.md"
   } | sed -E 's/.*version: ([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/' | LC_ALL=C sort -u

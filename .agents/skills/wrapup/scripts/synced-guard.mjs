@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-08-22
+// 一致性机制 version: 2026-09-25
 
 import process from "node:process";
 import { spawnSync } from "node:child_process";

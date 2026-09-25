@@ -1,4 +1,4 @@
-# 一致性机制 version: 2026-08-22
+# 一致性机制 version: 2026-09-25
 [CmdletBinding(PositionalBinding = $false)]
 param(
     [Alias("ref")]
