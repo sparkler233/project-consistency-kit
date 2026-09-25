@@ -119,6 +119,14 @@ EOF
   }
 }
 
+version_at_least_2_0() {
+  local version_core="${1%%-*}"
+  local major
+  major="${version_core%%.*}"
+  [[ "$major" =~ ^[0-9]+$ ]] || return 1
+  [ "$major" -ge 2 ]
+}
+
 version_at_least_1_3() {
   local version_core="${1%%-*}"
   local major minor patch
@@ -243,7 +251,6 @@ skills/project-consistency-installer/scripts/fetch-kit.sh
 templates/PROJECT.md
 templates/AGENTS.md
 templates/一致性机制/文件联动目录.md
-templates/一致性机制/决策档案.md
 一致性机制/README.md
 一致性机制/机制设计说明.md
 一致性机制/hooks/收尾提醒.sh
@@ -297,6 +304,21 @@ EOF
       [ -f "$distribution_dir/.agents/skills/wrapup/scripts/synced-guard.mjs" ] \
         || fail "v1.3+ distribution is incomplete: missing synced guard"
     fi
+    if version_at_least_2_0 "$validated_version"; then
+      for relative_path in \
+        一致性机制/运行规则.md \
+        .agents/skills/wrapup/scripts/scope.mjs \
+        .agents/skills/wrapup/scripts/decisions.mjs \
+        .agents/skills/wrapup/references/document-maintenance.md \
+        skills/project-consistency-installer/references/upgrade-from-v1.3.md; do
+        [ -f "$distribution_dir/$relative_path" ] \
+          || fail "v2.0+ distribution is incomplete: missing $relative_path"
+      done
+    fi
+  fi
+  if [ "$validated_profile" != "versioned" ] || ! version_at_least_2_0 "$validated_version"; then
+    [ -f "$distribution_dir/templates/一致性机制/决策档案.md" ] \
+      || fail "distribution is incomplete: missing templates/一致性机制/决策档案.md"
   fi
 
   for relative_path in \
@@ -308,7 +330,8 @@ EOF
     [ ! -e "$distribution_dir/$relative_path" ] \
       || fail "source-only file leaked into distribution: $relative_path"
   done
-  if grep -Eq '^- 20[0-9]{2}-' "$distribution_dir/templates/一致性机制/决策档案.md"; then
+  if [ -f "$distribution_dir/templates/一致性机制/决策档案.md" ] \
+    && grep -Eq '^- 20[0-9]{2}-' "$distribution_dir/templates/一致性机制/决策档案.md"; then
     fail "decision archive template contains project history"
   fi
 

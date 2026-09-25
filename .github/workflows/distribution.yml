@@ -25,6 +25,8 @@ jobs:
         run: node scripts/test-stop-hook.mjs
       - name: Test synced guard
         run: node scripts/test-synced-guard.mjs
+      - name: Test wrapup scope and decision scripts
+        run: node scripts/test-wrapup-scripts.mjs
       - name: Build and verify
         env:
           SOURCE_REF: ${{ github.ref_name }}
@@ -45,6 +47,8 @@ jobs:
         run: node scripts/test-stop-hook.mjs
       - name: Test synced guard
         run: node scripts/test-synced-guard.mjs
+      - name: Test wrapup scope and decision scripts
+        run: node scripts/test-wrapup-scripts.mjs
       - name: Validate Windows adapters and clean distribution
         shell: powershell
         env:
@@ -84,7 +88,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$RELEASE_TAG" \
+          # 带 - 的 tag(如 v2.0.0-preview.1)发为预发布,GitHub 的 latest 不指向它
+          prerelease=()
+          case "$RELEASE_TAG" in *-*) prerelease=(--prerelease) ;; esac
+          gh release create "$RELEASE_TAG" "${prerelease[@]}" \
             "$RUNNER_TEMP/project-consistency-release/project-consistency-kit.tar.gz" \
             "$RUNNER_TEMP/project-consistency-release/project-consistency-kit.tar.gz.sha256" \
             --verify-tag \

@@ -164,8 +164,9 @@ for forbidden in \
   [ ! -e "$kit_dir/$forbidden" ] || fail "source-only file leaked into distribution: $forbidden"
 done
 
+# 2.0 起不再分发决策档案模板;若旧版本仍带,不得含项目历史
 archive_template="$kit_dir/templates/一致性机制/决策档案.md"
-if grep -Eq '^- 20[0-9]{2}-' "$archive_template"; then
+if [ -f "$archive_template" ] && grep -Eq '^- 20[0-9]{2}-' "$archive_template"; then
   fail "decision archive template contains project history"
 fi
 

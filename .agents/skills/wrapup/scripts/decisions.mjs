@@ -85,7 +85,7 @@ const mode = branchMode();
 
 function mentionFiles(n) {
   const re = `决策[[:space:]]*([0-9]+[[:space:]]*(、|,|，|/|和)[[:space:]]*)*${n}([^0-9]|$)`;
-  const out = run(["grep", "-l", "--untracked", "-E", re]);
+  const out = run(["-c", "core.quotepath=false", "grep", "-l", "--untracked", "-E", re]);
   return out ? out.split("\n").filter(Boolean) : [];
 }
 
