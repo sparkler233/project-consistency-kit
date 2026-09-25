@@ -6,13 +6,15 @@
 [![Distribution](https://github.com/sparkler233/project-consistency-kit/actions/workflows/distribution.yml/badge.svg?branch=main)](https://github.com/sparkler233/project-consistency-kit/actions/workflows/distribution.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f6f4e.svg)](LICENSE)
 
+> **2.0 预览版**:`main` 与 `v2.0.0-preview.1` 已是 2.0 的新流程(决策历史进 Git、PROJECT 改为入口式、运行规则独立、wrapup 一次确认)。它是预发布版本,默认安装仍取稳定版 v1.3.0;获取与升级方式见下文「发布与升级」。
+
 ## 它解决什么
 
 本项目旨在解决人与 Agent 在长程工作协作下切换 Session 和 Harness 并压缩上下文的过程中带来的项目内部文档与信息的漂移问题。我们借助 Git 来实现了项目的状态保存与内部文件联动。
 
 情景：当你和 Agent 推进一个项目几天后，仓库里通常会同时出现两种状态：代码或内容已经变了，项目进度、决策记录和素材清单仍停在旧版本。如果切换 Harness 和 Session，Agent 需要重新判断项目进度、哪些决定已经确认、哪些文档需要补写。
 
-Project Consistency Kit 把这些信息留在仓库里。Git 记录当前项目发生过什么，`PROJECT.md` 保存项目现在处于什么状态，`AGENTS.md` 告诉 Agent 应该遵守哪些规则。新会话用 catchup Skill 恢复现场，工作结束时用 wrapup Skill 检查还有哪些状态或文档需要一起更新。
+Project Consistency Kit 把这些信息留在仓库里。Git 记录当前项目发生过什么,决策全文和过程历史写在提交说明里;`PROJECT.md` 是项目入口,只写现在成立的事和各类资料在哪里;`一致性机制/运行规则.md` 说明机制怎么运行,`AGENTS.md` 保存项目自己的规则。新会话用 catchup Skill 恢复现场,工作结束时用 wrapup Skill 检查还有哪些状态或文档需要一起更新。
 
 ## 怎么工作
 
@@ -21,9 +23,9 @@ catchup  ->  正常工作  ->  wrapup
 恢复现场                    检查联动并提交
 ```
 
-1. 在一个新 Session 或压缩上下文之后开始工作时运行 catchup。它读取 `PROJECT.md`、Git 历史和当前工作区，汇报已经完成、正在进行、遇到的卡点和建议的下一步。这个过程只读，不修改文件。
-2. 中间照常和 Agent 协作。代码、内容、决策和项目状态将会在对话中不断积累。
-3. 此轮 Session 或上下文接近上限准备收尾时运行 wrapup。canonical branch 比较自上次 `synced` 以来的全部改动;并行 feature branch 改用它与 canonical 的 merge-base,避免全局 tag 前进后把其他分支变化反向算入。用户确认更新计划、提交范围和提交说明后，它才写入文件和创建本地提交;只有 canonical branch 能通过确定性 guard 推进 `synced`。
+1. 新 Session 开始时运行 catchup。它先读 `PROJECT.md`、运行规则和脚本给出的 Git 概况,汇报自上次收尾以来的变化、当前状态和建议的下一步,再按任务读需要的细节。这个过程只读,不修改文件。上下文被压缩后不用重跑,Agent 按 `AGENTS.md` 里的指令重读 PROJECT 与运行规则即可。
+2. 中间照常和 Agent 协作。拍板的决策会立即写进 `PROJECT.md` 的「待提交」区,不等收尾。
+3. 一段工作结束时运行 wrapup。canonical branch 比较自上次 `synced` 以来的全部改动;并行 feature branch 改用它与 canonical 的 merge-base。它把维护计划、拟提交文件、完整提交说明和 `synced` 条件一次展示给你,一次确认后才写入文件、把决策全文迁入提交说明并创建本地提交;只有 canonical branch 能通过确定性 guard 推进 `synced`。数行数、生成提交说明这类机械步骤由随附脚本完成。
 
 | 运行环境 | 会话初始化引入 | 会话收尾 |
 | --- | --- | --- |
@@ -59,11 +61,12 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 
 | 内容 | 用途 |
 | --- | --- |
-| `PROJECT.md` | 保存项目背景、当前阶段、文件地图和近期决策 |
-| `AGENTS.md` | 保存所有 Agent 共用的项目规则 |
+| `PROJECT.md` | 项目入口:目标与边界、总体状态、阅读入口,以及「待提交」「最近决策」 |
+| `AGENTS.md` | 项目自己的 Agent 规则;机制只在其中放一个接入块,引用运行规则 |
+| `一致性机制/运行规则.md` | 机制怎么运行(由安装器管理,升级时整体更新) |
 | `CLAUDE.md` | 用 `@AGENTS.md` 让 Claude Code 读取同一份规则 |
 | `.agents/skills/catchup/` | 定义如何恢复项目状态 |
-| `.agents/skills/wrapup/` | 定义如何检查联动、确认提交并推进 `synced` |
+| `.agents/skills/wrapup/` | 定义如何检查联动、迁出决策、确认提交并推进 `synced`;随附范围、决策与 guard 三个脚本和文档整理细则 |
 | `一致性机制/文件联动目录.md` | 记录哪些文件变化时需要一起检查其他内容 |
 | `.agents/hooks/` 和宿主配置 | 检测到未同步改动时提醒运行 wrapup;Windows Codex 通过薄 PowerShell 适配器转到同一 Node 逻辑 |
 | `一致性机制/VERSION` | 记录项目当前安装的套件版本 |
@@ -88,7 +91,7 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 
 ### 多个 Session 并行工作的边界
 
-v1.3.0 起,并行工作应使用独立 branch + worktree。非 canonical branch 的 catchup / wrapup 以 `merge-base(HEAD, canonical)` 为检查基线,可以完成本分支联动与 checkpoint commit,但 guard 会禁止它推进项目级 `synced`;合并回 canonical 后再执行最终 wrapup。这样不需要 per-session tag、Session registry 或自研 merge 系统。
+v1.3.0 起,并行工作应使用独立 branch + worktree。非 canonical branch 的 catchup / wrapup 以 `merge-base(HEAD, canonical)` 为检查基线,可以完成本分支联动与 checkpoint commit,但 guard 会禁止它推进项目级 `synced`;合并回 canonical 后再执行最终 wrapup。2.0 起,分支上的决策留在「待提交」,合并回 canonical 后统一迁出,决策脚本会检查两边是否撞号。这些只保证并行不比以前差;并行时的相互影响、整合流程与 Session 之间的交流,计划在后续预览版里以 Git 自身能力重新设计。
 
 两个 Session 直接操作同一个 worktree 仍不受支持:它们会共享未提交文件和索引,机制无法可靠判断改动归属。Stop hook 第一版仍保守读取全局 `synced`,所以旧 feature worktree 在 canonical 前进后可能收到一次多余提醒;提醒是 fail-open 的低风险 false positive,不影响 guard / wrapup 使用正确基线。
 
@@ -104,12 +107,20 @@ Git 和脚本能够检查文件是否发生变化，却无法仅凭确定性程�
 
 安装器默认使用[最新稳定版本](https://github.com/sparkler233/project-consistency-kit/releases/latest)，也可以固定到指定的 `v*` 标签。校验失败时不会静默回退到源码 `main`。
 
+**获取 2.0 预览版**:
+
+1. 先更新机器上的安装器(重新运行上面的 `npx skills add` 命令)。v1.3.0 的安装器会因为新包里没有决策档案模板而拒绝它。
+2. 在项目里告诉 Agent:“给这个项目引入一致性机制,使用 v2.0.0-preview.1”。预览版在 GitHub 上标为预发布,不会被当作“最新版”自动取用。
+
+**从 v1.3.0 升级**:安装器会把 `PROJECT.md` 改为入口式,把决策档案逐字写进升级提交后删除,并清理 AGENTS 里旧模板带来的机制条款;所有删除都会先列进计划,经你确认。更早的版本请先升到 v1.3.0。2.0 不提供降级;升级是单独的一次提交,需要时用 `git revert` 撤销它。预览版之间可能不兼容,每个预览版只保证能从上一站升级上来。
+
 ## 进一步阅读
 
 - [完整使用示例](docs/example-session.md)
 - [全新项目初始化](初始化新项目.md)
-- [机制文件索引](一致性机制/README.md)
-- [机制设计与决策理由](一致性机制/机制设计说明.md)
+- [机制运行规则](一致性机制/运行规则.md)
+- [机制文件索引](一致性机制/README.md)(套件仓库内部文档)
+- [机制设计与决策理由](一致性机制/机制设计说明.md)(套件仓库内部文档)
 - [版本变化](CHANGELOG.md)
 - [GitHub Releases](https://github.com/sparkler233/project-consistency-kit/releases)
 

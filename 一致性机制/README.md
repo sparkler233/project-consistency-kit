@@ -1,72 +1,57 @@
-# 一致性机制 —— catchup / wrapup 自我维护系统
+# 一致性机制 —— 套件仓库的机制索引
 
 <!-- 一致性机制 version: 2026-08-22 -->
 
-> 本目录把「项目的自我维护机制」(会话切换、上下文加载、改动落盘)和「项目本身的内容」分开收纳。
-> **想了解或修改这套机制,从这里看起。**
+> 本文件是套件仓库的内部索引,给维护者看,2.0 起不再装进用户项目(决策 77)。用户项目里机制怎么运行见 [`运行规则.md`](运行规则.md);设计动机见 [`机制设计说明.md`](机制设计说明.md)。
 
 ## 这是什么
 
-一套让 AI 协作能跨会话连续工作、并自动维护文件一致性的系统:
+一套让 AI 协作能跨会话连续工作、并维护文件一致性的机制:
 
-- **入向**:新会话用 catchup Skill 把项目状态加载回来;
-- **出向**:收尾用 wrapup Skill 按 guard 给出的 branch 基线检查联动、提交;只有 canonical branch 能推进 `synced` 标记;
-- **兜底**:跨平台 Stop hook(`../.agents/hooks/wrapup-reminder.mjs`)在有未同步改动时提醒收尾,Windows Codex 经 `.ps1` 薄适配器转发,Claude Code 与 Codex 本地客户端分别显示自己的 wrapup 入口;
-- **底座**:git 是唯一事件源,二进制走选择性处理(可选 LFS)。
-
-完整设计动机见 [`机制设计说明.md`](机制设计说明.md)。
+- **入向**:新会话用 catchup 分两层读取,恢复项目状态;
+- **出向**:收尾用 wrapup 按 guard 给出的基线检查联动、迁出「待提交」决策,一次确认后提交;只有 canonical branch 能推进 `synced`;
+- **兜底**:跨平台 Stop hook 在有未同步改动时提醒收尾;
+- **底座**:git 是事件源,决策全文与过程历史写在提交正文;PROJECT 只写现状与入口。
 
 ## 本目录里有什么
 
-| 文件 | 作用 |
-|------|------|
-| `README.md`(本文件) | 机制索引 + 登记钉在别处的文件 |
-| [`VERSION`](VERSION) | Project Consistency Kit 唯一正式 SemVer;目标项目安装身份也落在这里 |
-| [`机制设计说明.md`](机制设计说明.md) | 整套设计的「为什么」:每个决策的动机与取舍。给人 / 接手 AI 看 |
-| [`文件联动目录.md`](文件联动目录.md) | 当前项目的真实联动规则(中枢文档 + 例外)。分发骨架在套件 `templates/` |
-| [`.agents/hooks/wrapup-reminder.mjs`](../.agents/hooks/wrapup-reminder.mjs) | 出向兜底 hook 跨平台逻辑正本:AI 回答结束时若有未同步改动,提醒用户执行当前宿主的 wrapup 入口 |
-| [`.agents/hooks/wrapup-reminder.ps1`](../.agents/hooks/wrapup-reminder.ps1) | Windows Codex 薄适配器:从 git 根定位 Node 正本并转发 Stop JSON,不包含状态机逻辑 |
-| [`hooks/收尾提醒.sh`](hooks/收尾提醒.sh) | v1.1 Unix 旧接线兼容包装,只转发到 Node 逻辑正本 |
-| [`决策档案.md`](决策档案.md) | PROJECT 决策记录的历史档案:超限条目由 `/wrapup` 轮转进来(规则 6);不进 Part A,按需查 |
-| `LICENSE.project-consistency-kit`(安装后) | 套件 MIT 许可副本,放机制子目录以免被误解为目标项目整体许可证 |
+| 文件 | 作用 | 分发给用户项目 |
+|------|------|------|
+| [`运行规则.md`](运行规则.md) | 机制怎么运行;本仓库与用户项目用同一份(决策 73) | 是(机制文件) |
+| [`VERSION`](VERSION) | 套件唯一正式 SemVer;用户项目的安装身份也落在这里 | 是 |
+| [`hooks/收尾提醒.sh`](hooks/收尾提醒.sh) | v1.1 Unix 旧接线兼容包装,只转发到 Node 逻辑正本 | 是 |
+| `LICENSE.project-consistency-kit`(安装后) | 套件 MIT 许可副本,放在机制子目录以免被误解为项目整体许可证 | 安装时生成 |
+| [`文件联动目录.md`](文件联动目录.md) | 本仓库的真实联动规则;用户项目从 `templates/一致性机制/文件联动目录.md` 生成自己的 | 否(模板分发) |
+| [`机制设计说明.md`](机制设计说明.md) | 整套设计的「为什么」 | 否(决策 77) |
+| `README.md`(本文件) | 机制索引 + 钉在别处的文件登记册 | 否(决策 77) |
 
-## ⚠️ 这些文件也属于本机制,但被工具钉死在别处(不能移进来)
+## ⚠️ 这些文件也属于本机制,但被工具钉死在别处
 
 | 文件 | 实际位置 | 为什么不能进 `一致性机制/` |
 |------|----------|----------------------|
-| catchup 行为正本 | `.agents/skills/catchup/` | Codex 与兼容 Harness 从仓库级 Skill 发现;Claude Code 命令也转发到这里 |
-| wrapup 行为正本 | `.agents/skills/wrapup/` | 同上 |
-| synced guard | `.agents/skills/wrapup/scripts/synced-guard.mjs` | wrapup 内部的确定性 helper;给 canonical / feature 计算基线并独占自动 tag 状态迁移 |
-| 安装器行为正本 | `skills/project-consistency-installer/` | skills.sh 从 GitHub 发现并分发;含 GitHub 获取脚本,机器级使用,不进入目标项目 |
-| 干净分发白名单 | `distribution/manifest.txt` | 发布边界必须独立于套件源码目录,新增产品文件需显式评审 |
-| 分发构建与验证 | `scripts/build-distribution.sh`、`scripts/verify-distribution.sh` | 源码工具,负责生成 Release 资产并阻断自举状态泄漏 |
-| GitHub Release 工作流 | `.github/workflows/distribution.yml` | 普通变更只验证;`v*` 标签才用最小写权限创建 Release |
-| `/catchup` 适配器 | `.claude/commands/catchup.md` | Claude Code 斜杠入口;只读取对应 Skill,不复制流程 |
-| `/wrapup` 适配器 | `.claude/commands/wrapup.md` | 同上 |
-| `/引入一致性机制` 适配器 | `.claude/commands/引入一致性机制.md` | Claude Code 兼容入口;只定位并读取安装器 Skill,不复制流程 |
-| 二进制排除规则 | `.gitignore`(仓库根) | git 要它在根才全局生效 |
-| 选择性 LFS 规则 | `.gitattributes`(仓库根) | git/LFS 要它在根才全局生效 |
-| 项目事实 | `PROJECT.md`(仓库根) | catchup 固定读取;与 GitHub 对外 README 解耦 |
-| Agent 指令正本 | `AGENTS.md`(仓库根) | Codex 等 harness 按固定文件名自动加载 |
-| Claude 适配入口 | `CLAUDE.md`(仓库根,内容仅 `@AGENTS.md`) | Claude Code 按固定文件名加载并导入 AGENTS;跨平台复用同一正本 |
-| 同步纪律 | `AGENTS.md` 的“同步纪律”节 | 必须随 harness 自动注入;catchup 不再重复读取 |
-| canonical branch | 本地 Git config `projectConsistency.canonicalBranch` | 当前 clone 的运行状态,由用户确认;worktree 共享,不写进 PROJECT |
-| sync horizon | git tag `synced` | canonical 项目级 Git ref;guard 原子创建或推进,feature 只用 merge-base 检查自身变化 |
-| hook 接线(Stop → 收尾提醒) | `.claude/settings.json`(仓库根) | Claude Code 只从 settings.json 读 hooks 配置;脚本本体住本目录,接线必须钉在那里 |
-| Codex hook 接线(Stop → 收尾提醒) | `.codex/hooks.json`(仓库根) | Codex 本地客户端从项目 `.codex` 层发现;首次或变更后需要用户审查并信任 |
-| `/引入一致性机制` 全局命令 | `~/.claude/commands/引入一致性机制.md`(可选符号链接 → 套件适配器) | **机器级兼容入口**:只用于本地开发接线;skills.sh 用户直接使用安装器 Skill,不需要此链接 |
-| `project-consistency-installer` Skill | 由 skills.sh 安装到 Harness 的用户级 Skill 目录;本地开发可链接 `~/.agents/skills/project-consistency-installer` | **机器级引导器**:从 GitHub 或可信本地 checkout 获取套件,再把 catchup / wrapup 等产物增量引入当前项目 |
+| catchup / wrapup 行为正本 | `.agents/skills/catchup/`、`.agents/skills/wrapup/` | Codex 与兼容 Harness 从仓库级 Skill 发现;Claude Code 命令也转发到这里 |
+| wrapup 脚本 | `.agents/skills/wrapup/scripts/`(`scope.mjs`、`decisions.mjs`、`synced-guard.mjs`) | Skill 随附的机械步骤;guard 独占 `synced` 的状态迁移 |
+| 整理细则 | `.agents/skills/wrapup/references/document-maintenance.md` | 只在明确要求整理时由 wrapup 读取 |
+| 安装器行为正本 | `skills/project-consistency-installer/`(含 v1.3.0 升级细则与获取脚本) | skills.sh 分发,机器级使用,不进入用户项目 |
+| 干净分发白名单 | `distribution/manifest.txt` | 发布边界独立于源码目录,新增产品文件需显式评审 |
+| 分发构建、验证与测试 | `scripts/` | 源码工具:生成 Release 资产、阻断自举状态泄漏、回归测试 |
+| GitHub Release 工作流 | `.github/workflows/distribution.yml` | 普通变更只验证;`v*` 标签才创建 Release,带 `-` 的为预发布 |
+| Claude Code 适配器 | `.claude/commands/catchup.md`、`wrapup.md`、`引入一致性机制.md` | 斜杠入口,只转发到对应 Skill,不复制流程 |
+| 二进制排除与 LFS 规则 | `.gitignore`、`.gitattributes`(仓库根) | git 要它们在根才全局生效 |
+| 项目入口 | `PROJECT.md`(仓库根) | catchup 固定读取 |
+| Agent 指令与接入块 | `AGENTS.md`(仓库根,`一致性机制:接入` begin/end 块引用运行规则) | 宿主按固定文件名自动加载 |
+| Claude 适配入口 | `CLAUDE.md`(仓库根,内容仅 `@AGENTS.md`) | Claude Code 按固定文件名加载 |
+| canonical branch | 本地 Git config `projectConsistency.canonicalBranch` | 当前 clone 的运行状态,由用户确认 |
+| sync horizon | git tag `synced` | canonical 项目级 ref;guard 原子创建或推进,feature 只用 merge-base 检查自身变化 |
+| Stop hook 接线 | `.claude/settings.json`、`.codex/hooks.json` | 宿主只从这里读 hooks;Codex 首次或变更后需用户信任 |
+| 机器级引导器 | skills.sh 安装的 `project-consistency-installer`(本地开发可链接到本仓库) | 从 GitHub Release 或可信本地 checkout 获取套件,再增量引入或升级项目 |
 
-> 换句话说:**本机制在文件层面天生和项目缠在一起,是工具决定的,不是没设计好。** 本目录已尽可能把「能搬的文档」聚拢;上表是「搬不动的那几个」的登记册。改机制行为时,记得这几处也要一起看。
+## 版本、源码与发布面
 
-## 在新项目里启用本机制
-
-- **版本、源码与发布面**:`VERSION` 是正式 SemVer 正本,日期版本行只是文件修订标识;GitHub `main` 是套件源码仓库,保留套件自身 PROJECT、AGENTS、联动规则和决策历史;与 VERSION 一致的 `v*` 标签自动生成的 GitHub Release 才是无自举状态的干净分发源。
-- **项目模板**:套件根 `PROJECT.md` / `AGENTS.md` 是套件自身正本,不进入目标项目;新项目使用 `templates/PROJECT.md` / `templates/AGENTS.md`,再创建只含 `@AGENTS.md` 的 CLAUDE 适配器。README 由目标项目自行决定,套件不创建。
-- **项目机制模板**:套件根 `一致性机制/文件联动目录.md` 与 `决策档案.md` 分别保存套件自身规则和历史;新项目必须从 `templates/一致性机制/` 下的联动规则与空白决策档案生成,不得复制套件实况。
-- **绿地(全新项目)**:整包套用,仓库级 catchup / wrapup Skill、Claude Code 适配器与 Codex 本地 hook 接线一并复制;完整步骤见模板仓库根的 `初始化新项目.md`(随模板分发,开张后通常已删)。
-- **已有项目(已有文件 / git 历史)**:别整包拷。安装机器级引导器后,进入目标项目并告诉 Agent“给这个项目引入一致性机制”;也可以通过当前 Harness 显式选择 `project-consistency-installer`。安装器默认取得带双层 SHA-256、正式版本与来源元数据的最新干净 Release,报告来源 / 目标版本后再增量合并并扫描项目中枢。
+- `VERSION` 是正式 SemVer 正本,文件里的日期版本行只是修订标识。
+- GitHub `main` 是套件源码仓库,保留本仓库自己的 PROJECT、AGENTS、联动规则与决策历史;与 VERSION 一致的 `v*` 标签生成的 Release 才是干净分发源。2.0 起带 `-` 的版本(如 `2.0.0-preview.1`)发为预发布,须 `--release` 明确指定(决策 76)。
+- 用户项目的 PROJECT / AGENTS / 联动目录从 `templates/` 生成,不得复制本仓库实况。
 
 ## 改了机制怎么办
 
-机制自己的文件变动也走同一套流程:改完执行 wrapup(Codex: `$wrapup`;Claude Code: `/wrapup`),它会按 [`文件联动目录.md`](文件联动目录.md) 检查 PROJECT、AGENTS、公开 README、模板与发布记录等联动,再 commit、推进 `synced`。
+改完执行 wrapup,它会按本仓库的 [`文件联动目录.md`](文件联动目录.md) 检查 PROJECT、AGENTS、公开 README、模板、安装器与发布记录等联动,再提交、推进 `synced`。发版按 `AGENTS.md`「机制发版纪律」。
