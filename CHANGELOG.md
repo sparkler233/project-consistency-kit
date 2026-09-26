@@ -17,7 +17,7 @@
 - **安装器**(决策 75、77):全新引入按新模板;只支持从 v1.3.0 升级,由模型按升级细则完整改造 PROJECT、AGENTS 与联动目录,决策档案逐字写入升级提交后删除,删除均须确认。机制设计说明与机制 README 只留在套件仓库,不再装进用户项目。
 - **分发与校验**:分发清单增加运行规则、两个脚本、整理细则与升级细则,删除档案模板、机制设计说明与机制 README(35 个文件);包修订日期改取运行规则;`fetch-kit.sh` 对 ≥2.0 的包要求新文件,对更早的包保持原要求;v1.3.0 引导器会拒绝新包,须先更新引导器(决策 76);发布工作流对带 `-` 的 tag 发预发布;新增 `scripts/test-wrapup-scripts.mjs`(Linux 与 Windows CI)。
 - **兼容与回退**:不支持降级;升级是单独一次提交,可 `git revert`。预览版之间可能不兼容,每个预览版只保证从上一站升级。
-- **验证**:Codex(gpt-5.6-luna / gpt-5.6-sol)候选 catchup / wrapup 多轮测试、安装器全新引入与 v1.3.0 升级测试、Windows 上 Codex 跑 wrapup 冒烟测试,记录见套件仓库 `docs/experiments/`。均为单次运行,只有 Windows PowerShell 5.1 的环境未测。
+- **验证**:Codex(gpt-5.6-luna / gpt-5.6-sol)候选 catchup / wrapup 多轮测试、安装器全新引入与 v1.3.0 升级测试、Windows 上 Codex 跑 wrapup 冒烟测试、一个真实 v1.3.0 项目的试升级(副本上完成改造、提交、catchup 与 wrapup;含项目私有信息,记录未入库),其余记录见套件仓库 `docs/experiments/`。均为单次运行,只有 Windows PowerShell 5.1 的环境未测。
 
 ## v1.3.0 — 2026-08-22
 
