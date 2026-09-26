@@ -34,6 +34,7 @@
 | 整理细则 | `.agents/skills/wrapup/references/document-maintenance.md` | 只在明确要求整理时由 wrapup 读取 |
 | 安装器行为正本 | `skills/project-consistency-installer/`(含 v1.3.0 升级细则与获取脚本) | skills.sh 分发,机器级使用,不进入用户项目 |
 | 干净分发白名单 | `distribution/manifest.txt` | 发布边界独立于源码目录,新增产品文件需显式评审 |
+| GitHub 公开范围 | `distribution/public-paths.txt`、`scripts/publish-public.sh` | 本仓库是内部工作仓库;公开版历史按白名单由脚本生成,内部文档与实验不公开 |
 | 分发构建、验证与测试 | `scripts/` | 源码工具:生成 Release 资产、阻断自举状态泄漏、回归测试 |
 | GitHub Release 工作流 | `.github/workflows/distribution.yml` | 普通变更只验证;`v*` 标签才创建 Release,带 `-` 的为预发布 |
 | Claude Code 适配器 | `.claude/commands/catchup.md`、`wrapup.md`、`引入一致性机制.md` | 斜杠入口,只转发到对应 Skill,不复制流程 |
