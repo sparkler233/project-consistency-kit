@@ -13,3 +13,4 @@
 - **机制发版纪律**:任何机制文件发生真实变化,先判断 SemVer 的 major / minor / patch 影响,同步 `一致性机制/VERSION` 与安装器 metadata,统一推进全部修订日期到当天,更新 `CHANGELOG.md`,并检查初始化、安装器、公开文档、模板和设计说明是否联动。涉及分发的改动先在本仓库以不进入分发清单的方式试用(决策 51)。
 - **架构修改**:先讨论设计取舍,再改实现;被推翻的决策在设计说明中保留演进线索。
 - **外部实战反馈**:其他项目在安装、升级、跨会话使用中的反馈,用于回灌通用机制。
+- **Core 并行试用中(决策 86,转正后删除本条)**:在非 canonical 分支上运行 catchup / wrapup 时,改读 `docs/parallel-candidate/.agents/skills/` 下的同名 SKILL,其中 `.agents/skills/wrapup/scripts/` 一律换成 `docs/parallel-candidate/.agents/skills/wrapup/scripts/`;主线上照旧用正式版本,需要查看各并行分支时可运行候选目录下的 `parallel.mjs`。
