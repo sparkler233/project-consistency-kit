@@ -84,7 +84,68 @@ try {
   const committed = invoke("committed-after-synced");
   assert.match(committed.systemMessage, /1 个文件/);
 
+  branchBaseline();
   process.stdout.write("test-stop-hook: all scenarios passed\n");
 } finally {
   fs.rmSync(fixture, { recursive: true, force: true });
+}
+
+// 分支上的基线:最近的任务检查点(带 `Task:` trailer 的提交);没有检查点时用与主线的分叉点;
+// 检查点已进主线且分支已接回主线时用分叉点。主线上仍以 synced 为基线。
+function branchBaseline() {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "project-consistency-hook-branch-"));
+  const wt = `${repo}-wt`;
+  let n = 0;
+  const g = (cwd, ...args) => run("git", args, { cwd }).trim();
+  const remind = (cwd) => {
+    const env = { ...process.env };
+    delete env.CLAUDE_PROJECT_DIR;
+    const out = run(process.execPath, [hook], { cwd, env, input: JSON.stringify({ session_id: `branch-${(n += 1)}` }) });
+    return out ? JSON.parse(out).systemMessage : null;
+  };
+  const checkpoint = (msg) => g(wt, "commit", "-qam", msg, "-m", "目标:x\n进度:y\n还剩:z", "-m", "Task: 第三章");
+  try {
+    g(repo, "init", "-q", "-b", "main");
+    g(repo, "config", "user.name", "Project Consistency Test");
+    g(repo, "config", "user.email", "test@example.invalid");
+    g(repo, "config", "projectConsistency.canonicalBranch", "main");
+    fs.mkdirSync(path.join(repo, "一致性机制"));
+    fs.writeFileSync(path.join(repo, "一致性机制", "文件联动目录.md"), "# fixture\n");
+    fs.writeFileSync(path.join(repo, "第三章.md"), "第三章\n");
+    fs.writeFileSync(path.join(repo, "研究问题.md"), "A\n");
+    g(repo, "add", "-A");
+    g(repo, "commit", "-qm", "初始");
+    g(repo, "tag", "synced");
+    g(repo, "worktree", "add", "-q", "-b", "agent/第三章", wt, "main");
+
+    fs.writeFileSync(path.join(repo, "研究问题.md"), "B\n");
+    g(repo, "commit", "-qam", "主线:研究问题改为 B");
+    assert.match(remind(repo), /1 个文件/, "canonical: commits after synced still remind");
+    assert.equal(remind(wt), null, "branch without checkpoint or changes stays silent (merge-base baseline)");
+
+    fs.writeFileSync(path.join(wt, "第三章.md"), "第三章\n第一节\n");
+    assert.match(remind(wt), /1 个文件/);
+    checkpoint("第三章:第一节");
+    assert.equal(remind(wt), null, "silent right after a task checkpoint");
+
+    fs.writeFileSync(path.join(wt, "第三章.md"), "第三章\n第一节\n第二节草稿\n");
+    g(wt, "commit", "-qam", "第二节草稿");
+    assert.match(remind(wt), /1 个文件/, "commits after the checkpoint remind");
+    fs.writeFileSync(path.join(wt, "第三章.md"), "第三章\n第一节\n第二节\n");
+    checkpoint("第三章:第二节");
+    assert.equal(remind(wt), null);
+
+    g(repo, "merge", "-q", "--no-ff", "--no-edit", "agent/第三章");
+    fs.writeFileSync(path.join(repo, "研究问题.md"), "C\n");
+    g(repo, "commit", "-qam", "主线:研究问题改为 C");
+    g(repo, "tag", "-f", "synced");
+    g(wt, "merge", "-q", "main");
+    assert.equal(g(wt, "rev-parse", "HEAD"), g(repo, "rev-parse", "main"), "fast-forward back to canonical");
+    assert.equal(remind(wt), null, "changes brought in from canonical are not counted as unwrapped");
+    fs.writeFileSync(path.join(wt, "第三章.md"), "第三章\n第一节\n第二节\n第三节\n");
+    assert.match(remind(wt), /1 个文件/, "new changes after syncing still remind");
+  } finally {
+    fs.rmSync(repo, { recursive: true, force: true });
+    fs.rmSync(wt, { recursive: true, force: true });
+  }
 }

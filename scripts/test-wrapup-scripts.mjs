@@ -107,18 +107,23 @@ try {
   const refused = json(repo, decisions, ["apply", "--title", "x"], 1);
   assert.equal(refused.applied, false);
 
-  // 4. 分支模式:非 canonical 分支不迁出,apply 只写提交说明文件
+  // 4. 分支模式:非 canonical 分支不迁出,apply 只写提交说明文件;提交是任务检查点,说明段由模型按需填写、脚本不检查
   setPending(repo, [entry(14, "分支上的决策")]);
   git(repo, "checkout", "-qb", "feature");
   plan = json(repo, decisions, ["plan"]);
   assert.equal(plan.branch_mode.branch, "feature");
+  assert.equal(plan.branch_mode.task, "feature");
+  assert.equal(plan.branch_mode.task_source, "branch_name");
   const before = fs.readFileSync(path.join(repo, "PROJECT.md"), "utf8");
-  const branchApply = json(repo, decisions, ["apply", "--title", "分支检查点"]);
+  assert.deepEqual(plan.problems, [], "没写说明段也不报问题");
+  const branchApply = json(repo, decisions, ["apply", "--title", "分支检查点", "--intro", "目标:x\\n进度:y\\n还剩:无"]);
   assert.equal(branchApply.applied, false);
   assert.equal(branchApply.pending_kept, 1);
+  assert.equal(branchApply.task, "feature");
   assert.equal(fs.readFileSync(path.join(repo, "PROJECT.md"), "utf8"), before);
   check = commitApplied(repo);
   assert.equal(check.ok, true, JSON.stringify(check));
+  assert.match(git(repo, "log", "-1", "--format=%B"), /^分支检查点\n\n目标:x\n进度:y\n还剩:无\n\nTask: feature$/, "字面 \\n 按换行处理,Task 在 trailer 段");
   git(repo, "checkout", "-q", "main");
 
   // 5. 无编号的旧行被删时,Decision-Archive 写“无编号”
@@ -142,7 +147,100 @@ try {
   assert.equal(dir.files, 3);
   const overview = json(scoped, scope, ["--overview"]);
   assert.equal(overview.recent_commits[0].subject, "初始");
+  // 只有主线一条线:没有 current_branch_state,other_branches 与 anomalies 为空
+  assert.equal(overview.current_branch_state, undefined);
+  assert.deepEqual(overview.other_branches, []);
+  assert.deepEqual(overview.anomalies, []);
   assert.ok(overview.top_files.includes("PROJECT.md"), JSON.stringify(overview.top_files));
+
+  // 7. 任务状态:分支检查点由 decisions.mjs 写入,scope.mjs --overview 读出;经过集成周期仍能读出
+  // 分支上不写说明段也能提交检查点,仍带 Task 标记
+  git(scoped, "checkout", "-qb", "quick-fix");
+  fs.writeFileSync(path.join(scoped, "说明.md"), "改一行\n");
+  git(scoped, "add", "说明.md");
+  const quick = json(scoped, decisions, ["apply", "--title", "小改动"]);
+  git(scoped, "commit", "-q", "-F", quick.message_file);
+  assert.equal(git(scoped, "log", "-1", "--format=%B"), "小改动\n\nTask: quick-fix");
+  assert.equal(json(scoped, scope, ["--overview"]).current_branch_state.task.name, "quick-fix");
+  git(scoped, "checkout", "-q", "main");
+
+  const tsRepo = createRepo(recent10);
+  fs.writeFileSync(path.join(tsRepo, "第三章.md"), "第三章\n");
+  fs.writeFileSync(path.join(tsRepo, "研究问题.md"), "研究问题 A\n");
+  git(tsRepo, "add", "-A");
+  git(tsRepo, "commit", "-qm", "素材");
+  const wt = `${tsRepo}-第三章`;
+  fixtures.push(wt);
+  git(tsRepo, "worktree", "add", "-q", "-b", "agent/第三章", wt, "main");
+  const state = (cwd) => json(cwd, scope, ["--overview"]);
+  const checkpoint = (file, text, title, intro, extra = []) => {
+    fs.writeFileSync(path.join(wt, file), text);
+    const applied = json(wt, decisions, ["apply", "--title", title, "--intro", intro, "--trailer", "Co-Authored-By: 测试 <t@example.invalid>", ...extra]);
+    git(wt, "add", "-A");
+    git(wt, "commit", "-q", "-F", applied.message_file); // worktree 里 .git 是文件,用 apply 给出的路径
+  };
+
+  // 还没有检查点:任务为空,与主线的关系照常给出;主线上能看到这个分支
+  let cur = state(wt).current_branch_state;
+  assert.equal(cur.task, null);
+  assert.equal(cur.ahead, 0);
+  let others = state(tsRepo).other_branches;
+  assert.deepEqual(others.map((b) => [b.branch, b.worktree !== null, b.task]), [["agent/第三章", true, null]]);
+
+  checkpoint("第三章.md", "第三章\n结构\n", "第三章:结构调整完成", "目标:让第三章与新的研究问题一致\n进度:结构调整完成\n还剩:重写第二节");
+  assert.match(git(wt, "log", "-1", "--format=%B"), /\n\nTask: agent\/第三章\nCo-Authored-By: /);
+  cur = state(wt).current_branch_state;
+  assert.equal(cur.task.name, "agent/第三章");
+  assert.match(cur.task.message, /还剩:重写第二节/);
+  assert.deepEqual(cur.task.commits_since_checkpoint, []);
+  assert.equal(cur.ahead, 1);
+  assert.deepEqual(cur.branch_changed, ["第三章.md"]);
+
+  // 普通提交不是检查点,但列在「检查点之后的提交」里;主线上看到任务名与「还剩」
+  fs.writeFileSync(path.join(wt, "第三章.md"), "第三章\n结构\n第二节草稿\n");
+  git(wt, "commit", "-qam", "第二节草稿");
+  cur = state(wt).current_branch_state;
+  assert.deepEqual(cur.task.commits_since_checkpoint.map((c) => c.subject), ["第二节草稿"]);
+  others = state(tsRepo).other_branches;
+  assert.deepEqual(others[0].task, { name: "agent/第三章", remaining: "还剩:重写第二节", commits_since_checkpoint: 1 });
+  assert.equal(others[0].merge_into_canonical.status, git(tsRepo, "version").match(/2\.(\d+)/) && Number(git(tsRepo, "version").match(/2\.(\d+)/)[1]) >= 38 ? "clean" : "unavailable");
+
+  // 主线改了同一个文件:分支上看到交集与冲突
+  fs.writeFileSync(path.join(tsRepo, "第三章.md"), "第三章(主线改)\n");
+  git(tsRepo, "commit", "-qam", "主线:改第三章");
+  cur = state(wt).current_branch_state;
+  assert.equal(cur.behind, 1);
+  assert.deepEqual(cur.overlap, ["第三章.md"]);
+  if (cur.merge_into_canonical.status !== "unavailable") assert.deepEqual(cur.merge_into_canonical.conflicts, ["第三章.md"]);
+  git(tsRepo, "revert", "--no-edit", "HEAD");
+
+  // 第二个检查点沿用任务名;集成周期:主线 --no-ff 合并分支、再前进,分支快进接回主线后仍能读出任务
+  assert.equal(json(wt, decisions, ["plan"]).branch_mode.task_source, "previous_checkpoint");
+  checkpoint("第三章.md", "第三章\n结构\n第二节\n", "第三章:第二节完成", "目标:同上\n进度:第二节完成\n还剩:第三节");
+  git(tsRepo, "merge", "-q", "--no-ff", "--no-edit", "agent/第三章");
+  fs.writeFileSync(path.join(tsRepo, "研究问题.md"), "研究问题 B\n");
+  git(tsRepo, "commit", "-qam", "主线:研究问题改为 B");
+  git(wt, "merge", "-q", "--no-edit", "main");
+  assert.equal(git(wt, "rev-parse", "HEAD"), git(tsRepo, "rev-parse", "main"), "接回主线是一次快进");
+  cur = state(wt).current_branch_state;
+  assert.equal(cur.task.name, "agent/第三章", "快进接回主线后仍能读出本分支的任务");
+  assert.match(cur.task.message, /进度:第二节完成/);
+  assert.equal(cur.behind, 0);
+
+  // 换任务用 --task;从主线新开的分支读不到别人的任务;主线上的提交不带 Task
+  checkpoint("第三章.md", "第三章\n结构\n第二节\n第三节\n", "第三章:按 B 修订", "目标:按研究问题 B 修订全章\n进度:第三节完成\n还剩:通读", ["--task", "按研究问题 B 修订第三章"]);
+  assert.equal(state(wt).current_branch_state.task.name, "按研究问题 B 修订第三章");
+  const wt2 = `${tsRepo}-文献`;
+  fixtures.push(wt2);
+  git(tsRepo, "worktree", "add", "-q", "-b", "agent/文献", wt2, "main");
+  assert.equal(state(wt2).current_branch_state.task, null);
+  assert.equal(git(tsRepo, "log", "--first-parent", "-2", "--format=%(trailers:key=Task,valueonly)").trim(), "");
+  const main = state(tsRepo);
+  assert.equal(main.current_branch_state, undefined);
+  assert.deepEqual(Object.fromEntries(main.other_branches.map((b) => [b.branch, b.task && b.task.name])), {
+    "agent/文献": null,
+    "agent/第三章": "按研究问题 B 修订第三章",
+  });
 
   console.log("wrapup scripts tests passed");
 } finally {

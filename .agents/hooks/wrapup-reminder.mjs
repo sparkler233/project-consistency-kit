@@ -2,6 +2,9 @@
 // 一致性机制 version: 2026-09-25
 // Project Consistency Kit cross-platform Stop hook.
 // Always fails open: it only emits one systemMessage per dirty cycle.
+// Baseline: `synced` on the canonical branch; on other branches the latest task checkpoint
+// (a commit with a `Task:` trailer, looked up in the branch reflog, then along first-parent),
+// or the merge-base with the canonical branch when the branch has no checkpoint yet.
 
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -33,9 +36,34 @@ function hasRef(repoRoot, ref) {
   return git(repoRoot, ["rev-parse", "-q", "--verify", ref]) !== null;
 }
 
+function text(repoRoot, args) {
+  const out = git(repoRoot, args);
+  return out ? out.toString("utf8").trim() : "";
+}
+
+function branchBase(repoRoot) {
+  const canonical = text(repoRoot, ["config", "--get", "projectConsistency.canonicalBranch"]);
+  const branch = text(repoRoot, ["symbolic-ref", "--quiet", "--short", "HEAD"]);
+  if (!canonical || !branch || branch === canonical) return null;
+  let checkpoint = null;
+  for (const walk of [["-g", `refs/heads/${branch}`], ["--first-parent", "HEAD"]]) {
+    const log = text(repoRoot, ["log", ...walk, "-n", "200", "--format=%H%x1f%(trailers:key=Task,valueonly,separator=%x2C)"]);
+    const hit = log.split("\n").map((l) => l.split("\x1f")).find((r) => r[1] && r[1].trim());
+    if (hit) { checkpoint = hit[0]; break; }
+  }
+  const mergeBase = text(repoRoot, ["merge-base", "HEAD", `refs/heads/${canonical}`]) || null;
+  if (!checkpoint) return mergeBase;
+  // 检查点已进主线且分支已接回主线时,分叉点比检查点新,用分叉点,避免把主线带来的改动算成未收尾
+  if (mergeBase && git(repoRoot, ["merge-base", "--is-ancestor", checkpoint, mergeBase]) !== null) return mergeBase;
+  return checkpoint;
+}
+
 function changedFiles(repoRoot) {
   let tracked;
-  if (hasRef(repoRoot, "refs/tags/synced")) {
+  const base = branchBase(repoRoot);
+  if (base) {
+    tracked = nulPaths(git(repoRoot, ["diff", "--name-only", "-z", base, "--"]));
+  } else if (hasRef(repoRoot, "refs/tags/synced")) {
     tracked = nulPaths(git(repoRoot, ["diff", "--name-only", "-z", "synced", "--"]));
   } else if (hasRef(repoRoot, "HEAD")) {
     tracked = nulPaths(git(repoRoot, ["diff", "--name-only", "-z", "HEAD", "--"]));

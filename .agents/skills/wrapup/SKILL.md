@@ -43,7 +43,7 @@ node .agents/skills/wrapup/scripts/decisions.mjs plan
 
 脚本按位置读取「待提交」，给出要迁出的决策、提交正文(`body`，含全文与 trailer)、「最近决策」追加与删除的行及迁出后条数(`recent_count_after`)，对 git 中没有全文的旧行自动逐字写入正文。行数与删除由脚本决定，不自行数行。`mentions_undecided` 列出新决策提到、仍在「最近决策」中的旧编号：判断是推翻、部分调整还是仅提及——推翻加 `--supersede 新:旧`，部分调整加 `--partial 新:旧`，仅提及不处理；带上选项重跑 `plan` 确认结果。`problems` 非空时先解决。`collisions` 列出撞号的编号与提到它的文件：把后来的那条改成下一个空号，逐个文件判断引用指的是哪一条再改。计划中写明脚本给出的迁出后条数与删除的行。
 
-在非 canonical 分支上，脚本输出 `branch_mode`：分支上不迁出，决策留在「待提交」随检查点提交，合并回 canonical 后再迁出。
+在非 canonical 分支上，无论有无决策都运行 `plan`，脚本输出 `branch_mode`：分支上不迁出，决策留在「待提交」随检查点提交，合并回 canonical 后再迁出。分支上的提交是任务检查点。之后可能由别的 Session 接手、或任务还没做完时，说明段写三行供接手时读取——「目标:」写整个任务(不是本次会话的范围)，「进度:」写做到哪里，「还剩:」写这个任务还有什么没做(做完写「无」)，不写提交、集成这类收尾动作；没有必要时(如一次提交就做完的小改动)可以不写，脚本不检查。脚本自动加 `Task:` 标记，任务名见 `branch_mode.task`(沿用上一个检查点，没有则用分支名)，换了任务时加 `--task 新任务名`。
 
 素材清单、二进制或其他特定检查只按项目实际规则和本次变化触发，不向所有项目强加一种文件策略。找不到落点或归属冲突时提出最小调整；超范围整理仅报告，不自动升级为整理模式。
 
@@ -68,7 +68,7 @@ node .agents/skills/wrapup/scripts/decisions.mjs plan
 
 没有新改动不制造空提交。已有 commit 尚未检查同步时，完整检查后可经授权处理 horizon。必要维护失败时可经明确授权提交部分成果，但不能推进 synced。
 
-有决策迁出或处于 `branch_mode` 时，其余维护完成后运行 `decisions.mjs apply`(分支上它不改 PROJECT，只写提交说明文件)，选项与确认时的 `plan` 相同，并用 `--title` 传入确认过的标题(可选 `--intro` 说明段)；宿主要求的额外 trailer(如 `Co-Authored-By`)用 `--trailer "键: 值"` 传入。脚本把完整提交说明写成 UTF-8 文件，直接用它提交，不经 shell 管道拼接，bash、PowerShell 写法相同：
+有决策迁出或处于 `branch_mode` 时，其余维护完成后运行 `decisions.mjs apply`(分支上它不改 PROJECT，只写提交说明文件)，选项与确认时的 `plan` 相同，并用 `--title` 传入确认过的标题、`--intro` 传入说明段(可选；分支上按上文判断是否写三行)；宿主要求的额外 trailer(如 `Co-Authored-By`)用 `--trailer "键: 值"` 传入。脚本把完整提交说明写成 UTF-8 文件，直接用它提交，不经 shell 管道拼接，bash、PowerShell 写法相同：
 
 ```bash
 git commit -F <apply 输出的 message_file>

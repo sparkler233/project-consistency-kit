@@ -6,6 +6,9 @@
 //   node decisions.mjs apply [选项]   执行:改写 PROJECT.md,把完整提交说明(UTF-8)写到 .git/pck-commit-message.txt,再 `git commit -F <文件>`
 //   node decisions.mjs check          提交后核对:「待提交」已清空、「最近决策」不超过上限、HEAD 正文含全部 Decision 行
 // 非 canonical 分支上不迁出:plan 标出 branch_mode;apply 不改 PROJECT,只写提交说明文件(标题、说明段、trailer)。
+// 分支上的提交是任务检查点:自动加 trailer `Task: <任务名>`;任务名沿用分支上最近一个检查点,没有则用分支名;
+// 之后可能由别的 Session 接手或任务没做完时,用 --intro 写三行(由模型判断,脚本不检查),各以「目标:」「进度:」「还剩:」开头:目标写整个任务(不是本次会话的范围),
+// 还剩写这个任务还有什么没做(做完写「无」),不写提交、集成这类收尾动作。任务名同样写整个任务,不写当前这一步。
 // 撞号检查:「待提交」内重号、与「最近决策」或 git 中已迁出的编号重复,列入 collisions 与 problems。
 // 选项(由模型判断后传入):
 //   --supersede NEW:OLD   决策 NEW 推翻 OLD:删除 OLD 的索引行,正文加 `Supersedes: OLD`
@@ -13,6 +16,7 @@
 //   --trailer "K: V"      追加到正文末尾 trailer 段(如 Co-Authored-By),可重复
 //   --title "..."         提交标题(模型撰写);--intro "..." 可选说明段。写入提交说明文件,不经 shell 管道拼接
 //   --limit N             「最近决策」上限,默认 10
+//   --task "..."          分支上换了任务时指定新任务名(默认沿用上一个检查点的任务名);写整个任务,不写当前这一步
 
 import process from "node:process";
 import path from "node:path";
@@ -20,14 +24,16 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const [cmd = "plan", ...argv] = process.argv.slice(2);
-const opt = { supersede: [], partial: [], trailer: [], limit: 10, title: "", intro: "" };
+const opt = { supersede: [], partial: [], trailer: [], limit: 10, title: "", intro: "", task: "" };
 for (let i = 0; i < argv.length; i += 1) {
   const k = argv[i], v = argv[i + 1];
   if (k === "--supersede" || k === "--partial") { const [n, o] = v.split(":").map(Number); opt[k.slice(2)].push({ new: n, old: o }); i += 1; }
   else if (k === "--trailer") { opt.trailer.push(v); i += 1; }
   else if (k === "--limit") { opt.limit = Number(v); i += 1; }
-  else if (k === "--title" || k === "--intro") { opt[k.slice(2)] = v; i += 1; }
+  else if (k === "--title" || k === "--intro" || k === "--task") { opt[k.slice(2)] = v; i += 1; }
 }
+// 说明段里字面的 `\n`(如 zsh 双引号不转义)按换行处理,目标 / 进度 / 还剩三行不会挤成一行
+opt.intro = opt.intro.replace(/\\n/g, "\n");
 
 function run(args) {
   const r = spawnSync("git", args, { cwd: process.cwd(), encoding: "utf8", windowsHide: true });
@@ -83,6 +89,14 @@ function branchMode() {
 }
 const mode = branchMode();
 
+// 分支上最近一个检查点的任务名:先查分支的 reflog,没有再沿分支的提交线(first-parent)往回找带 `Task:` trailer 的提交
+function lastTask() {
+  const find = (walk) => (run(["log", ...walk, "-n", "200", "--format=%(trailers:key=Task,valueonly,separator=%x2C)"]) || "")
+    .split("\n").map((l) => l.trim()).find(Boolean) || null;
+  return find(["-g", `refs/heads/${mode.branch}`]) || find(["--first-parent", "HEAD"]);
+}
+const task = mode ? (opt.task.trim() || lastTask() || mode.branch) : null;
+
 function mentionFiles(n) {
   const re = `决策[[:space:]]*([0-9]+[[:space:]]*(、|,|，|/|和)[[:space:]]*)*${n}([^0-9]|$)`;
   const out = run(["-c", "core.quotepath=false", "grep", "-l", "--untracked", "-E", re]);
@@ -120,11 +134,11 @@ function compute(p) {
   for (const c of clash) problems.push(`决策 ${c.number} 撞号:${c.reasons.join(";")}`);
   if (mode) {
     return {
-      branch_mode: { ...mode, note: "非 canonical 分支:决策留在「待提交」随检查点提交,合并回 canonical 后再迁出" },
+      branch_mode: { ...mode, task, task_source: opt.task.trim() ? "option" : lastTask() ? "previous_checkpoint" : "branch_name", note: "非 canonical 分支:决策留在「待提交」随检查点提交,合并回 canonical 后再迁出;本次提交是任务检查点" },
       pending: p.pending.map(({ number, date, title }) => ({ number, date, title })),
       collisions: clash,
       problems,
-      body: opt.trailer.length ? opt.trailer.join("\n") + "\n" : "",
+      body: [`Task: ${task}`, ...opt.trailer].join("\n") + "\n",
       recent: p.recentLines,
     };
   }
@@ -199,7 +213,7 @@ if (cmd === "plan" || cmd === "apply") {
     if (mode) {
       writeFileSync(messagePath, [opt.title, opt.intro, r.body].filter(Boolean).join("\n\n"));
       writeFileSync(statePath, JSON.stringify({ numbers: [], limit: opt.limit, branch_mode: true }));
-      emit({ applied: false, branch_mode: r.branch_mode, message_file: messagePath, has_title: Boolean(opt.title), pending_kept: r.pending.length });
+      emit({ applied: false, branch_mode: r.branch_mode, message_file: messagePath, has_title: Boolean(opt.title), pending_kept: r.pending.length, task });
       process.exit(0);
     }
     writeProject(p, r);

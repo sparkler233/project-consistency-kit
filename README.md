@@ -23,9 +23,9 @@ catchup  ->  正常工作  ->  wrapup
 恢复现场                    检查联动并提交
 ```
 
-1. 新 Session 开始时运行 catchup。它先读 `PROJECT.md`、运行规则和脚本给出的 Git 概况,汇报自上次收尾以来的变化、当前状态和建议的下一步,再按任务读需要的细节。这个过程只读,不修改文件。上下文被压缩后不用重跑,Agent 按 `AGENTS.md` 里的指令重读 PROJECT 与运行规则即可。
+1. 新 Session 开始时运行 catchup。它先读 `PROJECT.md`、运行规则和脚本给出的 Git 概况,汇报自上次收尾以来的变化、当前状态和建议的下一步,再按任务读需要的细节。在 feature branch 上,它还会读出这个分支最近一次收尾写下的目标、进度与还剩,以及主线自分叉以来的变化与本分支是否相关;在 canonical branch 上,它列出其他分支各自的任务与进度。这个过程只读,不修改文件。上下文被压缩后不用重跑,Agent 按 `AGENTS.md` 里的指令重读 PROJECT 与运行规则即可。
 2. 中间照常和 Agent 协作。拍板的决策会立即写进 `PROJECT.md` 的「待提交」区,不等收尾。
-3. 一段工作结束时运行 wrapup。canonical branch 比较自上次 `synced` 以来的全部改动;并行 feature branch 改用它与 canonical 的 merge-base。它把维护计划、拟提交文件、完整提交说明和 `synced` 条件一次展示给你,一次确认后才写入文件、把决策全文迁入提交说明并创建本地提交;只有 canonical branch 能通过确定性 guard 推进 `synced`。数行数、生成提交说明这类机械步骤由随附脚本完成。
+3. 一段工作结束时运行 wrapup。canonical branch 比较自上次 `synced` 以来的全部改动;并行 feature branch 改用它与 canonical 的 merge-base。它把维护计划、拟提交文件、完整提交说明和 `synced` 条件一次展示给你,一次确认后才写入文件、把决策全文迁入提交说明并创建本地提交;只有 canonical branch 能通过确定性 guard 推进 `synced`。在 feature branch 上收尾时,这次提交就是任务检查点;任务还没做完或之后可能换 Session 接手时,提交说明里写上目标、进度、还剩三行,供接手时读取。数行数、生成提交说明这类机械步骤由随附脚本完成。
 
 | 运行环境 | 会话初始化引入 | 会话收尾 |
 | --- | --- | --- |
@@ -91,9 +91,9 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 
 ### 多个 Session 并行工作的边界
 
-v1.3.0 起,并行工作应使用独立 branch + worktree。非 canonical branch 的 catchup / wrapup 以 `merge-base(HEAD, canonical)` 为检查基线,可以完成本分支联动与 checkpoint commit,但 guard 会禁止它推进项目级 `synced`;合并回 canonical 后再执行最终 wrapup。2.0 起,分支上的决策留在「待提交」,合并回 canonical 后统一迁出,决策脚本会检查两边是否撞号。这些只保证并行不比以前差;并行时的相互影响、整合流程与 Session 之间的交流,计划在后续预览版里以 Git 自身能力重新设计。
+v1.3.0 起,并行工作应使用独立 branch + worktree。非 canonical branch 的 catchup / wrapup 以 `merge-base(HEAD, canonical)` 为检查基线,可以完成本分支联动与 checkpoint commit,但 guard 会禁止它推进项目级 `synced`;合并回 canonical 后再执行最终 wrapup。2.0 起,分支上的决策留在「待提交」,合并回 canonical 后统一迁出,决策脚本会检查两边是否撞号;分支上的收尾提交是任务检查点,catchup 能读出分支做到哪里、与主线有无交集或冲突。这些只保证并行不比以前差;并行时的相互影响、整合流程与 Session 之间的交流,计划在后续预览版里以 Git 自身能力重新设计。
 
-两个 Session 直接操作同一个 worktree 仍不受支持:它们会共享未提交文件和索引,机制无法可靠判断改动归属。Stop hook 第一版仍保守读取全局 `synced`,所以旧 feature worktree 在 canonical 前进后可能收到一次多余提醒;提醒是 fail-open 的低风险 false positive,不影响 guard / wrapup 使用正确基线。
+两个 Session 直接操作同一个 worktree 仍不受支持:它们会共享未提交文件和索引,机制无法可靠判断改动归属。Stop hook 在 feature branch 上以最近的任务检查点为基线(还没有检查点时用与 canonical 的分叉点),不再因 canonical 前进而误报。
 
 ### 决策落盘仍然依赖模型
 

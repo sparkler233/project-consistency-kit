@@ -2,7 +2,8 @@
 // 一致性机制 version: 2026-09-25
 // 一次输出 catchup / wrapup 需要的 Git 范围,JSON 格式,模型直接取值,不再抄写哈希。
 // 用法:node scope.mjs            → 基线、基线后提交、改动清单、工作区(含未跟踪文件摘要)
-//       node scope.mjs --overview → 另加最近 15 条提交标题、目录一层清单、并行与推送异常
+//       node scope.mjs --overview → 另加最近 15 条提交标题、目录一层清单、分支状态(当前分支的任务检查点与和主线的关系,
+//                                   其他分支的任务与领先 / 落后)、推送异常
 // 默认模式另给 hints:整理线索(本次涉及的文档中大量重复的行、没有被任何文档引用的文档),只供模型判断是否提醒整理
 
 import process from "node:process";
@@ -105,22 +106,85 @@ function worktree() {
   return result;
 }
 
+// 分支:任务检查点是分支上 wrapup 的提交,带 `Task:` trailer,说明段写目标 / 进度 / 还剩。
+// 找最近的检查点先查分支的 reflog(快进接回主线后仍在,新开的分支里没有别人的检查点),查不到再沿 first-parent 往回找。
+function taskState(ref) {
+  const find = (walk) => (git(["log", ...walk, "-n", "200", "--format=%H%x1f%(trailers:key=Task,valueonly,separator=%x2C)%x1e"]) || "")
+    .split("\x1e").map((r) => r.trim().split("\x1f")).find((r) => r[1] && r[1].trim()) || null;
+  const hit = find(["-g", ref]) || find(["--first-parent", ref]);
+  if (!hit) return null;
+  const message = (git(["log", "-1", "--format=%B", hit[0]]) || "").trim();
+  const since = commits(`${hit[0]}..${ref}`, ["--first-parent"]);
+  return { name: hit[1].trim(), checkpoint: hit[0].slice(0, 12), message, commits_since_checkpoint: since };
+}
+
+function tryMerge(a, b) {
+  const v = (git(["version"]) || "").match(/(\d+)\.(\d+)/);
+  if (!v || Number(v[1]) < 2 || (Number(v[1]) === 2 && Number(v[2]) < 38)) return { status: "unavailable", reason: "git_older_than_2.38" };
+  const r = spawnSync("git", ["-c", "core.quotepath=false", "merge-tree", "--write-tree", "--name-only", "--no-messages", "-z", a, b], { cwd: root, encoding: "utf8", windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
+  if (r.status === 0) return { status: "clean" };
+  if (r.status === 1) return { status: "conflict", conflicts: [...new Set((r.stdout || "").split("\0").filter(Boolean).slice(1))] };
+  return { status: "error" };
+}
+
+// 分支与主线的关系:分叉点、领先 / 落后、两边自分叉点以来改动的文件及交集、试合并进主线的结果。只看已提交的内容。
+function relation(ref, canonicalRef, detail) {
+  const bases = lines(git(["merge-base", "--all", canonicalRef, ref]));
+  if (bases.length !== 1) return { error: bases.length ? "ambiguous_merge_base" : "no_merge_base" };
+  const [behind, ahead] = (git(["rev-list", "--left-right", "--count", `${canonicalRef}...${ref}`]) || "0 0").trim().split(/\s+/).map(Number);
+  const merge = ahead ? tryMerge(canonicalRef, ref) : { status: "nothing_to_merge" };
+  if (!detail) return { ahead, behind, merge_into_canonical: merge };
+  const changed = (to) => (git(["diff", "--name-only", "--no-renames", "-z", bases[0], to, "--"]) || "").split("\0").filter(Boolean);
+  const cap = (list) => (list.length > LIST_MAX ? { items: list.slice(0, LIST_MAX), truncated: list.length - LIST_MAX } : list);
+  const mine = changed(ref), theirs = changed(canonicalRef);
+  const theirSet = new Set(theirs);
+  return { base: bases[0].slice(0, 12), ahead, behind, branch_changed: cap(mine), canonical_changed: cap(theirs),
+    overlap: mine.filter((f) => theirSet.has(f)), merge_into_canonical: merge };
+}
+
+// 当前在分支上:current_branch_state 给出任务状态与和主线的关系;other_branches 列出其他有主线没有的提交、或检出在某个 worktree 中的分支
+function branchInfo(canonical, current, worktreeOf) {
+  const canonicalRef = `refs/heads/${canonical}`;
+  if (!git(["rev-parse", "--verify", "-q", `${canonicalRef}^{commit}`])) return { branches_note: "canonical_ref_missing" };
+  const info = {};
+  if (current && current !== canonical) {
+    const ref = `refs/heads/${current}`;
+    info.current_branch_state = { task: taskState(ref), ...relation(ref, canonicalRef, true) };
+  }
+  const unmerged = lines(git(["branch", "--no-merged", canonicalRef, "--format=%(refname:short)"]));
+  const others = [...new Set([...unmerged, ...Object.keys(worktreeOf)])].filter((b) => b !== canonical && b !== current).sort();
+  info.other_branches = others.map((b) => {
+    const ref = `refs/heads/${b}`;
+    const task = taskState(ref);
+    const remaining = task && (task.message.split("\n").find((l) => /^\s*还剩\s*[:：]/.test(l)) || "").trim();
+    return { branch: b, worktree: worktreeOf[b] || null, last_commit: (git(["log", "-1", "--format=%s", ref]) || "").trim(),
+      task: task ? { name: task.name, remaining: remaining || null, commits_since_checkpoint: task.commits_since_checkpoint.length } : null,
+      ...relation(ref, canonicalRef, false) };
+  });
+  return info;
+}
+
 function overviewInfo(guard) {
   const dirs = lines(git(["ls-tree", "-d", "--name-only", "HEAD"]));
   const tree = {};
   for (const d of dirs) tree[d] = lines(git(["ls-tree", "--name-only", "HEAD", `${d}/`])).map((p) => p.slice(d.length + 1));
   const top_files = lines(git(["ls-tree", "--name-only", "HEAD"])).filter((p) => !dirs.includes(p));
   const anomalies = [];
-  const worktrees = lines(git(["worktree", "list", "--porcelain"])).filter((l) => l.startsWith("worktree ")).map((l) => l.slice(9));
-  if (worktrees.length > 1) anomalies.push({ kind: "other_worktrees", items: worktrees.filter((w) => path.resolve(w) !== path.resolve(root)) });
-  const unmerged = lines(git(["branch", "--no-merged", "--format=%(refname:short)"]));
-  if (unmerged.length) anomalies.push({ kind: "unmerged_branches", items: unmerged });
+  const worktreeOf = {}, detached = [];
+  let wt = null;
+  for (const l of lines(git(["worktree", "list", "--porcelain"]))) {
+    if (l.startsWith("worktree ")) wt = l.slice(9);
+    else if (l.startsWith("branch refs/heads/")) worktreeOf[l.slice(18)] = wt;
+    else if (l === "detached" && path.resolve(wt) !== path.resolve(root)) detached.push(wt);
+  }
+  if (detached.length) anomalies.push({ kind: "detached_worktrees", items: detached });
   const upstream = (git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]) || "").trim();
   if (upstream) {
     const [behind, ahead] = (git(["rev-list", "--left-right", "--count", "@{u}...HEAD"]) || "0 0").trim().split(/\s+/).map(Number);
     if (behind || ahead) anomalies.push({ kind: "upstream_diverged", upstream, ahead, behind });
   }
-  return { recent_commits: commits("HEAD", ["-15"]), top_files, tree, anomalies };
+  const branches = guard.canonical_branch ? branchInfo(guard.canonical_branch, guard.current_branch ?? null, worktreeOf) : { branches_note: "canonical_unconfigured" };
+  return { recent_commits: commits("HEAD", ["-15"]), top_files, tree, ...branches, anomalies };
 }
 
 const MECH = [".agents/", ".claude/", ".codex/", "一致性机制/"];
