@@ -12,6 +12,20 @@ import { spawnSync } from "node:child_process";
 import { existsSync, openSync, readSync, closeSync, statSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+// --help 只打印开头这段说明,不做任何改动;不认识的参数报错且不执行
+{
+  const args = process.argv.slice(2);
+  if (args.includes("--help") || args.includes("-h")) {
+    const text = readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n");
+    process.stdout.write(text.slice(1).filter((l) => l.startsWith("//")).map((l) => l.replace(/^\/\/ ?/, "")).join("\n") + "\n");
+    process.exit(0);
+  }
+  const bad = args.filter((a) => !["--overview"].includes(a));
+  if (bad.length) {
+    process.stdout.write(JSON.stringify({ error: `unknown_option: ${bad.join(" ")}`, hint: "node scope.mjs --help 查看用法;未做任何改动" }) + "\n");
+    process.exit(2);
+  }
+}
 const here = path.dirname(fileURLToPath(import.meta.url));
 const overview = process.argv.includes("--overview");
 const HEAD_LINES = 3, LINE_MAX = 120, READ_MAX = 2 * 1024 * 1024, LIST_MAX = 200;

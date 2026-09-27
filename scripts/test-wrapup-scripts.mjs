@@ -242,6 +242,24 @@ try {
     "agent/第三章": "按研究问题 B 修订第三章",
   });
 
+  // 8. --help 只打印用法、不做任何改动;不认识的命令或参数报错且不执行(防止为查用法而误执行有副作用的命令)
+  const guard = path.join(scripts, "synced-guard.mjs");
+  const hp = createRepo(recent10);
+  setPending(hp, [entry(11, "只为测试 --help")]);
+  const snap = () => [fs.readFileSync(path.join(hp, "PROJECT.md"), "utf8"), git(hp, "rev-parse", "HEAD"), git(hp, "rev-parse", "synced"),
+    fs.existsSync(path.join(hp, ".git", "pck-commit-message.txt"))];
+  const before8 = snap();
+  for (const [script, args] of [[decisions, ["--help"]], [decisions, ["apply", "--help"]], [decisions, ["apply", "-h", "--title", "x"]],
+    [scope, ["--help"]], [guard, ["--help"]]]) {
+    const out = run(process.execPath, [script, ...args], { cwd: hp }).stdout;
+    assert.ok(out.length > 0 && !out.startsWith("{"), `${path.basename(script)} ${args.join(" ")} 应只打印用法`);
+  }
+  for (const [script, args] of [[decisions, ["apply", "--titel", "x"]], [decisions, ["apply", "--title"]], [decisions, ["frob"]],
+    [scope, ["--overvew"]], [guard, ["advance", "--force"]]]) {
+    run(process.execPath, [script, ...args], { cwd: hp, expected: 2 });
+  }
+  assert.deepEqual(snap(), before8, "--help 与不认识的参数都不应改动 PROJECT、HEAD、synced 或写提交说明文件");
+
   console.log("wrapup scripts tests passed");
 } finally {
   for (const dir of fixtures) fs.rmSync(dir, { recursive: true, force: true });

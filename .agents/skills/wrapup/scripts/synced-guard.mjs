@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 // 一致性机制 version: 2026-09-25
+// synced 的唯一操作入口:检查能否推进、按条件创建或推进本地 `synced` 标签。输出 JSON。
+// 用法:node synced-guard.mjs inspect   只检查,不做改动
+//       node synced-guard.mjs advance   条件满足时创建或推进 synced
+//       node synced-guard.mjs --help    只打印本段说明,不做任何改动;其他参数报错且不执行
 
 import process from "node:process";
 import { spawnSync } from "node:child_process";
 
+const guardUsage = "inspect  只检查,不做改动\nadvance  条件满足时创建或推进 synced\n--help   只打印用法\n";
 const canonicalConfigKey = "projectConsistency.canonicalBranch";
 
 function git(cwd, args) {
@@ -235,7 +240,10 @@ function advance() {
 }
 
 const command = process.argv[2];
-if (process.argv.length !== 3 || !["inspect", "advance"].includes(command)) {
+if (process.argv.length === 3 && (command === "--help" || command === "-h")) {
+  process.stdout.write(`${guardUsage}`);
+  process.exitCode = 0;
+} else if (process.argv.length !== 3 || !["inspect", "advance"].includes(command)) {
   emit({ status: "error", error: "usage: synced-guard.mjs inspect|advance" });
   process.exitCode = 2;
 } else if (command === "inspect") {

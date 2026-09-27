@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 一致性机制 version: 2026-09-25
 // 把 PROJECT.md「待提交」的决策迁入提交正文,并维护「最近决策」。只按位置读取,不要求特定写法。
-// 用法:
+// 用法(--help 只打印本段说明,不做任何改动;不认识的命令或参数报错且不执行):
 //   node decisions.mjs plan  [选项]   预览:要迁出的决策、提交正文、「最近决策」变化(不写文件)
 //   node decisions.mjs apply [选项]   执行:改写 PROJECT.md,把完整提交说明(UTF-8)写到 .git/pck-commit-message.txt,再 `git commit -F <文件>`
 //   node decisions.mjs check          提交后核对:「待提交」已清空、「最近决策」不超过上限、HEAD 正文含全部 Decision 行
@@ -22,9 +22,28 @@ import process from "node:process";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const [cmd = "plan", ...argv] = process.argv.slice(2);
+if (cmd === "--help" || cmd === "-h" || cmd === "help" || argv.includes("--help") || argv.includes("-h")) {
+  // 用法就是文件开头的注释;只打印,不做任何改动
+  const head = readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").filter((l) => l.startsWith("//")).map((l) => l.replace(/^\/\/ ?/, ""));
+  process.stdout.write(head.join("\n") + "\n");
+  process.exit(0);
+}
 const opt = { supersede: [], partial: [], trailer: [], limit: 10, title: "", intro: "", task: "" };
+if (!["plan", "apply", "check"].includes(cmd)) {
+  process.stdout.write(JSON.stringify({ error: `unknown_command: ${cmd}`, hint: "node decisions.mjs --help 查看用法" }) + "\n");
+  process.exit(2);
+}
+const KNOWN = ["--supersede","--partial","--trailer","--limit","--title","--intro","--task"], WITH_VALUE = ["--supersede","--partial","--trailer","--limit","--title","--intro","--task"];
+for (let i = 0; i < argv.length; i += 1) {
+  if (!KNOWN.includes(argv[i]) || (WITH_VALUE.includes(argv[i]) && argv[i + 1] === undefined)) {
+    process.stdout.write(JSON.stringify({ error: `unknown_or_incomplete_option: ${argv[i]}`, hint: "node decisions.mjs --help 查看用法;未做任何改动" }) + "\n");
+    process.exit(2);
+  }
+  if (WITH_VALUE.includes(argv[i])) i += 1;
+}
 for (let i = 0; i < argv.length; i += 1) {
   const k = argv[i], v = argv[i + 1];
   if (k === "--supersede" || k === "--partial") { const [n, o] = v.split(":").map(Number); opt[k.slice(2)].push({ new: n, old: o }); i += 1; }
