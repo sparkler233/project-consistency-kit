@@ -336,6 +336,15 @@ try {
   fs.renameSync(projectFile, `${projectFile}.bak`);
   assert.equal(json(dz, decisions, ["plan"], 1).error, "project_missing");
   fs.renameSync(`${projectFile}.bak`, projectFile);
+  // 没有要迁出的决策时 apply 只写提交说明文件,不改 PROJECT(每次提交都用它写说明)
+  git(dz, "add", "-A");
+  git(dz, "commit", "-qm", "迁出后");
+  const untouched = fs.readFileSync(projectFile, "utf8");
+  const msgOnly = json(dz, decisions, ["apply", "--title", "只改文档", "--intro", "说明段", "--trailer", "Co-Authored-By: 测试 <t@example.invalid>"]);
+  assert.equal(msgOnly.applied, true);
+  assert.equal(fs.readFileSync(projectFile, "utf8"), untouched, "apply without pending decisions must not touch PROJECT");
+  assert.equal(fs.readFileSync(msgOnly.message_file, "utf8"), "只改文档\n\n说明段\n\nCo-Authored-By: 测试 <t@example.invalid>\n");
+  assert.equal(git(dz, "status", "--porcelain"), "");
   // 推翻 / 部分调整已不在「最近决策」里、但 git 中有全文的决策:可以,正文加 trailer;两处都没有的报错
   const old = createRepo(recent10);
   git(old, "commit", "-q", "--allow-empty", "-m", "旧决策", "-m", "决策 3 · 2026-09-03 · 旧三\n\nDecision: 3");

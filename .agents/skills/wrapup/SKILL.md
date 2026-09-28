@@ -60,7 +60,7 @@ node .agents/skills/wrapup/scripts/decisions.mjs plan
 
 执行后实际改动与确认时不一致(文件清单或提交说明需实质改变)时，先补确认。按批准的路径暂存，只有明确批准整个工作区时才可 `git add -A`；检查实际暂存内容与授权一致，保留已有暂存内容；混有其他工作、无法分离时停下，不擅自提交或重置。没有新改动不制造空提交。
 
-有决策迁出或处于 `branch_mode` 时，其余维护完成后运行 `decisions.mjs apply`(分支上它不改 PROJECT，只写提交说明文件)，选项与确认时的 `plan` 相同，并用 `--title` 传入确认过的标题、`--intro` 传入说明段(可选；分支上按上文判断是否写三行)；宿主要求的额外 trailer(如 `Co-Authored-By`)用 `--trailer "键: 值"` 传入。脚本把完整提交说明写成 UTF-8 文件，直接用它提交，不经 shell 管道拼接，bash、PowerShell 写法相同：
+每次提交的说明都由脚本写成文件：其余维护完成后运行 `decisions.mjs apply`(有决策时迁出；没有要迁出的决策或在分支上时不改 PROJECT，只写提交说明文件)，选项与确认时的 `plan` 相同，并用 `--title` 传入确认过的标题、`--intro` 传入说明段(可选；分支上按上文判断是否写三行)；宿主要求的额外 trailer(如 `Co-Authored-By`)用 `--trailer "键: 值"` 传入。脚本把完整提交说明写成 UTF-8 文件，直接用它提交，不用 `git commit -m`、不经 shell 管道拼接，bash、PowerShell 写法相同：
 
 ```bash
 git commit -F <apply 输出的 message_file>

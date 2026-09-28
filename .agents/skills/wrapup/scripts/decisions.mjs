@@ -3,7 +3,8 @@
 // 把 PROJECT.md「待提交」的决策迁入提交正文,并维护「最近决策」。只按位置读取,不要求特定写法。
 // 用法(--help 只打印本段说明,不做任何改动;不认识的命令或参数报错且不执行):
 //   node decisions.mjs plan  [选项]   预览:要迁出的决策、提交正文、「最近决策」变化(不写文件)
-//   node decisions.mjs apply [选项]   执行:改写 PROJECT.md,把完整提交说明(UTF-8)写到 .git/pck-commit-message.txt,再 `git commit -F <文件>`
+//   node decisions.mjs apply [选项]   执行:迁出决策、改写 PROJECT.md,把完整提交说明(UTF-8)写到 .git/pck-commit-message.txt,再 `git commit -F <文件>`;
+//                                     没有要迁出的决策时不改 PROJECT,只写提交说明文件——每次提交都用它写说明
 //   node decisions.mjs check          提交后核对:「待提交」已清空、「最近决策」不超过上限、HEAD 正文含全部 Decision 行
 // 非 canonical 分支上不迁出:plan 标出 branch_mode;apply 不改 PROJECT,只写提交说明文件(标题、说明段、trailer)。
 // 分支上的提交是任务检查点:自动加 trailer `Task: <任务名>`;任务名沿用分支上最近一个检查点,没有则用分支名;
