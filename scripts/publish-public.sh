@@ -1,29 +1,36 @@
 #!/usr/bin/env bash
 # 一致性机制 version: 2026-09-27
 # 从本仓库(内部工作仓库)的历史生成 GitHub 公开版历史:只保留 distribution/public-paths.txt 列出的路径,
-# 接在公开仓库现有 main 之后,作者与提交者统一为公开身份,只改内部文件的提交自动略去。
-# 同样输入得到同样的提交号,之后每次重跑都能普通快进推送。脚本不推送,只打印推送命令。
+# 接在公开仓库最初的 main(PUBLIC_BASE,内部仓库建立前的旧线)之后,作者与提交者统一为公开身份,
+# 只改内部文件的提交自动略去。每次都从同一个基整段重新生成,同样输入得到同样的提交号,
+# 所以上次公开的提交会原样重现,新提交接在后面,可以普通快进推送。
+# 生成后检查:公开仓库当前的 main 必须原样包含在新历史里,新提交里不得重复已公开的提交;
+# 不满足就报错、不打印推送命令。脚本不推送,只打印推送命令。
 #
-# 用法:scripts/publish-public.sh [--ref <提交>] [--out <新目录>] [--base-repo <仓库>] [--base-ref <引用>]
-#   --ref        要公开到的内部提交,默认 HEAD(须已提交;工作区改动不会带上)
-#   --out        生成公开历史的裸仓库目录(不得已存在),默认新建临时目录
-#   --base-repo  取公开 main 的仓库,默认 PUBLIC_URL;离线试跑可指向本机一份公开仓库的 clone
-#   --base-ref   该仓库中公开 main 的引用,默认 main
+# 用法:scripts/publish-public.sh [--ref <提交>] [--out <新目录>] [--base-repo <仓库>] [--base <提交>] [--public-ref <引用>]
+#   --ref         要公开到的内部提交,默认 HEAD(须已提交;工作区改动不会带上)
+#   --out         生成公开历史的裸仓库目录(不得已存在),默认新建临时目录
+#   --base-repo   公开仓库,默认 PUBLIC_URL;离线试跑可指向本机一份公开仓库的 clone
+#   --base        内部历史接在哪个公开提交之后,默认 PUBLIC_BASE;一般不要改
+#   --public-ref  公开仓库当前 main 的引用,用于检查新历史能否快进,默认 main
 set -euo pipefail
 
 PUBLIC_URL="https://github.com/sparkler233/project-consistency-kit.git"
 PUBLIC_NAME="sparkler"
 PUBLIC_EMAIL="sparkler233@users.noreply.github.com"
+# 内部仓库建立前公开 main 的最后一个提交;内部历史永远接在它后面(换了它,已公开的提交就无法原样重现)
+PUBLIC_BASE="84d54661270458f263cdccfc250242e388e543e4"
 
 die() { printf '错误:%s\n' "$*" >&2; exit 1; }
 
-ref=HEAD; out=""; base_repo=""; base_ref=main
+ref=HEAD; out=""; base_repo=""; base="$PUBLIC_BASE"; public_ref=main
 while [ $# -gt 0 ]; do
   case "$1" in
     --ref) ref="${2:?}"; shift 2 ;;
     --out) out="${2:?}"; shift 2 ;;
     --base-repo) base_repo="${2:?}"; shift 2 ;;
-    --base-ref) base_ref="${2:?}"; shift 2 ;;
+    --base) base="${2:?}"; shift 2 ;;
+    --public-ref) public_ref="${2:?}"; shift 2 ;;
     *) die "未知参数 $1" ;;
   esac
 done
@@ -53,8 +60,12 @@ git remote remove origin 2>/dev/null || true
 git branch -q -f public "$src"
 git symbolic-ref HEAD refs/heads/public
 
-git fetch -q "${base_repo:-$PUBLIC_URL}" "$base_ref" || die "取不到公开 main:${base_repo:-$PUBLIC_URL} $base_ref"
-base="$(git rev-parse FETCH_HEAD)"
+repo="${base_repo:-$PUBLIC_URL}"
+git fetch -q "$repo" "$public_ref" || die "取不到公开 main:$repo $public_ref"
+current="$(git rev-parse FETCH_HEAD)"
+git fetch -q "$repo" "$base" || die "取不到公开基:$repo $base"
+base="$(git rev-parse --verify "$base^{commit}")"
+git merge-base --is-ancestor "$base" "$current" || die "基 $base 不在公开 main 的历史里"
 first="$(git rev-list --max-parents=0 public)"
 [ "$(printf '%s\n' "$first" | wc -l | tr -d ' ')" = 1 ] || die "内部历史有多个起点,需先确认接法"
 
@@ -68,10 +79,23 @@ git update-ref -d refs/original/refs/heads/public
 
 git merge-base --is-ancestor "$base" public || die "公开历史没有接在 $base 之后"
 tip="$(git rev-parse public)"
-count="$(git rev-list --count "$base..public")"
 files="$(git ls-tree -r --name-only public | wc -l | tr -d ' ')"
+printf '内部提交:%s\n公开基:%s\n公开 main:%s\n' "$src" "$base" "$current"
 
-printf '内部提交:%s\n公开 main:%s\n公开版:%s(新增 %s 个提交,%s 个文件)\n输出目录:%s\n\n' "$src" "$base" "$tip" "$count" "$files" "$out"
-git -c core.quotepath=false diff --stat=160 "$base" public | tail -n 1
+# 已公开的提交必须原样重现:公开 main 在新历史里,推送才是快进
+git merge-base --is-ancestor "$current" public \
+  || die "新历史不包含公开 main $current(已公开的提交没有原样重现),推送会分叉;检查 --base 与内部历史是否被改写"
+# 新提交不得重复已公开的提交(同一作者时间与标题):基选错时内部历史会被整段重放一遍
+dup="$(comm -12 <(git log --format='%ad %s' --date=raw "$current" | LC_ALL=C sort -u) \
+                <(git log --format='%ad %s' --date=raw "$current..public" | LC_ALL=C sort -u) | head -n 3)"
+[ -z "$dup" ] || die "新提交重复了已公开的提交(基选错会整段重放内部历史),例如:
+$dup"
+if [ "$tip" = "$current" ]; then
+  printf '公开版:%s,与公开 main 相同,没有新提交,无需推送\n输出目录:%s\n' "$tip" "$out"
+  exit 0
+fi
+count="$(git rev-list --count "$current..public")"
+printf '公开版:%s(在公开 main 后新增 %s 个提交,%s 个文件)\n输出目录:%s\n\n' "$tip" "$count" "$files" "$out"
+git -c core.quotepath=false diff --stat=160 "$current" public | tail -n 1
 printf '\n核对后推送(须维护者同意):\n  git -C %q push %s public:main\n' "$out" "$PUBLIC_URL"
 printf '打发布标签:\n  git -C %q push %s public:refs/tags/v<VERSION>\n' "$out" "$PUBLIC_URL"
