@@ -23,12 +23,10 @@ node .agents/skills/wrapup/scripts/scope.mjs --overview
 
 直接用输出中的值，不自己抄写哈希、不另算基线。
 
-- `base`、`commits_since_base`、`committed_since_base`、`worktree`：自上次收尾以来的提交、这些提交改过的文件、尚未提交的工作区改动。未提交与未跟踪文件只列出(脚本已附行数、大小；未跟踪目录附文件数与示例)，不读内容。
-- `recent_commits`：最近 15 条提交标题。标题只说明当时的事，现状以 `PROJECT.md` 为准；正文默认不读，标题与任务相关时再 `git show`。
-- `tree`、`top_files`：已跟踪顶层目录及其下一层名称，只看名称。
-- `current_branch_state`(只在非 canonical 分支上出现)：`task` 是本分支最近任务检查点的说明(目标、进度、还剩)及之后的提交，据此接着做；「还剩」不是「无」时任务没做完；为空表示还没有检查点，按提交标题与改动判断。`behind`、`canonical_changed`、`overlap`、`merge_into_canonical` 说明主线自分叉以来的变化与本分支是否相关，有交集或冲突时才读相关改动。
-- `other_branches`：其他有主线没有的提交、或检出在某个工作区中的分支，附所在工作区、任务名与「还剩」、领先 / 落后、能否干净合并进主线。
-- `anomalies`：不在任何分支上的其他工作区、领先或落后上游。
+- 未提交与未跟踪文件只看脚本列出的名称、行数与大小(未跟踪目录附文件数与示例)，不读内容。
+- `recent_commits` 只有标题，说明当时的事，现状以 `PROJECT.md` 为准；与任务相关时再 `git show` 读正文。
+- `tree`、`top_files` 只看名称。
+- 在非 canonical 分支上，`current_branch_state.task` 是本分支最近检查点的说明(目标、进度、还剩)及之后的提交，据此接着做；「还剩」不是「无」时任务没做完，为空时按提交标题与改动判断。主线自分叉以来的改动与本分支有交集或冲突时，才读相关改动。
 
 需要 diff 或更早历史时再展开。guard 不可用、未配置 canonical、没有首次提交或基线异常时，不猜替代基线，照常恢复其余资料并说明无法比较；`can_advance=false` 不影响读取。
 
