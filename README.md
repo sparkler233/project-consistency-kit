@@ -66,8 +66,8 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 | `一致性机制/运行规则.md` | 机制怎么运行(由安装器管理,升级时整体更新) |
 | `CLAUDE.md` | 用 `@AGENTS.md` 让 Claude Code 读取同一份规则 |
 | `.agents/skills/catchup/` | 定义如何恢复项目状态 |
-| `.agents/skills/wrapup/` | 定义如何检查联动、迁出决策、确认提交并推进 `synced`;随附范围、决策与 guard 三个脚本和文档整理细则 |
-| `一致性机制/文件联动目录.md` | 记录哪些文件变化时需要一起检查其他内容 |
+| `.agents/skills/wrapup/` | 定义如何检查联动、迁出决策、确认提交并推进 `synced`;随附范围(含联动规则的路径匹配)、决策与 guard 脚本和文档整理细则 |
+| `一致性机制/文件联动目录.md` | 记录哪些文件变化时需要一起检查其他内容;规则的触发写出文件或目录路径时,wrapup 会列出本次改动命中的规则 |
 | `.agents/hooks/` 和宿主配置 | 检测到未同步改动时提醒运行 wrapup;Windows Codex 通过薄 PowerShell 适配器转到同一 Node 逻辑 |
 | `一致性机制/VERSION` | 记录项目当前安装的套件版本 |
 

@@ -4,13 +4,15 @@
 // 用法:node scope.mjs            → 基线、基线后提交、改动清单、工作区(含未跟踪文件摘要)
 //       node scope.mjs --overview → 另加最近 15 条提交标题、目录一层清单、分支状态(当前分支的任务检查点与和主线的关系,
 //                                   其他分支的任务与领先 / 落后)、推送异常
-// 默认模式另给 hints:整理线索(本次涉及的文档中大量重复的行、没有被任何文档引用的文档),只供模型判断是否提醒整理
+// 默认模式另给 hints:整理线索(本次涉及的文档中大量重复的行、没有被任何文档引用的文档),只供模型判断是否提醒整理;
+// 以及 linkage:本次范围(基线后已提交与工作区改动)命中的联动规则(只按路径,是否成立、要不要改由模型按规则原文判断)
 
 import process from "node:process";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { existsSync, openSync, readSync, closeSync, statSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { LINKAGE, parseLinkage, ruleHits, notChecked } from "./linkage.mjs";
 
 // --help 只打印开头这段说明,不做任何改动;不认识的参数报错且不执行
 {
@@ -230,6 +232,19 @@ function hints(out) {
   return Object.keys(h).length ? h : null;
 }
 
+function linkageInfo(out) {
+  let text = null;
+  try { text = readFileSync(path.join(root, LINKAGE), "utf8"); } catch {}
+  const l = parseLinkage(text, LINKAGE);
+  if (!l.recognized) return l;
+  const files = [...new Set([
+    ...(out.committed_since_base || []).map((x) => x.path.split(" -> ").pop()),
+    ...out.worktree.staged.map((x) => x.path.split(" -> ").pop()), ...out.worktree.unstaged.map((x) => x.path.split(" -> ").pop()),
+    ...out.worktree.untracked.map((x) => x.path),
+  ])];
+  return { rules_hit: ruleHits(l, files), rules_not_checked: notChecked(l) };
+}
+
 const guard = guardState();
 const base = guard && guard.scope_base ? guard.scope_base : null;
 const out = {
@@ -247,5 +262,5 @@ const out = {
 if (!base) out.note = "no_reliable_base: 不猜替代基线,见 guard 字段";
 if (guard.error) out.guard_error = guard.error;
 if (overview) Object.assign(out, overviewInfo(guard));
-else { const h = hints(out); if (h) out.hints = h; }
+else { out.linkage = linkageInfo(out); const h = hints(out); if (h) out.hints = h; }
 process.stdout.write(JSON.stringify(out) + "\n");

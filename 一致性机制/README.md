@@ -30,7 +30,7 @@
 | 文件 | 实际位置 | 为什么不能进 `一致性机制/` |
 |------|----------|----------------------|
 | catchup / wrapup 行为正本 | `.agents/skills/catchup/`、`.agents/skills/wrapup/` | Codex 与兼容 Harness 从仓库级 Skill 发现;Claude Code 命令也转发到这里 |
-| wrapup 脚本 | `.agents/skills/wrapup/scripts/`(`scope.mjs`、`decisions.mjs`、`synced-guard.mjs`) | Skill 随附的机械步骤;guard 独占 `synced` 的状态迁移 |
+| wrapup 脚本 | `.agents/skills/wrapup/scripts/`(`scope.mjs` 及其联动匹配 `linkage.mjs`、`decisions.mjs`、`synced-guard.mjs`) | Skill 随附的机械步骤;guard 独占 `synced` 的状态迁移 |
 | 整理细则 | `.agents/skills/wrapup/references/document-maintenance.md` | 只在明确要求整理时由 wrapup 读取 |
 | 安装器行为正本 | `skills/project-consistency-installer/`(含 v1.3.0 升级细则与获取脚本) | skills.sh 分发,机器级使用,不进入用户项目 |
 | 干净分发白名单 | `distribution/manifest.txt` | 发布边界独立于源码目录,新增产品文件需显式评审 |

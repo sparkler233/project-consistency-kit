@@ -8,6 +8,7 @@
 .agents/skills/wrapup/references/document-maintenance.md
 .agents/skills/wrapup/scripts/decisions.mjs
 .agents/skills/wrapup/scripts/scope.mjs
+.agents/skills/wrapup/scripts/linkage.mjs
 .agents/skills/wrapup/scripts/synced-guard.mjs
 .agents/hooks/wrapup-reminder.mjs
 .agents/hooks/wrapup-reminder.ps1

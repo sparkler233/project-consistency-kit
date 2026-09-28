@@ -260,6 +260,34 @@ try {
   }
   assert.deepEqual(snap(), before8, "--help 与不认识的参数都不应改动 PROJECT、HEAD、synced 或写提交说明文件");
 
+  // 9. 联动命中:按规则触发行中的反引号路径列出本次范围(已提交与工作区)命中的规则;没有路径可比的列入 rules_not_checked
+  const lk = createRepo(recent10);
+  const noCatalog = json(lk, scope);
+  assert.deepEqual(noCatalog.linkage, { recognized: false, reason: "linkage_file_missing" });
+  fs.mkdirSync(path.join(lk, "一致性机制"));
+  fs.writeFileSync(path.join(lk, "一致性机制", "文件联动目录.md"), [
+    "# 文件联动目录", "", "## 项目联动关系", "",
+    "### 报名规则变化 → 对外说明", "", "**触发**:`docs/报名规则.md` 变化。", "**动作**:核对 `public/报名说明.md`。", "",
+    "### 素材目录变化 → 对账", "", "**触发**:`assets/` 下的文件变化。", "**动作**:对账 manifest。", "",
+    "### 研究问题调整 → 全书", "", "**触发**:研究问题调整,或出现 `.docx`、`v*` 这类文件。", "**动作**:检查各章。", "",
+    "## 格式", "", "```", "### 规则名", "", "**触发**:`示例/路径.md`", "```", "",
+  ].join("\n"));
+  fs.mkdirSync(path.join(lk, "docs"));
+  fs.writeFileSync(path.join(lk, "docs", "报名规则.md"), "容量 50\n");
+  git(lk, "add", "-A");
+  git(lk, "commit", "-qm", "已提交的改动");
+  fs.mkdirSync(path.join(lk, "assets"));
+  fs.writeFileSync(path.join(lk, "assets", "logo.txt"), "未跟踪\n");
+  const hits = json(lk, scope).linkage;
+  assert.deepEqual(hits.rules_hit, [
+    { rule: "报名规则变化 → 对外说明", files: ["docs/报名规则.md"] },
+    { rule: "素材目录变化 → 对账", files: ["assets/"] }, // 未跟踪目录整体列出,仍按目录命中
+  ]);
+  assert.deepEqual(hits.rules_not_checked, ["研究问题调整 → 全书"]);
+  assert.equal(json(lk, scope, ["--overview"]).linkage, undefined);
+  fs.writeFileSync(path.join(lk, "一致性机制", "文件联动目录.md"), "# 文件联动目录\n\n改了报名规则要看对外说明。\n");
+  assert.equal(json(lk, scope).linkage.reason, "no_rule_with_trigger_line");
+
   console.log("wrapup scripts tests passed");
 } finally {
   for (const dir of fixtures) fs.rmSync(dir, { recursive: true, force: true });
