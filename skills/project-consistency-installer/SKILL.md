@@ -2,10 +2,10 @@
 name: project-consistency-installer
 description: Fetch Project Consistency Kit from a trusted local source or its verified clean GitHub Release, then safely integrate or upgrade PROJECT.md, AGENTS.md, the CLAUDE.md adapter, catchup and wrapup repository Skills, linkage rules, and hooks without silently overwriting project content. Use when the user asks to install, introduce, bootstrap, migrate, or update the consistency mechanism in the current repository.
 metadata:
-  version: "2.0.0-preview.1"
+  version: "2.0.0-preview.2"
 ---
 
-<!-- 一致性机制 version: 2026-09-25 -->
+<!-- 一致性机制 version: 2026-09-27 -->
 
 # Project Consistency Installer
 
@@ -63,7 +63,7 @@ metadata:
    - `templates/PROJECT.md`
    - `templates/AGENTS.md`
    - `templates/一致性机制/文件联动目录.md`
-   versioned 分发包或当前源码 checkout 还必须包含 `.codex/hooks.json` 与 `一致性机制/VERSION`;v1.2.0+ 还必须包含 `fetch-kit.ps1` 与 `.agents/hooks/wrapup-reminder.mjs`;v1.2.2+ 还必须包含 `.agents/hooks/wrapup-reminder.ps1`;v1.3.0+ 还必须包含 `.agents/skills/wrapup/scripts/synced-guard.mjs`;v1.3.0 及更早的包还含 `templates/一致性机制/决策档案.md`;v2.0.0-preview.1+ 还必须包含 `一致性机制/运行规则.md`、`.agents/skills/wrapup/scripts/scope.mjs`、`.agents/skills/wrapup/scripts/decisions.mjs`、`.agents/skills/wrapup/references/document-maintenance.md` 与本 Skill 的 `references/upgrade-from-v1.3.md`;旧包按各自版本的最低集合验证,不得用新版本文件要求反向否决旧 Release。
+   versioned 分发包或当前源码 checkout 还必须包含 `.codex/hooks.json` 与 `一致性机制/VERSION`;v1.2.0+ 还必须包含 `fetch-kit.ps1` 与 `.agents/hooks/wrapup-reminder.mjs`;v1.2.2+ 还必须包含 `.agents/hooks/wrapup-reminder.ps1`;v1.3.0+ 还必须包含 `.agents/skills/wrapup/scripts/synced-guard.mjs`;v1.3.0 及更早的包还含 `templates/一致性机制/决策档案.md`;v2.0.0-preview.1+ 还必须包含 `一致性机制/运行规则.md`、`.agents/skills/wrapup/scripts/scope.mjs`、`.agents/skills/wrapup/scripts/decisions.mjs`、`.agents/skills/wrapup/references/document-maintenance.md` 与本 Skill 的 `references/upgrade-from-v1.3.md`;v2.0.0-preview.2+ 还必须包含 `.agents/skills/wrapup/scripts/linkage.mjs`;旧包按各自版本的最低集合验证,不得用新版本文件要求反向否决旧 Release。
 6. 记录版本与来源并在计划和最终报告回显:
    - 干净分发目录必须有 `DISTRIBUTION-METADATA.txt` 与 `DISTRIBUTION-MANIFEST.sha256`;记录其中的 `kit_version`、`mechanism_revision`、规范仓库、release ref 与 source commit;缺少版本字段的 schema 1 旧包标为 `legacy`,版本可从 `vX.Y.Z` release ref 派生展示,但必须标明不是包内 VERSION;
    - 本地源码 checkout 必须是 Git 仓库;读取 `一致性机制/VERSION` 为 `SOURCE_VERSION`,读取源内安装器 `metadata.version`,两者必须一致;另记录统一修订日期、`git rev-parse HEAD` 与当前 ref,有未提交改动时明确标出;
@@ -103,7 +103,7 @@ test -L CLAUDE.md && readlink CLAUDE.md
 
 把目标 `一致性机制/VERSION` 记为 `TARGET_VERSION`:不存在时标为“旧版或未标记”,不得从日期行反推 SemVer。`SOURCE_VERSION > TARGET_VERSION` 是升级,相等时仍检查实际 diff,`SOURCE_VERSION < TARGET_VERSION` 是降级请求,必须单独提示并再次确认;目标缺少版本时使用统一修订日期和实际内容规划迁移。
 
-升级只支持从 v1.3.0 开始:`TARGET_VERSION` 为 1.3.0 时,完整读取本 Skill 的 [v1.3.0 升级细则](references/upgrade-from-v1.3.md),后续步骤中凡细则另有规定的按细则执行;目标早于 1.3.0,或未标记版本但已有机制痕迹时,停止并建议先用 `--release v1.3.0` 升到 1.3.0 再升级。首次引入不读升级细则。
+升级只支持从 v1.3.0 或 2.0 预览版开始:`TARGET_VERSION` 为 1.3.0 时,完整读取本 Skill 的 [v1.3.0 升级细则](references/upgrade-from-v1.3.md),后续步骤中凡细则另有规定的按细则执行;`TARGET_VERSION` 为 2.0 较早的预览版(如 2.0.0-preview.1)时,PROJECT、AGENTS 正文与联动目录的结构已是 2.0 的,不读升级细则、不改造它们:替换机制文件、按模板更新接入块,联动目录只更新版本行;模板的「项目联动关系」规则写法有变化时,在计划中列出项目自己的哪些规则可以改成新写法,由用户决定改不改,改也只改写法、不改含义;目标早于 1.3.0,或未标记版本但已有机制痕迹时,停止并建议先用 `--release v1.3.0` 升到 1.3.0 再升级。首次引入不读升级细则。
 
 完整读取现有 PROJECT、实体 AGENTS、实体 CLAUDE 与 README 的相关结构,建立内容归属表:
 

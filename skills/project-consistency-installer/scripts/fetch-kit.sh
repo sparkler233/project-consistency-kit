@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-09-25
+# 一致性机制 version: 2026-09-27
 set -euo pipefail
 
 canonical_repository="https://github.com/sparkler233/project-consistency-kit.git"
@@ -125,6 +125,11 @@ version_at_least_2_0() {
   major="${version_core%%.*}"
   [[ "$major" =~ ^[0-9]+$ ]] || return 1
   [ "$major" -ge 2 ]
+}
+
+# 2.0.0-preview.1 是唯一早于 preview.2 的 2.0 版本
+version_at_least_2_0_preview_2() {
+  version_at_least_2_0 "$1" && [ "$1" != "2.0.0-preview.1" ]
 }
 
 version_at_least_1_3() {
@@ -313,6 +318,10 @@ EOF
         [ -f "$distribution_dir/$relative_path" ] \
           || fail "v2.0+ distribution is incomplete: missing $relative_path"
       done
+    fi
+    if version_at_least_2_0_preview_2 "$validated_version"; then
+      [ -f "$distribution_dir/.agents/skills/wrapup/scripts/linkage.mjs" ] \
+        || fail "v2.0.0-preview.2+ distribution is incomplete: missing .agents/skills/wrapup/scripts/linkage.mjs"
     fi
   fi
   if [ "$validated_profile" != "versioned" ] || ! version_at_least_2_0 "$validated_version"; then

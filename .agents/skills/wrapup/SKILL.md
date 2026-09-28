@@ -3,7 +3,7 @@ name: wrapup
 description: Reconcile project records and necessary linkage within the branch-safe Git scope, then prepare a user-confirmed local commit. Use for wrapup, project record synchronization or a repository checkpoint; add document restructuring only when explicitly requested.
 ---
 
-<!-- 一致性机制 version: 2026-09-25 -->
+<!-- 一致性机制 version: 2026-09-27 -->
 
 默认在已有结构内完成必要记录和联动，不例行整理全项目。用户明确要求文档整理时，才读取 [文档整理细则](references/document-maintenance.md)，按其中的目的与范围提出整理计划，复用本流程确认、执行与提交；有日常工作要收尾时，先完成日常提交，再整理并单独提交。没有要求整理时，看到可以整理的地方只在报告末尾提出(见第 5 节)，不扩大本次维护范围。
 

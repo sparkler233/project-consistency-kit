@@ -1,4 +1,4 @@
-# 一致性机制 version: 2026-09-25
+# 一致性机制 version: 2026-09-27
 # Thin Windows adapter for the cross-platform Node Stop hook.
 
 $ErrorActionPreference = 'Stop'

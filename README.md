@@ -6,7 +6,7 @@
 [![Distribution](https://github.com/sparkler233/project-consistency-kit/actions/workflows/distribution.yml/badge.svg?branch=main)](https://github.com/sparkler233/project-consistency-kit/actions/workflows/distribution.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f6f4e.svg)](LICENSE)
 
-> **2.0 预览版**:`main` 与 `v2.0.0-preview.1` 已是 2.0 的新流程(决策历史进 Git、PROJECT 改为入口式、运行规则独立、wrapup 一次确认)。它是预发布版本,默认安装仍取稳定版 v1.3.0;获取与升级方式见下文「发布与升级」。
+> **2.0 预览版**:`main` 与 `v2.0.0-preview.2` 已是 2.0 的新流程(决策历史进 Git、PROJECT 改为入口式、运行规则独立、wrapup 一次确认)。它是预发布版本,默认安装仍取稳定版 v1.3.0;获取与升级方式见下文「发布与升级」。
 
 ## 它解决什么
 
@@ -110,9 +110,9 @@ Git 和脚本能够检查文件是否发生变化，却无法仅凭确定性程�
 **获取 2.0 预览版**:
 
 1. 先更新机器上的安装器(重新运行上面的 `npx skills add` 命令)。v1.3.0 的安装器会因为新包里没有决策档案模板而拒绝它。
-2. 在项目里告诉 Agent:“给这个项目引入一致性机制,使用 v2.0.0-preview.1”。预览版在 GitHub 上标为预发布,不会被当作“最新版”自动取用。
+2. 在项目里告诉 Agent:“给这个项目引入一致性机制,使用 v2.0.0-preview.2”。预览版在 GitHub 上标为预发布,不会被当作“最新版”自动取用。
 
-**从 v1.3.0 升级**:安装器会把 `PROJECT.md` 改为入口式,把决策档案逐字写进升级提交后删除,并清理 AGENTS 里旧模板带来的机制条款;所有删除都会先列进计划,经你确认。更早的版本请先升到 v1.3.0。2.0 不提供降级;升级是单独的一次提交,需要时用 `git revert` 撤销它。预览版之间可能不兼容,每个预览版只保证能从上一站升级上来。
+**从 v1.3.0 升级**:安装器会把 `PROJECT.md` 改为入口式,把决策档案逐字写进升级提交后删除,并清理 AGENTS 里旧模板带来的机制条款;所有删除都会先列进计划,经你确认。更早的版本请先升到 v1.3.0。**从 v2.0.0-preview.1 升级**:只替换机制文件,PROJECT、AGENTS 与联动目录的内容不动;联动目录里你自己的规则可以改成新模板的「小标题 + 触发 + 动作」写法,安装器会列出来由你决定。2.0 不提供降级;升级是单独的一次提交,需要时用 `git revert` 撤销它。预览版之间可能不兼容,每个预览版只保证能从上一站升级上来。
 
 ## 进一步阅读
 
