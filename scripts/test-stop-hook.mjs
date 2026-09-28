@@ -144,6 +144,13 @@ function branchBaseline() {
     assert.equal(remind(wt), null, "changes brought in from canonical are not counted as unwrapped");
     fs.writeFileSync(path.join(wt, "第三章.md"), "第三章\n第一节\n第二节\n第三节\n");
     assert.match(remind(wt), /1 个文件/, "new changes after syncing still remind");
+
+    // 放弃未进主线的检查点(reset 回主线):reflog 里那个检查点已不在分支历史中,不再作基线
+    checkpoint("第三章:第三节");
+    fs.writeFileSync(path.join(wt, "第三章.md"), "第三章\n第一节\n第二节\n第三节\n废弃的第四节\n");
+    checkpoint("第三章:废弃的第四节");
+    g(wt, "reset", "-q", "--hard", "main");
+    assert.equal(remind(wt), null, "an abandoned checkpoint (reset away) is no longer the baseline");
   } finally {
     fs.rmSync(repo, { recursive: true, force: true });
     fs.rmSync(wt, { recursive: true, force: true });

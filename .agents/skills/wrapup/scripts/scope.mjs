@@ -5,12 +5,13 @@
 //       node scope.mjs --overview → 另加最近 15 条提交标题、目录一层清单、分支状态(当前分支的任务检查点与和主线的关系,
 //                                   其他分支的任务与领先 / 落后)、推送异常
 // 默认模式另给 hints:整理线索(本次涉及的文档中大量重复的行、没有被任何文档引用的文档),只供模型判断是否提醒整理;
-// 以及 linkage:本次范围(基线后已提交与工作区改动)命中的联动规则(只按路径,是否成立、要不要改由模型按规则原文判断)
+// 以及 linkage:本次范围(基线后已提交与工作区改动)按路径命中的联动规则 rules_hit,和脚本判断不全、要模型自行判断的
+// rules_not_checked(触发里没有路径,或还有文字条件而按路径没命中);是否成立、要不要改由模型按规则原文判断
 
 import process from "node:process";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { existsSync, openSync, readSync, closeSync, statSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, openSync, readSync, closeSync, lstatSync, readlinkSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { LINKAGE, parseLinkage, ruleHits, notChecked } from "./linkage.mjs";
 
@@ -30,7 +31,7 @@ import { LINKAGE, parseLinkage, ruleHits, notChecked } from "./linkage.mjs";
 }
 const here = path.dirname(fileURLToPath(import.meta.url));
 const overview = process.argv.includes("--overview");
-const HEAD_LINES = 3, LINE_MAX = 120, READ_MAX = 2 * 1024 * 1024, LIST_MAX = 200;
+const HEAD_LINES = 3, LINE_MAX = 120, READ_MAX = 2 * 1024 * 1024, LIST_MAX = 200, WALK_MAX = 20000;
 
 function run(cmd, args, cwd) {
   const r = spawnSync(cmd, args, { cwd, encoding: "utf8", windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
@@ -59,30 +60,41 @@ function commits(range, extra = []) {
   });
 }
 
+// 路径一律用 -z 取,文件名含空格、引号、制表符或中文都原样给出;改名给出新路径 path 与原路径 from
+const fields = (s) => (s || "").split("\0");
 function nameStatus(args) {
-  return lines(git(["diff", "--name-status", ...args])).map((l) => {
-    const [status, ...paths] = l.split("\t");
-    return { status, path: paths.join(" -> ") };
-  });
+  const f = fields(git(["diff", "--name-status", "-z", ...args])), out = [];
+  for (let i = 0; i + 1 < f.length && f[i]; ) {
+    const status = f[i];
+    if (/^[RC]/.test(status)) { out.push({ status: status[0], path: f[i + 2], from: f[i + 1] }); i += 3; }
+    else { out.push({ status, path: f[i + 1] }); i += 2; }
+  }
+  return out;
 }
 
 function numstat(args) {
-  const map = {};
-  for (const l of lines(git(["diff", "--numstat", ...args]))) {
-    const [a, d, ...p] = l.split("\t");
-    map[p.join("\t")] = { added: a === "-" ? null : Number(a), deleted: d === "-" ? null : Number(d) };
+  const map = {}, f = fields(git(["diff", "--numstat", "-z", ...args]));
+  for (let i = 0; i < f.length && f[i]; ) {
+    const [a, d, p] = f[i].split("\t");
+    const stat = { added: a === "-" ? null : Number(a), deleted: d === "-" ? null : Number(d) };
+    if (p) { map[p] = stat; i += 1; } else { map[f[i + 2]] = stat; i += 3; } // 改名:空路径后跟原路径、新路径
   }
   return map;
 }
 
+// 未跟踪文件的摘要;符号链接只报指向,不跟进;读不了的报 unreadable,不中断整个输出
 function fileSummary(rel) {
   const full = path.join(root, rel);
-  let bytes = 0;
-  try { bytes = statSync(full).size; } catch { return { path: rel, missing: true }; }
-  const fd = openSync(full, "r");
+  let st;
+  try { st = lstatSync(full); } catch { return { path: rel, missing: true }; }
+  if (st.isSymbolicLink()) { let target = null; try { target = readlinkSync(full); } catch {} return { path: rel, symlink: true, target }; }
+  if (!st.isFile()) return { path: rel, special: true };
+  const bytes = st.size;
   const buf = Buffer.alloc(Math.min(bytes, READ_MAX));
-  readSync(fd, buf, 0, buf.length, 0);
-  closeSync(fd);
+  try {
+    const fd = openSync(full, "r");
+    try { readSync(fd, buf, 0, buf.length, 0); } finally { closeSync(fd); }
+  } catch { return { path: rel, bytes, unreadable: true }; }
   const text = !buf.subarray(0, 8000).includes(0);
   if (!text) return { path: rel, bytes, text: false };
   const s = buf.toString("utf8");
@@ -91,30 +103,38 @@ function fileSummary(rel) {
   return { path: rel, bytes, lines: count, text: true, head };
 }
 
+// 未跟踪目录的汇总;里面的 .git(嵌套仓库)不计入,标 nested_repo;读不了的子目录跳过;最多走 WALK_MAX 个文件
 function dirSummary(rel) {
-  let files = 0, bytes = 0;
+  let files = 0, bytes = 0, nested = false, skipped = 0, truncated = false;
   const sample = [];
   const walk = (d) => {
-    for (const ent of readdirSync(path.join(root, d), { withFileTypes: true })) {
+    let ents;
+    try { ents = readdirSync(path.join(root, d), { withFileTypes: true }); } catch { skipped += 1; return; }
+    for (const ent of ents) {
+      if (files >= WALK_MAX) { truncated = true; return; }
       const r = path.posix.join(d, ent.name);
+      if (ent.name === ".git") { nested = true; continue; }
       if (ent.isDirectory()) walk(r);
-      else { files += 1; try { bytes += statSync(path.join(root, r)).size; } catch {} if (sample.length < 5) sample.push(r.slice(rel.length)); }
+      else { files += 1; try { bytes += lstatSync(path.join(root, r)).size; } catch {} if (sample.length < 5) sample.push(r.slice(rel.length)); }
     }
   };
   walk(rel.replace(/\/$/, ""));
-  return { path: rel, directory: true, files, bytes, sample };
+  return { path: rel, directory: true, files, bytes, sample, ...(nested ? { nested_repo: true } : {}),
+    ...(skipped ? { unreadable_dirs: skipped } : {}), ...(truncated ? { files_truncated: true } : {}) };
 }
 
 function worktree() {
   const staged = numstat(["--cached"]), unstagedStat = numstat([]);
   const result = { staged: [], unstaged: [], untracked: [] };
-  const entries = (git(["status", "--porcelain=v1", "--untracked-files=normal"]) || "").split("\n").filter(Boolean);
-  for (const e of entries) {
-    const x = e[0], y = e[1], p = e.slice(3);
+  const f = fields(git(["status", "--porcelain=v1", "-z", "--untracked-files=normal"]));
+  for (let i = 0; i < f.length && f[i]; i += 1) {
+    const x = f[i][0], y = f[i][1], p = f[i].slice(3);
     if (x === "?") { result.untracked.push(p); continue; }
-    const target = p.includes(" -> ") ? p.split(" -> ")[1] : p;
-    if (x !== " ") result.staged.push({ status: x, path: p, ...(staged[target] || {}) });
-    if (y !== " ") result.unstaged.push({ status: y, path: p, ...(unstagedStat[target] || {}) });
+    if (x === "!") continue;
+    const from = /[RC]/.test(x) ? f[(i += 1)] : null; // 改名 / 复制:下一个字段是原路径
+    const where = from ? { path: p, from } : { path: p };
+    if (x !== " ") result.staged.push({ status: x, ...where, ...(staged[p] || {}) });
+    if (y !== " ") result.unstaged.push({ status: y, ...where, ...(unstagedStat[p] || {}) });
   }
   const total = result.untracked.length;
   result.untracked = result.untracked.slice(0, LIST_MAX).map((p) => (p.endsWith("/") ? dirSummary(p) : fileSummary(p)));
@@ -124,9 +144,11 @@ function worktree() {
 
 // 分支:任务检查点是分支上 wrapup 的提交,带 `Task:` trailer,说明段写目标 / 进度 / 还剩。
 // 找最近的检查点先查分支的 reflog(快进接回主线后仍在,新开的分支里没有别人的检查点),查不到再沿 first-parent 往回找。
+// reflog 里的检查点须仍在分支历史中:分支被 reset 离开旧任务后,那个检查点不再算数
 function taskState(ref) {
+  const inBranch = (h) => spawnSync("git", ["merge-base", "--is-ancestor", h, ref], { cwd: root, windowsHide: true }).status === 0;
   const find = (walk) => (git(["log", ...walk, "-n", "200", "--format=%H%x1f%(trailers:key=Task,valueonly,separator=%x2C)%x1e"]) || "")
-    .split("\x1e").map((r) => r.trim().split("\x1f")).find((r) => r[1] && r[1].trim()) || null;
+    .split("\x1e").map((r) => r.trim().split("\x1f")).find((r) => r[1] && r[1].trim() && inBranch(r[0])) || null;
   const hit = find(["-g", ref]) || find(["--first-parent", ref]);
   if (!hit) return null;
   const message = (git(["log", "-1", "--format=%B", hit[0]]) || "").trim();
@@ -238,11 +260,11 @@ function linkageInfo(out) {
   const l = parseLinkage(text, LINKAGE);
   if (!l.recognized) return l;
   const files = [...new Set([
-    ...(out.committed_since_base || []).map((x) => x.path.split(" -> ").pop()),
-    ...out.worktree.staged.map((x) => x.path.split(" -> ").pop()), ...out.worktree.unstaged.map((x) => x.path.split(" -> ").pop()),
+    ...(out.committed_since_base || []).map((x) => x.path),
+    ...out.worktree.staged.map((x) => x.path), ...out.worktree.unstaged.map((x) => x.path),
     ...out.worktree.untracked.map((x) => x.path),
   ])];
-  return { rules_hit: ruleHits(l, files), rules_not_checked: notChecked(l) };
+  return { rules_hit: ruleHits(l, files), rules_not_checked: notChecked(l, files) };
 }
 
 const guard = guardState();
@@ -256,7 +278,7 @@ const out = {
   can_advance: guard.can_advance ?? false,
   blockers: guard.blockers ?? [],
   commits_since_base: base ? commits(`${base}..HEAD`) : null,
-  committed_since_base: base ? nameStatus([base, "HEAD"]) : null, // 基线后已提交的文件;未提交的见 worktree
+  committed_since_base: base ? nameStatus([base, "HEAD"]) : null, // 基线后已提交的文件(改名另给原路径 from);未提交的见 worktree
   worktree: worktree(),
 };
 if (!base) out.note = "no_reliable_base: 不猜替代基线,见 guard 字段";

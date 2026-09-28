@@ -287,6 +287,100 @@ try {
   assert.equal(json(lk, scope, ["--overview"]).linkage, undefined);
   fs.writeFileSync(path.join(lk, "一致性机制", "文件联动目录.md"), "# 文件联动目录\n\n改了报名规则要看对外说明。\n");
   assert.equal(json(lk, scope).linkage.reason, "no_rule_with_trigger_line");
+  // 触发跨行、通配、反斜杠、Windows 换行都能认出路径;路径之外还有文字条件而没命中的,列入 rules_not_checked;
+  // 带路径的限定语(「`a.md` 中的资格变化」)不算文字条件
+  fs.writeFileSync(path.join(lk, "一致性机制", "文件联动目录.md"), [
+    "## 项目联动关系", "",
+    "### 多行", "", "**触发**:", "- `docs/报名规则.md`", "- `public/`", "", "**动作**:看。", "",
+    "### 通配", "", "**触发**:`chapters/*.md` 或 `**/*.csv` 变化。", "**动作**:看。", "",
+    "### 反斜杠", "", "**触发**:`assets\\logo.txt` 变化。", "**动作**:看。", "",
+    "### 限定", "", "**触发**:`docs/报名规则.md` 中的报名资格变化。", "**动作**:看。", "",
+    "### 混合", "", "**触发**:`data/` 变化,或新增顶层目录。", "**动作**:看。", "",
+  ].join("\r\n"));
+  fs.mkdirSync(path.join(lk, "chapters"));
+  fs.writeFileSync(path.join(lk, "chapters", "01.md"), "一\n");
+  fs.mkdirSync(path.join(lk, "raw", "2026"), { recursive: true });
+  fs.writeFileSync(path.join(lk, "raw", "2026", "t.csv"), "a,b\n");
+  git(lk, "add", "-A");
+  const mixed = json(lk, scope).linkage;
+  assert.deepEqual(mixed.rules_hit.map((h) => h.rule), ["多行", "通配", "反斜杠", "限定"]);
+  assert.deepEqual(mixed.rules_hit.find((h) => h.rule === "通配").files, ["chapters/01.md", "raw/2026/t.csv"]);
+  assert.deepEqual(mixed.rules_not_checked, ["混合"]);
+
+  // 10. 决策脚本的边界:认不出的内容不删、HEAD 不在分支上不迁出、Windows 换行、只改两个小节、选项值检查、PROJECT 缺失
+  const dz = createRepo(recent10);
+  const projectFile = path.join(dz, "PROJECT.md");
+  setPending(dz, ["1. 2026-09-25 · 决策 11:用编号列表写的决策", "   - 决定:不能被悄悄删掉。"]);
+  let refusedApply = json(dz, decisions, ["apply", "--title", "t"], 1);
+  assert.equal(refusedApply.applied, false);
+  assert.ok(refusedApply.problems.some((x) => x.includes("认不出")), JSON.stringify(refusedApply.problems));
+  assert.match(fs.readFileSync(projectFile, "utf8"), /不能被悄悄删掉/, "unrecognized pending content must survive a refused apply");
+  setPending(dz, [entry(11, "报名容量改为 80")]);
+  git(dz, "checkout", "-q", "--detach");
+  refusedApply = json(dz, decisions, ["apply", "--title", "t"], 1);
+  assert.ok(refusedApply.problems.some((x) => x.includes("detached")), JSON.stringify(refusedApply.problems));
+  git(dz, "checkout", "-q", "main");
+  const crlf = project([entry(11, "报名容量改为 80")], recent10).replace("> 说明放在这里。", "段落一\n\n\n\n段落二").replace(/\n/g, "\r\n");
+  fs.writeFileSync(projectFile, crlf);
+  plan = json(dz, decisions, ["plan"]);
+  assert.deepEqual(plan.added, ["- 2026-09-25:报名容量改为 80(决策 11)"], "no stray \\r in titles");
+  assert.ok(!plan.body.includes("\r"));
+  json(dz, decisions, ["apply", "--title", "t"]);
+  const after = fs.readFileSync(projectFile, "utf8");
+  assert.ok(!/[^\r]\n/.test(after), "keeps the file's CRLF line endings");
+  assert.match(after, /段落一\r\n\r\n\r\n\r\n段落二/, "lines outside the two sections are left untouched");
+  for (const bad of [["--limit", "abc"], ["--limit", "0"], ["--supersede", "12-3"]]) {
+    assert.match(json(dz, decisions, ["plan", ...bad], 2).error, /invalid_value/);
+  }
+  assert.deepEqual(json(dz, decisions, ["plan", "--partial", "12：11"]).problems, [], "full-width colon is accepted");
+  fs.renameSync(projectFile, `${projectFile}.bak`);
+  assert.equal(json(dz, decisions, ["plan"], 1).error, "project_missing");
+  fs.renameSync(`${projectFile}.bak`, projectFile);
+  // 推翻 / 部分调整已不在「最近决策」里、但 git 中有全文的决策:可以,正文加 trailer;两处都没有的报错
+  const old = createRepo(recent10);
+  git(old, "commit", "-q", "--allow-empty", "-m", "旧决策", "-m", "决策 3 · 2026-09-03 · 旧三\n\nDecision: 3");
+  setPending(old, [entry(11, "推翻旧三")]);
+  plan = json(old, decisions, ["plan", "--supersede", "11:3", "--partial", "11:4"]);
+  assert.deepEqual(plan.problems, []);
+  assert.match(plan.body, /Supersedes: 3\nAdjusts: 4 by 11/);
+  assert.match(json(old, decisions, ["plan", "--supersede", "11:99"]).problems.join(), /都没有决策 99/);
+
+  // 11. 范围脚本的边界:特殊文件名与改名、读不了的未跟踪文件、指向目录的符号链接、嵌套仓库;被 reset 放弃的检查点不再算
+  const sz = createRepo(recent10);
+  const odd = process.platform === "win32" ? "单'引号.md" : "q\"uote.md"; // Windows 文件名不能含双引号
+  for (const name of ["a b.md", odd, "中文 名.md"]) fs.writeFileSync(path.join(sz, name), "x\n");
+  git(sz, "add", "-A");
+  git(sz, "commit", "-qm", "特殊文件名");
+  git(sz, "mv", "a b.md", "c d.md");
+  fs.appendFileSync(path.join(sz, odd), "y\n");
+  run("git", ["init", "-q", path.join(sz, "nested")]);
+  fs.writeFileSync(path.join(sz, "nested", "a.txt"), "n\n");
+  if (process.platform !== "win32") {
+    fs.symlinkSync(sz, path.join(sz, "link-to-dir"));
+    fs.writeFileSync(path.join(sz, "secret.txt"), "s\n");
+    fs.chmodSync(path.join(sz, "secret.txt"), 0o000);
+  }
+  const st = json(sz, scope);
+  assert.deepEqual(st.committed_since_base.map((x) => x.path).sort(), ["a b.md", odd, "中文 名.md"].sort());
+  assert.deepEqual(st.worktree.staged, [{ status: "R", path: "c d.md", from: "a b.md", added: 0, deleted: 0 }]);
+  assert.deepEqual(st.worktree.unstaged.map((x) => [x.path, x.added]), [[odd, 1]]);
+  const nested = st.worktree.untracked.find((x) => x.path === "nested/");
+  assert.equal(nested.nested_repo, true);
+  assert.deepEqual(nested.sample, ["a.txt"]);
+  if (process.platform !== "win32") {
+    fs.chmodSync(path.join(sz, "secret.txt"), 0o644);
+    assert.equal(st.worktree.untracked.find((x) => x.path === "link-to-dir").symlink, true);
+    const secret = st.worktree.untracked.find((x) => x.path === "secret.txt");
+    assert.ok(secret.unreadable || process.getuid() === 0, JSON.stringify(secret)); // root 读得了
+  }
+  const ab = createRepo(recent10);
+  git(ab, "switch", "-q", "-c", "agent/废弃");
+  fs.writeFileSync(path.join(ab, "草稿.md"), "x\n");
+  git(ab, "add", "-A");
+  git(ab, "commit", "-qm", "检查点", "-m", "Task: 旧任务");
+  git(ab, "reset", "-q", "--hard", "main");
+  assert.equal(json(ab, scope, ["--overview"]).current_branch_state.task, null, "a checkpoint reset away is not the current task");
+  assert.equal(json(ab, decisions, ["plan"]).branch_mode.task, "agent/废弃");
 
   console.log("wrapup scripts tests passed");
 } finally {

@@ -10,9 +10,10 @@
 // 之后可能由别的 Session 接手或任务没做完时,用 --intro 写三行(由模型判断,脚本不检查),各以「目标:」「进度:」「还剩:」开头:目标写整个任务(不是本次会话的范围),
 // 还剩写这个任务还有什么没做(做完写「无」),不写提交、集成这类收尾动作。任务名同样写整个任务,不写当前这一步。
 // 撞号检查:「待提交」内重号、与「最近决策」或 git 中已迁出的编号重复,列入 collisions 与 problems。
+// 两个小节里认不出的内容(如编号列表、段落)列入 problems 且 apply 不执行,脚本不会删掉它;HEAD 不在分支上时同样不执行。
 // 选项(由模型判断后传入):
-//   --supersede NEW:OLD   决策 NEW 推翻 OLD:删除 OLD 的索引行,正文加 `Supersedes: OLD`
-//   --partial NEW:OLD     决策 NEW 部分调整 OLD:OLD 的索引行末尾加“(部分被决策 NEW 调整)”
+//   --supersede NEW:OLD   决策 NEW 推翻 OLD:删除 OLD 的索引行(已不在其中也可以),正文加 `Supersedes: OLD`
+//   --partial NEW:OLD     决策 NEW 部分调整 OLD:OLD 的索引行末尾加“(部分被决策 NEW 调整)”,正文加 `Adjusts: OLD by NEW`
 //   --trailer "K: V"      追加到正文末尾 trailer 段(如 Co-Authored-By),可重复
 //   --title "..."         提交标题(模型撰写);--intro "..." 可选说明段。写入提交说明文件,不经 shell 管道拼接
 //   --limit N             「最近决策」上限,默认 10
@@ -44,11 +45,19 @@ for (let i = 0; i < argv.length; i += 1) {
   }
   if (WITH_VALUE.includes(argv[i])) i += 1;
 }
+const badValue = (k, v) => {
+  process.stdout.write(JSON.stringify({ error: `invalid_value: ${k} ${v}`, hint: "node decisions.mjs --help 查看用法;未做任何改动" }) + "\n");
+  process.exit(2);
+};
 for (let i = 0; i < argv.length; i += 1) {
   const k = argv[i], v = argv[i + 1];
-  if (k === "--supersede" || k === "--partial") { const [n, o] = v.split(":").map(Number); opt[k.slice(2)].push({ new: n, old: o }); i += 1; }
+  if (k === "--supersede" || k === "--partial") {
+    const m = v.trim().match(/^(\d+)\s*[:：]\s*(\d+)$/);
+    if (!m) badValue(k, v);
+    opt[k.slice(2)].push({ new: Number(m[1]), old: Number(m[2]) }); i += 1;
+  }
   else if (k === "--trailer") { opt.trailer.push(v); i += 1; }
-  else if (k === "--limit") { opt.limit = Number(v); i += 1; }
+  else if (k === "--limit") { if (!/^[1-9]\d*$/.test(v.trim())) badValue(k, v); opt.limit = Number(v); i += 1; }
   else if (k === "--title" || k === "--intro" || k === "--task") { opt[k.slice(2)] = v; i += 1; }
 }
 // 说明段里字面的 `\n`(如 zsh 双引号不转义)按换行处理,目标 / 进度 / 还剩三行不会挤成一行
@@ -67,7 +76,10 @@ const messagePath = path.join(gitDir, "pck-commit-message.txt");
 const statePath = path.join(gitDir, "pck-decision-state.json");
 
 function section(lines, name) {
-  const start = lines.findIndex((l) => /^#{2,6}\s/.test(l) && l.includes(name));
+  // 优先取标题正好是该名字的小节,没有再取标题包含它的(如「待提交(拍板即写)」)
+  const heading = (l) => /^#{2,6}\s/.test(l);
+  let start = lines.findIndex((l) => heading(l) && l.replace(/^#+\s*/, "").trim() === name);
+  if (start < 0) start = lines.findIndex((l) => heading(l) && l.includes(name));
   if (start < 0) return null;
   let end = lines.findIndex((l, i) => i > start && /^#{1,6}\s/.test(l));
   if (end < 0) end = lines.length;
@@ -76,16 +88,21 @@ function section(lines, name) {
 const numberOf = (text) => { const m = text.match(/决策\s*(\d+)/); return m ? Number(m[1]) : null; };
 const indexNumber = (line) => { const m = line.match(/[(（]决策\s*(\d+)/) || line.match(/决策\s*(\d+)/); return m ? Number(m[1]) : null; };
 
+// 两个小节里能认出的行:空行、占位「(暂无)」、条目行(`- ` / `* ` 开头)及其缩进的续行;其余一律算认不出
+const PLACEHOLDER = /^\s*[(（]\s*暂无\s*[)）]\s*$/;
 function parse() {
-  const text = readFileSync(projectPath, "utf8");
-  const lines = text.split("\n");
+  let text;
+  try { text = readFileSync(projectPath, "utf8"); } catch { return { error: "project_missing", path: projectPath }; }
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const lines = text.split(/\r?\n/);
   const pend = section(lines, "待提交"), recent = section(lines, "最近决策");
   if (!pend || !recent) return { error: "section_not_found", need: ["待提交", "最近决策"] };
-  const entries = [];
-  for (const l of lines.slice(pend.start + 1, pend.end)) {
+  const entries = [], unrecognized = [];
+  lines.slice(pend.start + 1, pend.end).forEach((l, i) => {
     if (/^[-*]\s/.test(l)) entries.push([l]);
-    else if (entries.length && (/^\s+\S/.test(l) || l === "")) entries[entries.length - 1].push(l);
-  }
+    else if (entries.length && (/^\s+\S/.test(l) || l.trim() === "")) entries[entries.length - 1].push(l.trim() === "" ? "" : l);
+    else if (l.trim() !== "" && !PLACEHOLDER.test(l)) unrecognized.push({ section: "待提交", line: pend.start + 2 + i, text: l.slice(0, 80) });
+  });
   const pending = entries.map((e) => {
     while (e.length && e[e.length - 1] === "") e.pop();
     const first = e[0].replace(/^[-*]\s+/, "");
@@ -97,10 +114,15 @@ function parse() {
     const mentions = [...e.join("\n").matchAll(/决策\s*(\d+)/g)].map((m) => Number(m[1])).filter((n) => n !== number);
     return { number, date, title, body, mentions: [...new Set(mentions)] };
   });
-  const recentLines = lines.slice(recent.start + 1, recent.end).filter((l) => /^[-*]\s/.test(l));
-  return { text, lines, pend, recent, pending, recentLines };
+  const recentLines = [];
+  lines.slice(recent.start + 1, recent.end).forEach((l, i) => {
+    if (/^[-*]\s/.test(l)) recentLines.push(l);
+    else if (l.trim() !== "" && !PLACEHOLDER.test(l)) unrecognized.push({ section: "最近决策", line: recent.start + 2 + i, text: l.slice(0, 80) });
+  });
+  return { text, eol, lines, pend, recent, pending, recentLines, unrecognized };
 }
 
+const detached = Boolean(run(["rev-parse", "--verify", "-q", "HEAD"])) && !(run(["symbolic-ref", "--quiet", "HEAD"]) || "").trim();
 function branchMode() {
   const canonical = (run(["config", "--local", "--get", "projectConsistency.canonicalBranch"]) || "").trim();
   const branch = (run(["symbolic-ref", "--quiet", "--short", "HEAD"]) || "").trim();
@@ -109,9 +131,16 @@ function branchMode() {
 const mode = branchMode();
 
 // 分支上最近一个检查点的任务名:先查分支的 reflog,没有再沿分支的提交线(first-parent)往回找带 `Task:` trailer 的提交
+// reflog 里的检查点须仍在分支历史中:分支被 reset 离开旧任务后,那个检查点不再算数
 function lastTask() {
-  const find = (walk) => (run(["log", ...walk, "-n", "200", "--format=%(trailers:key=Task,valueonly,separator=%x2C)"]) || "")
-    .split("\n").map((l) => l.trim()).find(Boolean) || null;
+  const inBranch = (h) => spawnSync("git", ["merge-base", "--is-ancestor", h, "HEAD"], { cwd: process.cwd(), windowsHide: true }).status === 0;
+  const find = (walk) => {
+    for (const l of (run(["log", ...walk, "-n", "200", "--format=%H%x1f%(trailers:key=Task,valueonly,separator=%x2C)"]) || "").split("\n")) {
+      const [h, t] = l.split("\x1f");
+      if (t && t.trim() && inBranch(h)) return t.trim();
+    }
+    return null;
+  };
   return find(["-g", `refs/heads/${mode.branch}`]) || find(["--first-parent", "HEAD"]);
 }
 const task = mode ? (opt.task.trim() || lastTask() || mode.branch) : null;
@@ -149,6 +178,8 @@ const ranges = (nums) => {
 
 function compute(p) {
   const problems = p.pending.filter((d) => d.number === null).map((d) => `无法从第一行认出决策编号:${d.title}`);
+  for (const u of p.unrecognized) problems.push(`「${u.section}」第 ${u.line} 行认不出(条目须以「- 」开头,续行缩进):${u.text}`);
+  if (detached) problems.push("HEAD 不在任何分支上(detached):不迁出决策,先切回分支");
   const clash = collisions(p);
   for (const c of clash) problems.push(`决策 ${c.number} 撞号:${c.reasons.join(";")}`);
   if (mode) {
@@ -166,12 +197,12 @@ function compute(p) {
   for (const { new: n, old } of opt.supersede) {
     const i = recent.findIndex((l) => indexNumber(l) === old);
     if (i >= 0) dropped.push({ line: recent.splice(i, 1)[0], number: old, reason: `被决策 ${n} 推翻` });
-    else problems.push(`--supersede ${n}:${old}:「最近决策」中没有决策 ${old}`);
+    else if (!hasFullText(old)) problems.push(`--supersede ${n}:${old}:「最近决策」与 git 中都没有决策 ${old}`);
   }
   for (const { new: n, old } of opt.partial) {
     const i = recent.findIndex((l) => indexNumber(l) === old);
     if (i >= 0) recent[i] = `${recent[i]}(部分被决策 ${n} 调整)`;
-    else problems.push(`--partial ${n}:${old}:「最近决策」中没有决策 ${old}`);
+    else if (!hasFullText(old)) problems.push(`--partial ${n}:${old}:「最近决策」与 git 中都没有决策 ${old}`);
   }
   const added = p.pending.map((d) => `- ${d.date ? d.date + ":" : ""}${d.title}(决策 ${d.number})`);
   recent = recent.concat(added);
@@ -190,6 +221,7 @@ function compute(p) {
   const trailers = [
     ...p.pending.map((d) => `Decision: ${d.number}`),
     ...opt.supersede.map((x) => `Supersedes: ${x.old}`),
+    ...opt.partial.map((x) => `Adjusts: ${x.old} by ${x.new}`),
     ...(archive.length ? [`Decision-Archive: ${ranges(archive.map((r) => r.number).filter((n) => n !== null)) || "无编号"}`] : []),
     ...opt.trailer,
   ];
@@ -211,15 +243,19 @@ function compute(p) {
   };
 }
 
+// 只替换两个小节的内容,其余行原样保留;沿用文件原来的换行符;内容不变时不写文件
 function writeProject(p, r) {
   const lines = p.lines.slice();
-  const pendBlock = ["", "(暂无)", ""], recentBlock = ["", ...r.recent, ""];
+  const pendBlock = ["", "(暂无)", ""], recentBlock = ["", ...(r.recent.length ? r.recent : ["(暂无)"]), ""];
   const edits = [
     { start: p.pend.start + 1, end: p.pend.end, block: pendBlock },
     { start: p.recent.start + 1, end: p.recent.end, block: recentBlock },
   ].sort((a, b) => b.start - a.start);
   for (const e of edits) lines.splice(e.start, e.end - e.start, ...e.block);
-  writeFileSync(projectPath, lines.join("\n").replace(/\n{3,}/g, "\n\n"));
+  const text = lines.join(p.eol);
+  if (text === p.text) return false;
+  writeFileSync(projectPath, text);
+  return true;
 }
 
 const p = parse();

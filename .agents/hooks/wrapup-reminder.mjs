@@ -48,7 +48,9 @@ function branchBase(repoRoot) {
   let checkpoint = null;
   for (const walk of [["-g", `refs/heads/${branch}`], ["--first-parent", "HEAD"]]) {
     const log = text(repoRoot, ["log", ...walk, "-n", "200", "--format=%H%x1f%(trailers:key=Task,valueonly,separator=%x2C)"]);
-    const hit = log.split("\n").map((l) => l.split("\x1f")).find((r) => r[1] && r[1].trim());
+    // reflog 里的检查点须仍在分支历史中:分支被 reset 离开旧任务后,那个检查点不再算数
+    const hit = log.split("\n").map((l) => l.split("\x1f"))
+      .find((r) => r[1] && r[1].trim() && git(repoRoot, ["merge-base", "--is-ancestor", r[0], "HEAD"]) !== null);
     if (hit) { checkpoint = hit[0]; break; }
   }
   const mergeBase = text(repoRoot, ["merge-base", "HEAD", `refs/heads/${canonical}`]) || null;

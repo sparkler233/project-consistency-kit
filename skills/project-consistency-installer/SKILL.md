@@ -145,7 +145,7 @@ test -L CLAUDE.md && readlink CLAUDE.md
 │ PROJECT.md                       │ 新建;首次引入补入口结构;升级完整改造 │ …      │
 │ AGENTS.md                        │ 新建或合并工作规则 + 接入块             │ …      │
 │ CLAUDE.md                        │ 核对后替换为一行 @AGENTS.md             │ …      │
-│ README.md                        │ 默认不动;仅判断是否加入 Part A          │ 跳过   │
+│ README.md                        │ 默认不动;仅判断是否登记为关键资料       │ 跳过   │
 │ .agents/skills/(catchup/wrapup)  │ 新建或按版本更新行为正本                │ …      │
 │ .claude/commands/(catchup/wrapup)│ 新建或迁移为 Claude Code 薄适配器       │ …      │
 │ 旧版中文出向命令                 │ 对账定制后迁移并移除旧入口              │ …      │
@@ -154,7 +154,7 @@ test -L CLAUDE.md && readlink CLAUDE.md
 │ 决策档案(仅升级)                │ 全文写入升级提交正文后删除,或保留只读  │ …      │
 │ 升级提交(仅升级)                │ 展示提交说明全文,确认后提交            │ …      │
 │ 一致性机制/VERSION               │ 全部机制件验证成功后最后写入             │ …      │
-│ 文件联动目录.md                  │ 从分发模板新建或逐条合并通用规则        │ …      │
+│ 文件联动目录.md                  │ 从分发模板新建或补齐结构,保留项目规则  │ …      │
 │ .claude/settings.json            │ 增量接线 Stop hook                     │ …      │
 │ .codex hooks                     │ 增量接线 Stop hook + 提示信任           │ …      │
 │ 项目自定中枢 / 领域规则          │ 扫描候选后询问                          │ …      │
@@ -254,10 +254,10 @@ Codex 本地客户端使用同一份 `.agents/hooks/wrapup-reminder.mjs`,但接�
 ## 步骤 6 · 发现中枢、领域规则与二进制策略
 
 1. 扫描已跟踪文件、顶层与常见文档目录。
-2. PROJECT 与 AGENTS 固定进入 Part A。
-3. README 只有承载公开安装 / API / 使用契约且用户确认时才进入 Part A。
-4. 列出 ADR、spec、schema、contract、大纲、风格定义等候选,由用户选择。
-5. 询问稳定的“改 A 必查 B”规则,确认后写入项目自定规则区。
+2. PROJECT 固定登记在联动目录的「关键资料的受影响条件」表中。
+3. README 只有承载公开安装 / API / 使用契约且用户确认时才登记进该表。
+4. 列出 ADR、spec、schema、contract、大纲、风格定义等候选,由用户选择后登记进该表。
+5. 询问稳定的“改 A 必查 B”规则,确认后按模板的「小标题 + 触发 + 动作」写进「项目联动关系」,触发中的文件或目录用反引号写出路径。
 6. 含图片 / 设计稿 / 字体 / 媒体 → 只增补缺失的 ignore / LFS 规则;纯代码 / 纯文字项目跳过 LFS。
 
 ## 步骤 7 · 配置 canonical branch 并建立 synced horizon
@@ -279,14 +279,14 @@ Codex 本地客户端使用同一份 `.agents/hooks/wrapup-reminder.mjs`,但接�
 - 升级时:决策档案已按用户选择处理;v1.3.0 模板带来的旧机制条款已不在 AGENTS;升级提交已按确认完成或明确报告未提交;
 - AGENTS 是实体正本,CLAUDE 是只含 `@AGENTS.md` 的普通文件适配器;
 - catchup / wrapup 两个仓库级 Skill 存在且通过 Skill 校验;
-- synced guard 存在并通过行为测试;catchup 与 wrapup 都消费它给出的 branch / `scope_base`,安装器与 wrapup 不保留第二套自动 tag 迁移逻辑;
+- synced guard 存在,`node .agents/skills/wrapup/scripts/synced-guard.mjs inspect` 可运行并给出 branch 与 `scope_base`;catchup 与 wrapup 都消费它给出的 branch / `scope_base`,安装器与 wrapup 不保留第二套自动 tag 迁移逻辑;
 - catchup 不重复读取 Agent 指令;
 - Claude 的 catchup / wrapup 文件只是薄适配器;
 - Claude Code 与 Codex 本地客户端的 Stop 配置都最终指向同一份跨平台 Node 收尾提醒逻辑;Codex 含不内联变量脚本的 `commandWindows`,并安装 `.ps1` 薄适配器,且没有重复的 JSON / TOML hook 表示;
 - Codex 新增或变化的项目 hook 已明确报告“待用户信任”或“已由用户信任”,不把配置存在误报为已经运行;
 - 完整安装时目标 `一致性机制/VERSION` 等于来源版本;部分安装或失败时 VERSION 未被错误推进;
 - README 不存在或完全改写时工作流仍可运行;
-- Part A 已登记项目真实中枢;
+- 联动目录的「关键资料的受影响条件」表已登记项目真实的关键资料;
 - 用当前 Harness 的入口执行一次 catchup。
 
 ## 守则
