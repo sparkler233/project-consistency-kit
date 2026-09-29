@@ -27,6 +27,12 @@ jobs:
         run: node scripts/test-synced-guard.mjs
       - name: Test wrapup scope and decision scripts
         run: node scripts/test-wrapup-scripts.mjs
+      - name: Test parallel scripts and hooks
+        run: |
+          node scripts/test-task.mjs
+          node scripts/test-parallel.mjs
+          node scripts/test-task-state.mjs
+          node scripts/test-recent-decisions.mjs
       - name: Build and verify
         env:
           SOURCE_REF: ${{ github.ref_name }}
@@ -49,6 +55,12 @@ jobs:
         run: node scripts/test-synced-guard.mjs
       - name: Test wrapup scope and decision scripts
         run: node scripts/test-wrapup-scripts.mjs
+      - name: Test parallel scripts and hooks
+        run: |
+          node scripts/test-task.mjs
+          node scripts/test-parallel.mjs
+          node scripts/test-task-state.mjs
+          node scripts/test-recent-decisions.mjs
       - name: Validate Windows adapters and clean distribution
         shell: powershell
         env:

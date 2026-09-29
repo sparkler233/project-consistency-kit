@@ -1,6 +1,6 @@
 ---
 name: wrapup
-description: Reconcile project records and necessary linkage within the branch-safe Git scope, then prepare a user-confirmed local commit. Use for wrapup, project record synchronization or a repository checkpoint; add document restructuring only when explicitly requested.
+description: Reconcile project records and necessary linkage within the branch-safe Git scope, then prepare a user-confirmed local commit. Use for wrapup, project record synchronization or a repository checkpoint, and when the user says 收尾 or 并进主线 (merge a parallel branch into the main line); add document restructuring only when explicitly requested.
 ---
 
 <!-- 一致性机制 version: 2026-09-27 -->
@@ -13,7 +13,7 @@ description: Reconcile project records and necessary linkage within the branch-s
 
 回看当前仍可见的对话，找已确认但未写入文件的内容：决策应已在 `PROJECT.md`「待提交」区，漏写的列入计划补写；其他约定按归属补写。纯讨论和未确认的想法不写成有效要求；用户要求保留的备选按备选记录。没有原始对话的信息不凭空恢复。
 
-机械步骤由随附脚本负责，这些结果只由脚本产生：检查范围与基线(`scope.mjs`)、决策迁出与「最近决策」、提交说明(`decisions.mjs`)、synced 的创建与推进(`synced-guard.mjs`)。直接用脚本输出的值，不自己抄写哈希、另算基线或数行数；不手工代做这些步骤，也不手改脚本生成的内容，要改就带新选项重跑。不清楚用法时运行 `node <脚本> --help`，它只打印用法、不做任何改动。脚本报错或结果与预期不符时停下，写进报告或询问用户，不绕过脚本自己做。
+机械步骤由随附脚本负责，这些结果只由脚本产生：检查范围与基线(`scope.mjs`)、决策迁出与「最近决策」、提交说明与提交(`decisions.mjs`)、并行的开工、同步主线、并进主线与收工(`task.mjs`)、synced 的创建与推进(`synced-guard.mjs`)。直接用脚本输出的值，不自己抄写哈希、另算基线或数行数；不手工代做这些步骤，也不手改脚本生成的内容，要改就带新选项重跑。不清楚用法时运行 `node <脚本> --help`，它只打印用法、不做任何改动。脚本报错或结果与预期不符时停下，写进报告或询问用户，不绕过脚本自己做。
 
 用一个脚本取得全部范围，输出为 JSON：
 
@@ -27,23 +27,27 @@ node .agents/skills/wrapup/scripts/scope.mjs
 
 canonical 未配置时，先请用户确认，再写 `projectConsistency.canonicalBranch` 并重新运行脚本。没有可靠基线时不猜范围，可以维护资料，但不能声称范围检查完整；canonical 上还没有 synced 时，按工作区状态检查，并说明历史未设基线。PROJECT 或联动目录缺失时，报告缺口并提出最小补救，不自动安装或重组项目。
 
+并行的三条与同步、并进主线的做法见运行规则第四节。`task.mjs` 另有：用户要求开并行时 `start`，要求收工时 `close`(删除前请用户先关掉该 worktree 里的会话)；各子命令的输出写明下一步(`next`)。
+
 ## 2. 拟定一份计划
 
 对范围内每项变化，按项目联动规则检查受影响的资料：`scope.mjs` 的 `linkage.rules_hit` 列出本次范围按路径命中的规则，逐条读规则原文判断要改什么，`rules_not_checked` 中的规则自行判断；中枢清单用来判断是否受影响，不必全文读所有中枢。处理已发现的直接依赖，不开放式审计全库；查联动时优先搜索相关路径，减少无关输出。明确的依赖还没检查的，要么完成，要么报告为缺口。
 
 把对话补写、正文更新、引用修正与必要联动合成一份计划，说明改哪里、改什么、为什么。优先用已有的维护位置；要求、实际成果、验证范围分开写。不为凑记录刷新日期；原始证据不改写，必要的替代原因就近写明。素材清单、二进制等特定检查只按项目自己的规则和本次变化触发。找不到落点或归属冲突时，提出最小调整。
 
-决策：「待提交」区有决策时，先运行
+决策：「待提交」区有决策且要迁出时(在主线上，或并进主线时加 `--land`)，先运行
 
 ```bash
 node .agents/skills/wrapup/scripts/decisions.mjs plan
 ```
 
-脚本按位置读取「待提交」，给出要迁出的决策、提交正文(`body`，含全文与 trailer)、「最近决策」追加与删除的行及迁出后条数(`recent_count_after`)，对 git 中没有全文的旧行自动逐字写入正文。`mentions_undecided` 列出新决策提到、仍在「最近决策」中的旧编号：判断是推翻、部分调整还是仅提及——推翻加 `--supersede 新:旧`，部分调整加 `--partial 新:旧`，仅提及不处理；带上选项重跑 `plan` 确认结果。`problems` 非空时先解决。`collisions` 列出撞号的编号与提到它的文件：把后来的那条改成下一个空号，逐个文件判断引用指的是哪一条再改。计划中写明脚本给出的迁出后条数与删除的行。
+脚本按位置读取「待提交」，给出要迁出的决策、提交正文(`body`)与「最近决策」的变化(迁出后条数 `recent_count_after`、删除的行)。输出有 `next` 时按它处理，带上选项重跑 `plan`，直到没有 `next`。计划中写明迁出后条数与删除的行。
 
-在非 canonical 分支上，无论有无决策都运行 `plan`，脚本输出 `branch_mode`：分支上不迁出，决策留在「待提交」随检查点提交，合并回 canonical 后再迁出。分支上的提交是任务检查点。之后可能由别的 Session 接手、或任务还没做完时，说明段写三行供接手时读取——「目标:」写整个任务(不是本次会话的范围)，「进度:」写做到哪里，「还剩:」写这个任务还有什么没做(做完写「无」)，不写提交、集成这类收尾动作；没有必要时(如一次提交就做完的小改动)可以不写，脚本不检查。脚本自动加 `Task:` 标记，任务名见 `branch_mode.task`(沿用上一个检查点，没有则用分支名)，换了任务时加 `--task 新任务名`。
+在非 canonical 分支上(不并进主线时)不迁出决策，也不必运行 `plan`：决策留在「待提交」随提交带走，这次提交就是任务检查点。之后可能由别的会话接手、或任务还没做完时，`apply` 加 `--goal`(整个任务，不是本次会话的范围)、`--progress`(做到哪里)、`--remaining`(这个任务还有什么没做，做完写「无」；不写提交、合并这类收尾动作)；没给的行沿用上一个检查点。一次提交就做完的小改动可以不加。
 
 ## 3. 一次确认
+
+在非 canonical 分支上(包括并进主线时的合并版 wrapup)跳过本节：不展示、不等确认，直接执行并提交，报告照常(决策 111)。
 
 默认只确认一次。一起展示：
 
@@ -60,18 +64,17 @@ node .agents/skills/wrapup/scripts/decisions.mjs plan
 
 执行后实际改动与确认时不一致(文件清单或提交说明需实质改变)时，先补确认。按批准的路径暂存，只有明确批准整个工作区时才可 `git add -A`；检查实际暂存内容与授权一致，保留已有暂存内容；混有其他工作、无法分离时停下，不擅自提交或重置。没有新改动不制造空提交。
 
-每次提交的说明都由脚本写成文件：其余维护完成后运行 `decisions.mjs apply`(有决策时迁出；没有要迁出的决策或在分支上时不改 PROJECT，只写提交说明文件)，选项与确认时的 `plan` 相同，并用 `--title` 传入确认过的标题、`--intro` 传入说明段(可选；分支上按上文判断是否写三行)；宿主要求的额外 trailer(如 `Co-Authored-By`)用 `--trailer "键: 值"` 传入。脚本把完整提交说明写成 UTF-8 文件，直接用它提交，不用 `git commit -m`、不经 shell 管道拼接，bash、PowerShell 写法相同：
+提交一律由脚本完成，有无决策、是否在分支上都一样：其余维护完成、按批准路径暂存后运行 `decisions.mjs apply --commit`，选项与确认时的 `plan` 相同，并用 `--title` 传入确认过的标题、`--intro` 传入说明段(可选；分支上另按上文加三个选项)；宿主要求的额外 trailer(如 `Co-Authored-By`)用 `--trailer "键: 值"` 传入。脚本写好提交说明、暂存它改动的 PROJECT(分支上它不改 PROJECT)、提交并核对，bash、PowerShell 写法相同：
 
 ```bash
-git commit -F <apply 输出的 message_file>
-node .agents/skills/wrapup/scripts/decisions.mjs check
+node .agents/skills/wrapup/scripts/decisions.mjs apply --commit --title "<确认过的标题>" [其他选项]
 ```
 
-commit 失败立即停止后续 Git 动作；`check` 的 `ok` 为 false 时，列入“必要但未完成”。
+输出中 `committed` 为 false 时提交失败，立即停止后续 Git 动作；`check.ok` 为 false 时，列入“必要但未完成”。
 
 以下条件全部满足才推进 synced，否则只提交、不推进(必要维护失败时，经用户明确同意可以先提交部分成果)：
 
-- 在 canonical 分支上(分支上的提交只是检查点，合并回 canonical 后再做最终检查)；
+- 在 canonical 分支上(分支上的提交只是检查点；并进主线时由 `task.mjs land --finish` 推进 synced)；
 - 基线可靠，检查范围没有遗漏；
 - “必要但未完成”为空，必要维护都在将标记的提交里；
 - 用户授权成立；
@@ -82,7 +85,7 @@ node .agents/skills/wrapup/scripts/synced-guard.mjs inspect
 node .agents/skills/wrapup/scripts/synced-guard.mjs advance
 ```
 
-`can_advance` 只证明 Git 条件，不证明内容维护完成。不自动合并分支，不 push。
+`can_advance` 只证明 Git 条件，不证明内容维护完成。未经用户要求不合并分支，不 push。
 
 ## 5. 报告
 

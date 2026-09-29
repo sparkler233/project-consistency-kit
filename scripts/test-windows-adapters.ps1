@@ -26,6 +26,22 @@ if ($handler.commandWindows -notmatch '(?i)-File') {
     throw "Codex commandWindows must invoke the PowerShell adapter with -File"
 }
 
+# 每轮提示与压缩后提醒:commandWindows 经通用薄适配器 run-hook.ps1 按名字转发
+foreach ($event in @('UserPromptSubmit', 'SessionStart')) {
+    $h = $codexHooks.hooks.$event[0].hooks[0]
+    if (-not $h.commandWindows -or $h.commandWindows -notmatch 'run-hook\.ps1' -or $h.commandWindows -notmatch '(?i)-File') {
+        throw "Codex $event commandWindows must invoke run-hook.ps1 with -File"
+    }
+    if ($h.commandWindows -match '\$root' -or $h.commandWindows -match '\.mjs') {
+        throw "Codex $event commandWindows still embeds PowerShell variables or Node hook logic"
+    }
+}
+$compactHandler = $codexHooks.hooks.SessionStart[0].hooks[0]
+$runHook = Join-Path $kit ".agents\hooks\run-hook.ps1"
+if (-not (Test-Path -LiteralPath $runHook -PathType Leaf)) {
+    throw "PowerShell generic hook adapter is missing"
+}
+
 $hookAdapter = Join-Path $kit ".agents\hooks\wrapup-reminder.ps1"
 if (-not (Test-Path -LiteralPath $hookAdapter -PathType Leaf)) {
     throw "PowerShell Stop hook adapter is missing"
@@ -68,6 +84,10 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $fixture "nested") -Force | Out-Null
     Copy-Item -LiteralPath $hook -Destination (Join-Path $fixture ".agents\hooks\wrapup-reminder.mjs")
     Copy-Item -LiteralPath $hookAdapter -Destination (Join-Path $fixture ".agents\hooks\wrapup-reminder.ps1")
+    Copy-Item -LiteralPath $runHook -Destination (Join-Path $fixture ".agents\hooks\run-hook.ps1")
+    Copy-Item -LiteralPath (Join-Path $kit ".agents\hooks\compact-reminder.mjs") -Destination (Join-Path $fixture ".agents\hooks\compact-reminder.mjs")
+    New-Item -ItemType Directory -Path (Join-Path $fixture ".agents\skills\wrapup\scripts") -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $kit ".agents\skills\wrapup\scripts\checkpoints.mjs") -Destination (Join-Path $fixture ".agents\skills\wrapup\scripts\checkpoints.mjs")
     Set-Content -LiteralPath (Join-Path $mechanismDir.FullName $linkageName) -Value "# fixture" -Encoding UTF8
     Set-Content -LiteralPath (Join-Path $fixture "tracked.txt") -Value "clean" -Encoding UTF8
 
@@ -93,6 +113,13 @@ try {
         if ($LASTEXITCODE -ne 0) {
             throw "Codex commandWindows duplicate-cycle check failed: exit $LASTEXITCODE"
         }
+        $compactInput = @{ session_id = "windows-adapter"; hook_event_name = "SessionStart"; source = "compact" } | ConvertTo-Json -Compress
+        $compactOutput = $compactInput | & powershell.exe -NoProfile -NonInteractive -Command $compactHandler.commandWindows
+        if ($LASTEXITCODE -ne 0) {
+            throw "Codex SessionStart commandWindows failed through an outer PowerShell: exit $LASTEXITCODE"
+        }
+        $startupInput = @{ session_id = "windows-adapter"; hook_event_name = "SessionStart"; source = "startup" } | ConvertTo-Json -Compress
+        $startupOutput = $startupInput | & powershell.exe -NoProfile -NonInteractive -Command $compactHandler.commandWindows
     } finally {
         Pop-Location
     }
@@ -103,6 +130,13 @@ try {
     }
     if ($duplicate) {
         throw "Codex commandWindows did not forward the session id for duplicate suppression: $duplicate"
+    }
+    $compactResult = $compactOutput | ConvertFrom-Json
+    if ($compactResult.hookSpecificOutput.hookEventName -ne 'SessionStart' -or -not $compactResult.hookSpecificOutput.additionalContext) {
+        throw "Codex SessionStart commandWindows did not return the post-compaction reminder: $compactOutput"
+    }
+    if ($startupOutput) {
+        throw "Post-compaction reminder must stay silent on startup: $startupOutput"
     }
 } finally {
     Remove-Item -LiteralPath $fixture -Recurse -Force -ErrorAction SilentlyContinue

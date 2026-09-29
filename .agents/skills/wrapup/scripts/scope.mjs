@@ -2,8 +2,11 @@
 // 一致性机制 version: 2026-09-27
 // 一次输出 catchup / wrapup 需要的 Git 范围,JSON 格式,模型直接取值,不再抄写哈希。
 // 用法:node scope.mjs            → 基线、基线后提交、改动清单、工作区(含未跟踪文件摘要)
-//       node scope.mjs --overview → 另加最近 15 条提交标题、目录一层清单、分支状态(当前分支的任务检查点与和主线的关系,
-//                                   其他分支的任务与领先 / 落后)、推送异常
+//       node scope.mjs --overview → 另加最近 15 条提交标题、本 worktree「待提交」里的决策(pending_decisions)、目录一层清单、分支状态(当前分支的任务检查点与和主线的关系,
+//                                   其他分支的任务、领先 / 落后、是否已全部进主线、未提交改动、还没进主线的决策)、推送异常;
+//                                   不变式的提醒(决策 109):分支有主线之外的提交却找不到检查点(handoff_missing,如 rebase 之后),
+//                                   与别的分支共有还没进主线的提交(shares_unmerged_with,分支之间直接合并过,对方的决策会被一起带进主线);
+//                                   分支上另给主线一侧改动命中的联动规则(rules_hit_by_canonical)
 // 默认模式另给 hints:整理线索(本次涉及的文档中大量重复的行、没有被任何文档引用的文档),只供模型判断是否提醒整理;
 // 以及 linkage:本次范围(基线后已提交与工作区改动)按路径命中的联动规则 rules_hit,和脚本判断不全、要模型自行判断的
 // rules_not_checked(触发里没有路径,或还有文字条件而按路径没命中);是否成立、要不要改由模型按规则原文判断
@@ -14,13 +17,13 @@ import { spawnSync } from "node:child_process";
 import { existsSync, openSync, readSync, closeSync, lstatSync, readlinkSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { LINKAGE, parseLinkage, ruleHits, notChecked } from "./linkage.mjs";
+import { taskState as taskStateAt, remainingLine, pendingDecisions, pendingIn, leadingComments } from "./checkpoints.mjs";
 
 // --help 只打印开头这段说明,不做任何改动;不认识的参数报错且不执行
 {
   const args = process.argv.slice(2);
   if (args.includes("--help") || args.includes("-h")) {
-    const text = readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n");
-    process.stdout.write(text.slice(1).filter((l) => l.startsWith("//")).map((l) => l.replace(/^\/\/ ?/, "")).join("\n") + "\n");
+    process.stdout.write(leadingComments(readFileSync(fileURLToPath(import.meta.url), "utf8")));
     process.exit(0);
   }
   const bad = args.filter((a) => !["--overview"].includes(a));
@@ -142,19 +145,8 @@ function worktree() {
   return result;
 }
 
-// 分支:任务检查点是分支上 wrapup 的提交,带 `Task:` trailer,说明段写目标 / 进度 / 还剩。
-// 找最近的检查点先查分支的 reflog(快进接回主线后仍在,新开的分支里没有别人的检查点),查不到再沿 first-parent 往回找。
-// reflog 里的检查点须仍在分支历史中:分支被 reset 离开旧任务后,那个检查点不再算数
-function taskState(ref) {
-  const inBranch = (h) => spawnSync("git", ["merge-base", "--is-ancestor", h, ref], { cwd: root, windowsHide: true }).status === 0;
-  const find = (walk) => (git(["log", ...walk, "-n", "200", "--format=%H%x1f%(trailers:key=Task,valueonly,separator=%x2C)%x1e"]) || "")
-    .split("\x1e").map((r) => r.trim().split("\x1f")).find((r) => r[1] && r[1].trim() && inBranch(r[0])) || null;
-  const hit = find(["-g", ref]) || find(["--first-parent", ref]);
-  if (!hit) return null;
-  const message = (git(["log", "-1", "--format=%B", hit[0]]) || "").trim();
-  const since = commits(`${hit[0]}..${ref}`, ["--first-parent"]);
-  return { name: hit[1].trim(), checkpoint: hit[0].slice(0, 12), message, commits_since_checkpoint: since };
-}
+// 分支:任务检查点是分支上 wrapup 的提交,带 `Task:` trailer。找法见 checkpoints.mjs
+const taskState = (ref) => taskStateAt(root, ref);
 
 function tryMerge(a, b) {
   const v = (git(["version"]) || "").match(/(\d+)\.(\d+)/);
@@ -176,8 +168,10 @@ function relation(ref, canonicalRef, detail) {
   const cap = (list) => (list.length > LIST_MAX ? { items: list.slice(0, LIST_MAX), truncated: list.length - LIST_MAX } : list);
   const mine = changed(ref), theirs = changed(canonicalRef);
   const theirSet = new Set(theirs);
+  let rules = null;
+  try { const l = parseLinkage(readFileSync(path.join(root, LINKAGE), "utf8"), LINKAGE); if (l.recognized) rules = ruleHits(l, theirs); } catch {}
   return { base: bases[0].slice(0, 12), ahead, behind, branch_changed: cap(mine), canonical_changed: cap(theirs),
-    overlap: mine.filter((f) => theirSet.has(f)), merge_into_canonical: merge };
+    overlap: mine.filter((f) => theirSet.has(f)), rules_hit_by_canonical: rules, merge_into_canonical: merge };
 }
 
 // 当前在分支上:current_branch_state 给出任务状态与和主线的关系;other_branches 列出其他有主线没有的提交、或检出在某个 worktree 中的分支
@@ -185,18 +179,35 @@ function branchInfo(canonical, current, worktreeOf) {
   const canonicalRef = `refs/heads/${canonical}`;
   if (!git(["rev-parse", "--verify", "-q", `${canonicalRef}^{commit}`])) return { branches_note: "canonical_ref_missing" };
   const info = {};
+  const unmerged = lines(git(["branch", "--no-merged", canonicalRef, "--format=%(refname:short)"]));
+  const all = [...new Set([...unmerged, ...Object.keys(worktreeOf), ...(current && current !== canonical ? [current] : [])])].filter((b) => b !== canonical).sort();
+  // 各分支还没进主线的提交;两个分支共有这样的提交,说明它们之间直接合并过
+  const own = new Map(all.map((b) => [b, new Set(lines(git(["rev-list", "-n", "500", `refs/heads/${b}`, `^${canonicalRef}`])))]));
+  const shares = (b) => all.filter((o) => o !== b && [...own.get(b)].some((h) => own.get(o).has(h)));
+  // 交接写在分支上:有主线之外的提交,就应能在分支历史里找到检查点
+  const handoffMissing = (b, task) => own.get(b).size > 0 && !task;
   if (current && current !== canonical) {
     const ref = `refs/heads/${current}`;
-    info.current_branch_state = { task: taskState(ref), ...relation(ref, canonicalRef, true) };
+    const task = taskState(ref);
+    info.current_branch_state = { task, handoff_missing: handoffMissing(current, task), shares_unmerged_with: shares(current), ...relation(ref, canonicalRef, true) };
   }
-  const unmerged = lines(git(["branch", "--no-merged", canonicalRef, "--format=%(refname:short)"]));
-  const others = [...new Set([...unmerged, ...Object.keys(worktreeOf)])].filter((b) => b !== canonical && b !== current).sort();
+  const others = all.filter((b) => b !== current);
   info.other_branches = others.map((b) => {
     const ref = `refs/heads/${b}`;
     const task = taskState(ref);
-    const remaining = task && (task.message.split("\n").find((l) => /^\s*还剩\s*[:：]/.test(l)) || "").trim();
-    return { branch: b, worktree: worktreeOf[b] || null, last_commit: (git(["log", "-1", "--format=%s", ref]) || "").trim(),
-      task: task ? { name: task.name, remaining: remaining || null, commits_since_checkpoint: task.commits_since_checkpoint.length } : null,
+    const wt = worktreeOf[b] || null;
+    // 是否已全部进主线:看分叉点之后的内容差异(合并后又同步过主线时,分支头不在主线里,但没有未进主线的内容)
+    const base = (git(["merge-base", canonicalRef, ref]) || "").trim();
+    const merged = Boolean(base) && spawnSync("git", ["diff", "--quiet", base, ref, "--"], { cwd: root, windowsHide: true }).status === 0;
+    let uncommitted = null;
+    if (wt && existsSync(wt)) {
+      const r = spawnSync("git", ["status", "--porcelain"], { cwd: wt, encoding: "utf8", windowsHide: true });
+      uncommitted = r.status === 0 ? lines(r.stdout).length : null;
+    }
+    return { branch: b, worktree: wt, last_commit: (git(["log", "-1", "--format=%s", ref]) || "").trim(),
+      task: task ? { name: task.name, remaining: remainingLine(task.message), commits_since_checkpoint: task.commits_since_checkpoint.length } : null,
+      merged, uncommitted, pending_decisions: merged ? [] : pendingDecisions(root, ref),
+      handoff_missing: handoffMissing(b, task), shares_unmerged_with: shares(b),
       ...relation(ref, canonicalRef, false) };
   });
   return info;
@@ -222,7 +233,10 @@ function overviewInfo(guard) {
     if (behind || ahead) anomalies.push({ kind: "upstream_diverged", upstream, ahead, behind });
   }
   const branches = guard.canonical_branch ? branchInfo(guard.canonical_branch, guard.current_branch ?? null, worktreeOf) : { branches_note: "canonical_unconfigured" };
-  return { recent_commits: commits("HEAD", ["-15"]), top_files, tree, ...branches, anomalies };
+  // 本 worktree「待提交」里还没迁出的决策(读工作区的 PROJECT.md,含未提交的改动)
+  let pending_decisions = [];
+  try { pending_decisions = pendingIn(readFileSync(path.join(root, "PROJECT.md"), "utf8")); } catch {}
+  return { recent_commits: commits("HEAD", ["-15"]), pending_decisions, top_files, tree, ...branches, anomalies };
 }
 
 const MECH = [".agents/", ".claude/", ".codex/", "一致性机制/"];
