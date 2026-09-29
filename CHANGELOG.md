@@ -4,9 +4,23 @@
 > 任何机制文件发生真实变化:判断 SemVer 影响、全部修订日期一起 bump 到当天,并在此记入对应版本。
 > 本文件**套件专属,不随模板进项目**(绿地 rsync 已排除;安装器也不拷它)。
 
-## 未发布
+## v2.0.0-preview.3 — 2026-09-29
 
-版本号与修订日期在下次发版时统一推进。
+**预发布(决策 115)。** 加入 Core 并行(实验性):一个人同时驾驶多个会话,各在自己的分支与 worktree 上工作,谁合并谁负责。与 preview.1 / preview.2 兼容:PROJECT、AGENTS 与联动目录的结构不变,升级替换机制文件、补上两个新 hook 的接线;从 v1.3.0 仍按升级细则。GitHub 上仍标为 prerelease,须 `--release v2.0.0-preview.3` 明确获取。
+
+- **Core 并行(实验性,决策 105–115)**:
+  - 运行规则第四节写入并行只守的三条:主线只通过检查过的合并前进、不改写主线历史;停下时把现状(目标、进度、还剩)写进分支上的检查点;只写自己的分支和 worktree。同步主线用脚本、不手抄;分支上不改 PROJECT 的总体状态与阅读入口。第三节写明用户说「收尾」就是运行 wrapup。
+  - 新脚本 `task.mjs`:`start` 开工(分支、worktree 与可选的开工检查点,宿主已建好 worktree 时用 `--here`);`sync` 把主线合进本分支,「最近决策」一段的冲突由脚本解决;`land` 并进主线——未提交改动先存为检查点、同步主线、引导合并版 wrapup,`land --finish` 做合并提交、快进主线并推进 synced,主线被抢先时拒绝且不改动任何东西,重新同步后不相关就直接完成;`close` 收工,改动未进主线时拒绝并列出会丢掉的提交与决策。检查点找法集中在新文件 `checkpoints.mjs`。
+  - 新 hook `parallel-notice.mjs`(每轮开始时,`UserPromptSubmit`):在任务分支上,主线的变化与本分支相关(改了同样的文件、命中联动规则或试合并冲突)时,把主线新增的提交、交集、命中的规则与试合并结果同时告诉模型和用户,末尾附同步命令;只报事实,不要求同步,同一主线位置只提示一次。
+  - 新 hook `compact-reminder.mjs`(`SessionStart`,只在上下文压缩后):提醒重读 PROJECT 与运行规则;在任务分支上另附三条与同步、合并用的命令。Claude Code 与 Codex(0.158 起)接口相同。Windows Codex 经新的通用薄适配器 `run-hook.ps1` 调用这两个 hook。
+  - `scope.mjs --overview`:每个分支另报是否已全部进主线、未提交改动、还没进主线的决策、找不到检查点(`handoff_missing`)与和别的分支共有未进主线的提交(`shares_unmerged_with`);分支上另报主线一侧命中的联动规则(`rules_hit_by_canonical`);新增本 worktree「待提交」里的决策(`pending_decisions`)。
+  - `decisions.mjs`:分支上的检查点不必先跑 `plan`,三行由 `--goal` / `--progress` / `--remaining` 传入,没给的行沿用上一个检查点;`--land` 合并模式在分支上迁出决策并记下 `Land-Checked`;`--commit` 由脚本暂存 PROJECT、提交并核对;`plan` 的 `next` 列出要处理的事(新决策提到旧决策、撞号、认不出的内容),新增 `--mention` 表示只是提到;「最近决策」改为按 git 历史整段生成,被手改坏或合并冲突后下一次提交自动恢复;新增 `regen`。
+  - wrapup:分支上的提交(含并进主线)不先确认,事后报告,主线上照旧确认一次(决策 111);描述写明用户说「收尾」「并进主线」时使用;分支段与决策问题的处理说明移进脚本输出,Skill 文字减少。catchup 报告各分支是否已进主线、未提交改动、还没进主线的决策与不变式提醒。
+  - 已知限制:Windows 上未经真实会话验证(由 CI 跑回归测试);Codex 与 Claude Code 实测每种设置只跑过一次;联动内容是否真正核对仍靠模型;长会话压缩后模型是否照规则做未验证;两个会话先后合并时 PROJECT 总体状态一段常有冲突;用户拍板的事可能没被记成决策;hook 只在项目受信任时运行;Codex 沙箱下并进主线须把主线目录列为可写;Claude Code 桌面版的 worktree 在仓库内 `.claude/worktrees/`,须加进 `.gitignore`(安装器会列入计划)。
+- **安装器**:新增文件与三项 hook 接线(Stop、UserPromptSubmit、SessionStart);从 preview.1 / preview.2 升级时补上新接线;`.gitignore` 缺 `.claude/worktrees/` 时列入计划。`fetch-kit.sh` 对 preview.3 起的包要求新增的 5 个文件。
+- **分发**:清单新增 `task.mjs`、`checkpoints.mjs`、`parallel-notice.mjs`、`compact-reminder.mjs`、`run-hook.ps1`(41 个文件);全部机制文件修订日期统一为 2026-09-29。并行的回归测试并入 CI(Linux 与 Windows)。
+
+以下为 preview.2 之后、与并行无关的修复:
 
 - **发布脚本**(套件仓库内部工具,不在分发包里):`scripts/publish-public.sh` 默认把内部历史接在最初的公开 main 之后,不再接在公开仓库当前的 main 之后(那样会把已公开的提交整段再重放一遍);生成后检查公开 main 原样包含在新历史里、新提交不重复已公开的提交,否则报错;没有新提交时说明无需推送。`--base-ref` 改为 `--base` 与 `--public-ref`。
 - **决策脚本**(`decisions.mjs`,边界情况修复):

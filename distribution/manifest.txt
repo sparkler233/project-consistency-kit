@@ -1,5 +1,5 @@
 # Project Consistency Kit clean distribution whitelist.
-# 一致性机制 version: 2026-09-27
+# 一致性机制 version: 2026-09-29
 # One tracked file per line. Directories and glob patterns are intentionally forbidden.
 .agents/skills/catchup/SKILL.md
 .agents/skills/catchup/agents/openai.yaml
@@ -10,8 +10,13 @@
 .agents/skills/wrapup/scripts/scope.mjs
 .agents/skills/wrapup/scripts/linkage.mjs
 .agents/skills/wrapup/scripts/synced-guard.mjs
+.agents/skills/wrapup/scripts/task.mjs
+.agents/skills/wrapup/scripts/checkpoints.mjs
 .agents/hooks/wrapup-reminder.mjs
 .agents/hooks/wrapup-reminder.ps1
+.agents/hooks/parallel-notice.mjs
+.agents/hooks/compact-reminder.mjs
+.agents/hooks/run-hook.ps1
 .codex/hooks.json
 .claude/commands/catchup.md
 .claude/commands/wrapup.md

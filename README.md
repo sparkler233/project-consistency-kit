@@ -6,7 +6,7 @@
 [![Distribution](https://github.com/sparkler233/project-consistency-kit/actions/workflows/distribution.yml/badge.svg?branch=main)](https://github.com/sparkler233/project-consistency-kit/actions/workflows/distribution.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f6f4e.svg)](LICENSE)
 
-> **2.0 预览版**:`main` 与 `v2.0.0-preview.2` 已是 2.0 的新流程(决策历史进 Git、PROJECT 改为入口式、运行规则独立、wrapup 一次确认)。它是预发布版本,默认安装仍取稳定版 v1.3.0;获取与升级方式见下文「发布与升级」。
+> **2.0 预览版**:`main` 与 `v2.0.0-preview.3` 已是 2.0 的新流程(决策历史进 Git、PROJECT 改为入口式、运行规则独立、wrapup 一次确认),并加入实验性的多会话并行。它是预发布版本,默认安装仍取稳定版 v1.3.0;获取与升级方式见下文「发布与升级」。
 
 ## 它解决什么
 
@@ -75,8 +75,8 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 
 ## 支持范围
 
-- Codex 可以直接发现仓库级 catchup 和 wrapup Skill；项目 Stop hook 通过 `.codex/hooks.json` 接入，首次使用或配置变化后需要用户审查并信任。
-- Claude Code 通过 `/catchup`、`/wrapup` 和 `CLAUDE.md` 适配同一套规则，Stop hook 配置位于 `.claude/settings.json`。
+- Codex 可以直接发现仓库级 catchup 和 wrapup Skill；项目 hook(收尾提醒、并行时的每轮提示、上下文压缩后的提醒)通过 `.codex/hooks.json` 接入，首次使用或配置变化后需要用户审查并信任。
+- Claude Code 通过 `/catchup`、`/wrapup` 和 `CLAUDE.md` 适配同一套规则，hook 配置位于 `.claude/settings.json`。
 - 其他能读取 `AGENTS.md` 或 Agent Skills 的运行环境可以复用项目规则和工作流；如果没有等价的生命周期 hook，就不会获得自动收尾提醒。
 - 核心脚本支持 macOS、Linux 和原生 Windows。Windows Codex 使用仓库内 `.ps1` 薄适配器，避免会话 PowerShell 预先展开内联命令中的变量；Hook 还需用户完成项目与命令信任。
 
@@ -91,9 +91,11 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 
 ### 多个 Session 并行工作的边界
 
-v1.3.0 起,并行工作应使用独立 branch + worktree。非 canonical branch 的 catchup / wrapup 以 `merge-base(HEAD, canonical)` 为检查基线,可以完成本分支联动与 checkpoint commit,但 guard 会禁止它推进项目级 `synced`;合并回 canonical 后再执行最终 wrapup。2.0 起,分支上的决策留在「待提交」,合并回 canonical 后统一迁出,决策脚本会检查两边是否撞号;分支上的收尾提交是任务检查点,catchup 能读出分支做到哪里、与主线有无交集或冲突。这些只保证并行不比以前差;并行时的相互影响、整合流程与 Session 之间的交流,计划在后续预览版里以 Git 自身能力重新设计。
+2.0.0-preview.3 起提供实验性的并行:你同时驾驶几个会话,每个会话在自己的 branch + worktree 上工作,主线上不放会话;对哪个会话说「并进主线」,就由它自己同步主线、检查、合并并推进 `synced`。机制只守三条:主线只通过检查过的合并前进;停下时把目标、进度、还剩写进分支上的检查点;不动别的分支和别人未提交的改动。开工、同步、合并、收工由 `task.mjs` 完成;主线变化与某个分支相关时,那个会话在下一轮开始时收到提示(你也看得到);要不要同步由你决定。
 
-两个 Session 直接操作同一个 worktree 仍不受支持:它们会共享未提交文件和索引,机制无法可靠判断改动归属。Stop hook 在 feature branch 上以最近的任务检查点为基线(还没有检查点时用与 canonical 的分叉点),不再因 canonical 前进而误报。
+这部分还是实验性的:只在 macOS 上经过少量真实会话验证,每种设置只跑过一次;两个会话先后合并时,`PROJECT.md` 总体状态一段常要解冲突;长会话被压缩后模型是否仍守规则还没验证;Codex 沙箱下并进主线需要把主线目录设为可写;Claude Code 桌面版把 worktree 建在仓库内的 `.claude/worktrees/`,需要加进 `.gitignore`。
+
+两个 Session 直接操作同一个 worktree 仍不受支持:它们会共享未提交文件和索引,机制无法可靠判断改动归属。
 
 ### 决策落盘仍然依赖模型
 
@@ -110,9 +112,9 @@ Git 和脚本能够检查文件是否发生变化，却无法仅凭确定性程�
 **获取 2.0 预览版**:
 
 1. 先更新机器上的安装器(重新运行上面的 `npx skills add` 命令)。v1.3.0 的安装器会因为新包里没有决策档案模板而拒绝它。
-2. 在项目里告诉 Agent:“给这个项目引入一致性机制,使用 v2.0.0-preview.2”。预览版在 GitHub 上标为预发布,不会被当作“最新版”自动取用。
+2. 在项目里告诉 Agent:“给这个项目引入一致性机制,使用 v2.0.0-preview.3”。预览版在 GitHub 上标为预发布,不会被当作“最新版”自动取用。
 
-**从 v1.3.0 升级**:安装器会把 `PROJECT.md` 改为入口式,把决策档案逐字写进升级提交后删除,并清理 AGENTS 里旧模板带来的机制条款;所有删除都会先列进计划,经你确认。更早的版本请先升到 v1.3.0。**从 v2.0.0-preview.1 升级**:只替换机制文件,PROJECT、AGENTS 与联动目录的内容不动;联动目录里你自己的规则可以改成新模板的「小标题 + 触发 + 动作」写法,安装器会列出来由你决定。2.0 不提供降级;升级是单独的一次提交,需要时用 `git revert` 撤销它。预览版之间可能不兼容,每个预览版只保证能从上一站升级上来。
+**从 v1.3.0 升级**:安装器会把 `PROJECT.md` 改为入口式,把决策档案逐字写进升级提交后删除,并清理 AGENTS 里旧模板带来的机制条款;所有删除都会先列进计划,经你确认。更早的版本请先升到 v1.3.0。**从 v2.0.0-preview.1 或 preview.2 升级**:只替换机制文件,并补上每轮提示与压缩后提醒两个 hook 的接线,PROJECT、AGENTS 与联动目录的内容不动;联动目录里你自己的规则可以改成新模板的「小标题 + 触发 + 动作」写法,安装器会列出来由你决定。2.0 不提供降级;升级是单独的一次提交,需要时用 `git revert` 撤销它。预览版之间可能不兼容,每个预览版只保证能从上一站升级上来。
 
 ## 进一步阅读
 

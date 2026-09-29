@@ -57,3 +57,6 @@ _drafts/
 Thumbs.db
 *.tmp
 *~
+
+# Claude Code 桌面版把并行会话的 worktree 建在仓库内,不忽略的话主线会把它当成未提交改动
+.claude/worktrees/

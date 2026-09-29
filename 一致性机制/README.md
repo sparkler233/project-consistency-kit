@@ -1,6 +1,6 @@
 # 一致性机制 —— 套件仓库的机制索引
 
-<!-- 一致性机制 version: 2026-09-27 -->
+<!-- 一致性机制 version: 2026-09-29 -->
 
 > 本文件是套件仓库的内部索引,给维护者看,2.0 起不再装进用户项目(决策 77)。用户项目里机制怎么运行见 [`运行规则.md`](运行规则.md);设计动机见 [`机制设计说明.md`](机制设计说明.md)。
 
@@ -10,7 +10,8 @@
 
 - **入向**:新会话用 catchup 分两层读取,恢复项目状态;
 - **出向**:收尾用 wrapup 按 guard 给出的基线检查联动、迁出「待提交」决策,一次确认后提交;只有 canonical branch 能推进 `synced`;
-- **兜底**:跨平台 Stop hook 在有未同步改动时提醒收尾;
+- **兜底**:跨平台 Stop hook 在有未同步改动时提醒收尾;上下文压缩后由 SessionStart hook 提醒重读规则;
+- **并行**(实验性):各会话在自己的 branch + worktree 上工作,`task.mjs` 负责开工、同步、并进主线与收工,每轮提示在主线变化与本分支相关时报出事实;
 - **底座**:git 是事件源,决策全文与过程历史写在提交正文;PROJECT 只写现状与入口。
 
 ## 本目录里有什么
@@ -30,7 +31,8 @@
 | 文件 | 实际位置 | 为什么不能进 `一致性机制/` |
 |------|----------|----------------------|
 | catchup / wrapup 行为正本 | `.agents/skills/catchup/`、`.agents/skills/wrapup/` | Codex 与兼容 Harness 从仓库级 Skill 发现;Claude Code 命令也转发到这里 |
-| wrapup 脚本 | `.agents/skills/wrapup/scripts/`(`scope.mjs` 及其联动匹配 `linkage.mjs`、`decisions.mjs`、`synced-guard.mjs`) | Skill 随附的机械步骤;guard 独占 `synced` 的状态迁移 |
+| wrapup 脚本 | `.agents/skills/wrapup/scripts/`(`scope.mjs` 及其联动匹配 `linkage.mjs`、`decisions.mjs`、`synced-guard.mjs`、并行的 `task.mjs`,检查点找法 `checkpoints.mjs`) | Skill 随附的机械步骤;guard 独占 `synced` 的状态迁移,并进主线时由 `task.mjs land --finish` 在主线前进后推进 |
+| hook 逻辑 | `.agents/hooks/`(`wrapup-reminder.mjs` 收尾提醒、`parallel-notice.mjs` 每轮提示、`compact-reminder.mjs` 压缩后提醒;`wrapup-reminder.ps1`、`run-hook.ps1` 为 Windows Codex 薄适配器) | 宿主接线指向固定 ASCII 路径的跨平台 Node 脚本 |
 | 整理细则 | `.agents/skills/wrapup/references/document-maintenance.md` | 只在明确要求整理时由 wrapup 读取 |
 | 安装器行为正本 | `skills/project-consistency-installer/`(含 v1.3.0 升级细则与获取脚本) | skills.sh 分发,机器级使用,不进入用户项目 |
 | 干净分发白名单 | `distribution/manifest.txt` | 发布边界独立于源码目录,新增产品文件需显式评审 |
@@ -44,7 +46,7 @@
 | Claude 适配入口 | `CLAUDE.md`(仓库根,内容仅 `@AGENTS.md`) | Claude Code 按固定文件名加载 |
 | canonical branch | 本地 Git config `projectConsistency.canonicalBranch` | 当前 clone 的运行状态,由用户确认 |
 | sync horizon | git tag `synced` | canonical 项目级 ref;guard 原子创建或推进,feature 只用 merge-base 检查自身变化 |
-| Stop hook 接线 | `.claude/settings.json`、`.codex/hooks.json` | 宿主只从这里读 hooks;Codex 首次或变更后需用户信任 |
+| hook 接线(Stop、UserPromptSubmit、SessionStart) | `.claude/settings.json`、`.codex/hooks.json` | 宿主只从这里读 hooks;Codex 首次或变更后需用户信任 |
 | 机器级引导器 | skills.sh 安装的 `project-consistency-installer`(本地开发可链接到本仓库) | 从 GitHub Release 或可信本地 checkout 获取套件,再增量引入或升级项目 |
 
 ## 版本、源码与发布面

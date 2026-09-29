@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-09-27
+// 一致性机制 version: 2026-09-29
 
 import assert from "node:assert/strict";
 import fs from "node:fs";

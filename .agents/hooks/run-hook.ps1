@@ -1,4 +1,4 @@
-# 一致性机制 version: 2026-09-27
+# 一致性机制 version: 2026-09-29
 # Thin Windows adapter for the kit's cross-platform Node hooks: locates .agents/hooks/<Hook>.mjs and forwards stdin.
 # Used by Codex commandWindows for the per-turn notice and the post-compaction reminder; wrapup-reminder.ps1 stays for existing Stop wiring.
 [CmdletBinding()]

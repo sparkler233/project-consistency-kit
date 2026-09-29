@@ -1,4 +1,4 @@
-# 一致性机制 version: 2026-09-27
+# 一致性机制 version: 2026-09-29
 name: Validate and publish clean distribution
 
 on:

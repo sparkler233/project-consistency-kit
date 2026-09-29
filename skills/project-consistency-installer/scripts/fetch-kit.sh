@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-09-27
+# 一致性机制 version: 2026-09-29
 set -euo pipefail
 
 canonical_repository="https://github.com/sparkler233/project-consistency-kit.git"
@@ -130,6 +130,11 @@ version_at_least_2_0() {
 # 2.0.0-preview.1 是唯一早于 preview.2 的 2.0 版本
 version_at_least_2_0_preview_2() {
   version_at_least_2_0 "$1" && [ "$1" != "2.0.0-preview.1" ]
+}
+
+# preview.3 起含并行脚本与每轮提示、压缩后提醒两个 hook
+version_at_least_2_0_preview_3() {
+  version_at_least_2_0_preview_2 "$1" && [ "$1" != "2.0.0-preview.2" ]
 }
 
 version_at_least_1_3() {
@@ -322,6 +327,17 @@ EOF
     if version_at_least_2_0_preview_2 "$validated_version"; then
       [ -f "$distribution_dir/.agents/skills/wrapup/scripts/linkage.mjs" ] \
         || fail "v2.0.0-preview.2+ distribution is incomplete: missing .agents/skills/wrapup/scripts/linkage.mjs"
+    fi
+    if version_at_least_2_0_preview_3 "$validated_version"; then
+      for relative_path in \
+        .agents/skills/wrapup/scripts/task.mjs \
+        .agents/skills/wrapup/scripts/checkpoints.mjs \
+        .agents/hooks/parallel-notice.mjs \
+        .agents/hooks/compact-reminder.mjs \
+        .agents/hooks/run-hook.ps1; do
+        [ -f "$distribution_dir/$relative_path" ] \
+          || fail "v2.0.0-preview.3+ distribution is incomplete: missing $relative_path"
+      done
     fi
   fi
   if [ "$validated_profile" != "versioned" ] || ! version_at_least_2_0 "$validated_version"; then
