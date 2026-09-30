@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-09-29
+// 一致性机制 version: 2026-09-30
 // 并行的机械部分:开工、同步主线、并进主线、收工。只做 Git 操作并报告结果,JSON 格式;要判断的事留给模型与用户。
-// 三条不变式(决策 109):主线只前进,每一步都经过检查;交接写在分支上;不动别人的东西。满足它们,其余怎么做由 Harness 与用户决定,
-// 本脚本只是便捷工具。存在未收工的任务分支就是在并行,全部收工即回到单线程。
+// 三条不变式:主线只前进,每一步都经过检查;交接写在分支上;不动别人的东西。满足它们,其余怎么做由 Harness 与用户决定,
+// 本脚本只是便捷工具。存在未收工的任务分支就是在并行,全部收工即回到单线程。需要 Git 2.38 及以上,版本不够时拦下并说明。
 // 用法(--help 只打印本段说明,不做任何改动;不认识的参数报错且不执行):
 //   node task.mjs start <分支> [--goal "目标"] [--task "任务名"] [--path 目录] [--trailer "K: V"]
 //       从主线建分支和 worktree(默认放在主 worktree 旁的「<仓库名>.worktrees/」下);给了 --goal 或 --task 时提交一个只带 `Task:`(与「目标:」)的空检查点,记下任务名与目标。
@@ -29,7 +29,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { readFileSync as readText, writeFileSync } from "node:fs";
-import { gitIn, findCheckpoint, taskLines, pendingDecisions, projectBody, leadingComments } from "./checkpoints.mjs";
+import { gitIn, gitAtLeast, findCheckpoint, taskLines, pendingDecisions, projectBody, leadingComments } from "./checkpoints.mjs";
 import { LINKAGE, parseLinkage, ruleHits } from "./linkage.mjs";
 
 const emit = (v, code = 0) => { process.stdout.write(JSON.stringify(v) + "\n"); process.exit(code); };
@@ -76,6 +76,9 @@ const merging = () => git(["rev-parse", "-q", "--verify", "MERGE_HEAD"]).status 
 const dirtyTracked = () => lines(ok(["status", "--porcelain", "--untracked-files=no"]));
 const unresolved = () => lines(ok(["diff", "--name-only", "--diff-filter=U"]));
 const blocked = (blockers, extra = {}) => emit({ status: "blocked", command: cmd, canonical_branch: canonical || null, current_branch: current || null, blockers, ...extra }, 3);
+// 同步用到 Git 2.35 的冲突格式(zdiff3),试合并用到 2.38 的 merge-tree --write-tree;版本不够时在这里说明,不让后面的命令以看不懂的错误失败
+const gitVersion = (ok(["version"]) || "").trim();
+if (gitAtLeast(gitVersion, 2, 38) === false) blocked(["git_older_than_2.38"], { git: gitVersion, next: "并行脚本需要 Git 2.38 及以上:升级 Git 后再运行" });
 if (!canonical) blocked(["canonical_unconfigured"]);
 
 function worktrees() {
@@ -301,7 +304,7 @@ if (cmd === "land") {
     if (rel.related) blocked(["recheck_needed"], { ...rel, next: "检查之后主线新增的改动与本分支相关:重新走合并版 wrapup(--land),再运行 task.mjs land --finish" });
     finishLanding(ck, ck.against !== (ok(["rev-parse", canonicalRef]) || "").trim());
   }
-  // 1. 未提交的改动自动提交为检查点(决策 110):沿用上一个检查点的任务名与三行
+  // 1. 未提交的改动自动提交为检查点:沿用上一个检查点的任务名与三行
   let autoCheckpoint = null;
   const dirty = dirtyTracked();
   if (dirty.length) {
@@ -329,7 +332,7 @@ if (cmd === "land") {
       next: "检查之后主线新增的改动与本分支相关:重新走合并版 wrapup(decisions.mjs 加 --land),提交后运行 task.mjs land --finish" });
   }
   emit({ ...base, sync: s, status: "needs_wrapup", reason: ck ? "untracked_files" : "first_check",
-    next: "按 wrapup 合并模式收尾:照主线的做法检查联动、更新 PROJECT 状态与阅读入口;「待提交」有决策时先 decisions.mjs plan --land,按输出的 next 处理;分支上不等确认(决策 111),直接 decisions.mjs apply --land --commit,再运行 task.mjs land --finish" });
+    next: "按 wrapup 合并模式收尾:照主线的做法检查联动、更新 PROJECT 状态与阅读入口;「待提交」有决策时先 decisions.mjs plan --land,按输出的 next 处理;分支上不等确认,直接 decisions.mjs apply --land --commit --title \"<标题>\",再运行 task.mjs land --finish" });
 }
 
 // ---------- close ----------

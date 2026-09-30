@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-09-29
+// 一致性机制 version: 2026-09-30
 // 把 PROJECT.md「待提交」的决策迁入提交正文,并按 git 整段生成「最近决策」。只按位置读取,不要求特定写法。
 // 「最近决策」= 本次迁出的决策 + 当前分支历史中带 `Decision:` 的提交(取正文「决策 N · 日期 · 标题」行),
 // 跳过被 `Supersedes:` 推翻的,取最近 N 条;`Adjusts: 旧 by 新` 生成「(部分被决策 新 调整)」。
@@ -8,7 +8,8 @@
 //   node decisions.mjs plan  [选项]   预览:要迁出的决策、提交正文、「最近决策」变化(不写文件)
 //   node decisions.mjs apply [选项]   执行:迁出决策、改写 PROJECT.md,把完整提交说明(UTF-8)写到 Git 目录下的 pck-commit-message.txt;
 //                                     没有要迁出的决策时不改 PROJECT,只写提交说明文件;
-//                                     加 --commit 时由脚本暂存它改动的 PROJECT.md、用该文件提交并核对(其余文件由调用方先暂存)
+//                                     加 --commit 时由脚本暂存它改动的 PROJECT.md、用该文件提交并核对(其余文件由调用方先暂存);
+//                                     --commit 必须带 --title,没有标题时拒绝执行、不做任何改动
 //   node decisions.mjs check          提交后核对:「待提交」已清空、「最近决策」不超过上限、HEAD 正文含全部 Decision 行
 //   node decisions.mjs regen          只按 git 历史重新生成「最近决策」,「待提交」不动(task.mjs 同步后使用)
 // 非 canonical 分支上不迁出,不必先跑 plan:apply 不改 PROJECT,只写提交说明文件(标题、三行、说明段、trailer)并输出 branch_mode。
@@ -27,7 +28,8 @@
 //   --partial NEW:OLD     决策 NEW 部分调整 OLD:正文加 `Adjusts: OLD by NEW`,OLD 的索引行末尾显示“(部分被决策 NEW 调整)”
 //   --mention NEW:OLD     决策 NEW 只是提到 OLD,两者都有效:不加 trailer,只是不再列入 next
 //   --trailer "K: V"      追加到正文末尾 trailer 段(如 Co-Authored-By),可重复
-//   --title "..."         提交标题(模型撰写);--intro "..." 可选说明段。写入提交说明文件,不经 shell 管道拼接
+//   --title "..."         提交标题(模型撰写);迁出决策时标题末尾的〔决策 N〕由脚本补上(已写了就不重复)。
+//                         --intro "..." 可选说明段。写入提交说明文件,不经 shell 管道拼接
 //   --goal / --progress / --remaining "..."   分支上:检查点的目标、进度、还剩(见上)
 //   --limit N             「最近决策」上限,默认 10
 //   --task "..."          分支上换了任务时指定新任务名(默认沿用上一个检查点的任务名);写整个任务,不写当前这一步
@@ -373,7 +375,15 @@ function commitNow(projectChanged, allowEmpty = false) {
 const p = parse();
 if (p.error) { emit(p); process.exit(1); }
 
+// 标题末尾的〔决策 N〕由脚本补上:标题里没有这个标记时加在末尾,写错的旧标记先去掉
+const withTag = (title, tag) => (!title || !tag || title.includes(tag) ? title : `${title.replace(/\s*〔决策[^〕]*〕/g, "").trimEnd()}${tag}`);
+
 if (cmd === "plan" || cmd === "apply") {
+  // 没有标题就提交时,提交说明的第一段(三行、决策正文或 `Task:` 行)会被 Git 当成标题,分支上的 `Task:` 也不再是 trailer、检查点之后找不到
+  if (cmd === "apply" && opt.commit && !opt.title.trim()) {
+    emit({ applied: false, committed: false, error: "title_required", hint: "--commit 必须带 --title \"<提交标题>\";未做任何改动" });
+    process.exit(2);
+  }
   const r = compute(p);
   if (cmd === "apply") {
     if (r.problems.length) { emit({ applied: false, problems: r.problems, collisions: r.collisions, next: r.next }); process.exit(1); }
@@ -385,11 +395,12 @@ if (cmd === "plan" || cmd === "apply") {
       emit(out);
       process.exit(out.committed === false ? 1 : 0);
     }
+    const title = withTag(opt.title, r.title_tag);
     writeProject(p, r);
-    writeFileSync(messagePath, [opt.title, block.lines.join("\n"), opt.intro, r.body].filter(Boolean).join("\n\n"));
+    writeFileSync(messagePath, [title, block.lines.join("\n"), opt.intro, r.body].filter(Boolean).join("\n\n"));
     writeFileSync(statePath, JSON.stringify({ numbers: r.pending.map((d) => d.number), limit: opt.limit }));
     const after = parse();
-    const out = { applied: true, ...(r.land_mode ? { land_mode: r.land_mode } : {}), message_file: messagePath, has_title: Boolean(opt.title), pending_left: after.pending.length, recent_count: after.recentLines.length, limit: opt.limit, removed: r.removed.map((x) => x.line), added: r.added, title_tag: r.title_tag };
+    const out = { applied: true, ...(r.land_mode ? { land_mode: r.land_mode } : {}), message_file: messagePath, has_title: Boolean(opt.title), ...(title ? { title } : {}), pending_left: after.pending.length, recent_count: after.recentLines.length, limit: opt.limit, removed: r.removed.map((x) => x.line), added: r.added, title_tag: r.title_tag };
     if (r.land_mode && opt.commit) out.next = "提交后运行 node .agents/skills/wrapup/scripts/task.mjs land --finish";
     if (opt.commit) Object.assign(out, commitNow(after.text !== p.text, Boolean(r.land_mode)));
     emit(out);

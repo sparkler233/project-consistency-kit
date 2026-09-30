@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-09-29
+// 一致性机制 version: 2026-09-30
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -390,6 +390,31 @@ try {
   git(ab, "reset", "-q", "--hard", "main");
   assert.equal(json(ab, scope, ["--overview"]).current_branch_state.task, null, "a checkpoint reset away is not the current task");
   assert.equal(json(ab, decisions, ["plan"]).branch_mode.task, "agent/废弃");
+
+  // 12. --commit 必须带标题(没有标题时提交说明的第一段会被当成标题);迁出决策时标题末尾的〔决策 N〕由脚本补上
+  const tt = createRepo([]);
+  setPending(tt, [entry(1, "第一条")]);
+  const ttBefore = { head: git(tt, "rev-parse", "HEAD"), project: fs.readFileSync(path.join(tt, "PROJECT.md"), "utf8") };
+  const ttNoTitle = json(tt, decisions, ["apply", "--commit"], 2);
+  assert.equal(ttNoTitle.error, "title_required");
+  assert.equal(ttNoTitle.committed, false);
+  assert.equal(json(tt, decisions, ["apply", "--commit", "--title", "   "], 2).error, "title_required", "a blank title is no title");
+  assert.equal(git(tt, "rev-parse", "HEAD"), ttBefore.head, "no commit without a title");
+  assert.equal(fs.readFileSync(path.join(tt, "PROJECT.md"), "utf8"), ttBefore.project, "PROJECT is untouched when the title is missing");
+  const ttTagged = json(tt, decisions, ["apply", "--commit", "--title", "记下第一条"]);
+  assert.equal(ttTagged.committed, true);
+  assert.equal(ttTagged.title, "记下第一条〔决策 1〕");
+  assert.equal(git(tt, "log", "-1", "--format=%s"), "记下第一条〔决策 1〕", "the script appends the decision tag");
+  setPending(tt, [entry(2, "第二条")]);
+  json(tt, decisions, ["apply", "--commit", "--title", "记下第二条〔决策 2〕"]);
+  assert.equal(git(tt, "log", "-1", "--format=%s"), "记下第二条〔决策 2〕", "a tag already in the title is not repeated");
+  setPending(tt, [entry(3, "第三条"), entry(4, "第四条")]);
+  json(tt, decisions, ["apply", "--commit", "--title", "记下两条〔决策 3〕"]);
+  assert.equal(git(tt, "log", "-1", "--format=%s"), "记下两条〔决策 3/4〕", "a wrong tag is replaced with the script's");
+  fs.writeFileSync(path.join(tt, "a.md"), "x\n");
+  git(tt, "add", "a.md");
+  json(tt, decisions, ["apply", "--commit", "--title", "只是改文件"]);
+  assert.equal(git(tt, "log", "-1", "--format=%s"), "只是改文件", "no decision migrated, the title is kept as written");
 
   console.log("wrapup scripts tests passed");
 } finally {

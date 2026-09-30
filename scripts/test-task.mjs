@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-09-29
+// 一致性机制 version: 2026-09-30
 // 并行生命周期回归测试(决策 107–110):开工 → 工作 → 谁合并谁负责(land:自动检查点 → 同步 → 合并版 wrapup → 快进主线、推进 synced)
 // → 收工;以及每轮提示只在相关时出现、合并冲突在本分支解决、快进失败后重试(不相关时跳过重新检查、相关时要求重新检查)、
 // 「最近决策」冲突由脚本重新生成、主线目录不干净时拒绝、主线没检出时直接更新引用、合并后继续工作与新分支不沿用别人的任务名。
@@ -11,6 +11,7 @@ import path from "node:path";
 import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { gitAtLeast } from "../.agents/skills/wrapup/scripts/checkpoints.mjs";
 
 const kitRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const S = (name) => path.join(kitRoot, ".agents", "skills", "wrapup", "scripts", name);
@@ -71,6 +72,14 @@ try {
   assert.match(help, /node task\.mjs land --finish/);
   assert.doesNotMatch(help, /integrate|--ready/, "已去掉集成命令与可集成标记");
   assert.doesNotMatch(help, /提交说明经 stdin/, "--help 不带实现注释");
+  assert.doesNotMatch(help, /决策 ?\d/, "分发文件不写套件仓库的决策编号");
+  // Git 版本判断:低于 2.38 时 task.mjs 拦下并说明(同步的冲突格式要 2.35,试合并要 2.38)
+  assert.match(help, /Git 2\.38/);
+  assert.equal(gitAtLeast("git version 2.34.1", 2, 38), false);
+  assert.equal(gitAtLeast("git version 2.38.0", 2, 38), true);
+  assert.equal(gitAtLeast("git version 2.54.0 (Apple Git-157)", 2, 38), true);
+  assert.equal(gitAtLeast("git version 3.0.1", 2, 38), true);
+  assert.equal(gitAtLeast("", 2, 38), null, "认不出版本时不拦");
   assert.equal(node(repo, "decisions.mjs", ["plan", "--ready"], 2).error.startsWith("unknown_or_incomplete_option"), true, "--ready 已去掉");
   assert.match(node(repo, "decisions.mjs", ["plan", "--land"]).problems.join(), /只用于分支/);
 
@@ -104,6 +113,8 @@ try {
   assert.equal(la.status, "needs_wrapup");
   assert.equal(la.reason, "first_check");
   assert.equal(la.auto_checkpoint.files, 2, "未提交的改动先自动提交为检查点(决策 110)");
+  assert.doesNotMatch(la.next, /决策 ?\d/, "脚本给模型看的提示里不写套件仓库的决策编号");
+  assert.match(la.next, /apply --land --commit --title/, "提示里带上必须给的标题选项");
   assert.match(git(a, "log", "-1", "--format=%B"), /^合并前检查点:提交未提交的改动\n\n目标:按口径 A 改写第三章第二行\n\nTask: 改写第三章/);
   ov = node(repo, "scope.mjs", ["--overview"]);
   assert.deepEqual(ov.other_branches.find((x) => x.branch === "task/a").pending_decisions, ["2026-09-28 · 决策 2:第三章按口径 A"], "看得到分支上还没进主线的决策");
@@ -131,6 +142,8 @@ try {
   assert.equal(git(repo, "status", "--porcelain"), "");
   assert.match(read(repo, "PROJECT.md"), /### 待提交\n\n\(暂无\)/);
   assert.match(read(repo, "PROJECT.md"), /第三章按口径 A\(决策 2\)/);
+  // 最近提交沿 first-parent:这次并进主线只占一行(合并提交),不逐条列出分支上的开工、合并前检查点与合并版 wrapup
+  assert.deepEqual(node(repo, "scope.mjs", ["--overview"]).recent_commits.map((c) => c.subject), ["并入 A:第三章按口径 A〔决策 2〕", "初始"]);
   // 合并后在同一分支继续:检查点仍是本任务;从主线新开的分支不会读到别人的任务名
   assert.equal(node(a, "scope.mjs", ["--overview"]).current_branch_state.task.name, "改写第三章");
   const nPath = task(repo, ["start", "task/n"]).worktree;
@@ -307,6 +320,21 @@ try {
   assert.deepEqual(cq.remaining_task_branches, [], "home 已切回主线、没有未合并的内容,不算任务分支");
   assert.match(cq.note, /回到单线程/);
   assert.equal(exists(repo, "refs/heads/task/q"), false);
+
+  // --commit 必须带标题:分支上没有标题时 `Task:` 行会成为标题、不再是 trailer,这个检查点之后找不到
+  const tw = task(repo, ["start", "task/t"]).worktree;
+  write(tw, "t.md", "t\n");
+  git(tw, "add", "-A");
+  const headT = rev(tw, "HEAD");
+  const refused = node(tw, "decisions.mjs", ["apply", "--commit"], 2);
+  assert.equal(refused.error, "title_required");
+  assert.equal(refused.committed, false);
+  assert.equal(rev(tw, "HEAD"), headT, "没有标题就不提交");
+  assert.equal(node(tw, "decisions.mjs", ["apply", "--commit", "--title", "T 的检查点"]).committed, true);
+  const stT = node(tw, "scope.mjs", ["--overview"]).current_branch_state;
+  assert.equal(stT.task.name, "task/t", "带标题提交的检查点找得到");
+  assert.equal(stT.handoff_missing, false);
+  assert.equal(task(repo, ["close", "task/t", "--abandon"]).abandoned, true);
 
   console.log("并行生命周期测试通过");
 } finally {

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-09-29
+// 一致性机制 version: 2026-09-30
 // 一次输出 catchup / wrapup 需要的 Git 范围,JSON 格式,模型直接取值,不再抄写哈希。
 // 用法:node scope.mjs            → 基线、基线后提交、改动清单、工作区(含未跟踪文件摘要)
-//       node scope.mjs --overview → 另加最近 15 条提交标题、本 worktree「待提交」里的决策(pending_decisions)、目录一层清单、分支状态(当前分支的任务检查点与和主线的关系,
+//       node scope.mjs --overview → 另加最近 15 条提交标题(沿 first-parent:一次并进主线只占一行,被合并进来的分支提交不逐条列出)、
+//                                   本 worktree「待提交」里的决策(pending_decisions)、目录一层清单、分支状态(当前分支的任务检查点与和主线的关系,
 //                                   其他分支的任务、领先 / 落后、是否已全部进主线、未提交改动、还没进主线的决策)、推送异常;
-//                                   不变式的提醒(决策 109):分支有主线之外的提交却找不到检查点(handoff_missing,如 rebase 之后),
+//                                   不变式的提醒:分支有主线之外的提交却找不到检查点(handoff_missing,如 rebase 之后),
 //                                   与别的分支共有还没进主线的提交(shares_unmerged_with,分支之间直接合并过,对方的决策会被一起带进主线);
 //                                   分支上另给主线一侧改动命中的联动规则(rules_hit_by_canonical)
 // 默认模式另给 hints:整理线索(本次涉及的文档中大量重复的行、没有被任何文档引用的文档),只供模型判断是否提醒整理;
@@ -17,7 +18,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, openSync, readSync, closeSync, lstatSync, readlinkSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { LINKAGE, parseLinkage, ruleHits, notChecked } from "./linkage.mjs";
-import { taskState as taskStateAt, remainingLine, pendingDecisions, pendingIn, leadingComments } from "./checkpoints.mjs";
+import { taskState as taskStateAt, remainingLine, pendingDecisions, pendingIn, leadingComments, gitAtLeast } from "./checkpoints.mjs";
 
 // --help 只打印开头这段说明,不做任何改动;不认识的参数报错且不执行
 {
@@ -149,8 +150,7 @@ function worktree() {
 const taskState = (ref) => taskStateAt(root, ref);
 
 function tryMerge(a, b) {
-  const v = (git(["version"]) || "").match(/(\d+)\.(\d+)/);
-  if (!v || Number(v[1]) < 2 || (Number(v[1]) === 2 && Number(v[2]) < 38)) return { status: "unavailable", reason: "git_older_than_2.38" };
+  if (gitAtLeast(git(["version"]), 2, 38) !== true) return { status: "unavailable", reason: "git_older_than_2.38" };
   const r = spawnSync("git", ["-c", "core.quotepath=false", "merge-tree", "--write-tree", "--name-only", "--no-messages", "-z", a, b], { cwd: root, encoding: "utf8", windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
   if (r.status === 0) return { status: "clean" };
   if (r.status === 1) return { status: "conflict", conflicts: [...new Set((r.stdout || "").split("\0").filter(Boolean).slice(1))] };
@@ -236,7 +236,8 @@ function overviewInfo(guard) {
   // 本 worktree「待提交」里还没迁出的决策(读工作区的 PROJECT.md,含未提交的改动)
   let pending_decisions = [];
   try { pending_decisions = pendingIn(readFileSync(path.join(root, "PROJECT.md"), "utf8")); } catch {}
-  return { recent_commits: commits("HEAD", ["-15"]), pending_decisions, top_files, tree, ...branches, anomalies };
+  // 最近提交沿 first-parent:并进主线的合并提交与它的第二父提交标题相同,再加同步提交,逐条列出会把一次合并写成两三行
+  return { recent_commits: commits("HEAD", ["-15", "--first-parent"]), pending_decisions, top_files, tree, ...branches, anomalies };
 }
 
 const MECH = [".agents/", ".claude/", ".codex/", "一致性机制/"];

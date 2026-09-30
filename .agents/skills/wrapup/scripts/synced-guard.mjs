@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-09-29
-// synced 的唯一操作入口:检查能否推进、按条件创建或推进本地 `synced` 标签。输出 JSON。
+// 一致性机制 version: 2026-09-30
+// synced 的操作入口:检查能否推进、按条件创建或推进本地 `synced` 标签。输出 JSON。
+// 另有一处推进:并行时 `task.mjs land --finish` 在主线快进到合并提交之后推进 synced(它在任务分支的 worktree 里运行,不满足这里「在主线上」的条件)。
 // 用法:node synced-guard.mjs inspect   只检查,不做改动
 //       node synced-guard.mjs advance   条件满足时创建或推进 synced
 //       node synced-guard.mjs --help    只打印本段说明,不做任何改动;其他参数报错且不执行

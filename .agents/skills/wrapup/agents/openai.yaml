@@ -1,4 +1,4 @@
-# 一致性机制 version: 2026-09-29
+# 一致性机制 version: 2026-09-30
 interface:
   display_name: "Wrap Up"
   short_description: "Review linkage and close the current work cycle"

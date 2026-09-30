@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-09-29
+// 一致性机制 version: 2026-09-30
 // Project Consistency Kit cross-platform Stop hook.
 // Always fails open: it only emits one systemMessage per dirty cycle.
 // Baseline: `synced` on the canonical branch; on other branches the latest task checkpoint
@@ -134,7 +134,7 @@ function main() {
   const entry = isClaude ? "/wrapup" : "$wrapup";
   process.stdout.write(
     asciiJson({
-      systemMessage: `⚠️ 一致性机制:${count} 个文件自上次同步后有改动,收尾前建议执行 ${entry}`,
+      systemMessage: `⚠️ 一致性机制:${count} 个文件自上次收尾后有改动,结束前建议执行 ${entry}`,
     }),
   );
 }

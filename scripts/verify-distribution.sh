@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-09-29
+# 一致性机制 version: 2026-09-30
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -169,6 +169,22 @@ archive_template="$kit_dir/templates/一致性机制/决策档案.md"
 if [ -f "$archive_template" ] && grep -Eq '^- 20[0-9]{2}-' "$archive_template"; then
   fail "decision archive template contains project history"
 fi
+
+# 装进用户项目的文件不写套件仓库的决策编号:用户项目的决策也从 1 编号,模型会把它当成自己项目的决策。
+# 不查:套件自己的版本史(CHANGELOG.md)、示例里的虚构决策(docs/example-session.md)、
+# 升级细则里两条要逐字比对的历史行。
+decision_refs=$(
+  cd "$kit_dir"
+  grep -rnE '决策 ?[0-9]' . \
+    --exclude=CHANGELOG.md --exclude=example-session.md \
+    --exclude=DISTRIBUTION-MANIFEST.sha256 --exclude=DISTRIBUTION-METADATA.txt \
+    | grep -vF \
+      -e '启用套件级统一版本行与 CHANGELOG 治理(决策 9)' \
+      -e '加入 Stop 收尾提醒与决策记录轮转归档(决策 10/11)' \
+    || true
+)
+[ -z "$decision_refs" ] || fail "distributed file mentions a kit decision number:
+$decision_refs"
 
 printf 'verify-distribution: kit_version=%s revision=%s source_ref=%s source_commit=%s files=%s\n' \
   "$kit_version" "$mechanism_revision" "$source_ref" "$source_commit" \

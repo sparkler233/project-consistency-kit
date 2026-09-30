@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-09-29
+// 一致性机制 version: 2026-09-30
 // Task State 回归测试(决策 85):分支检查点写入 `Task:` trailer,scope.mjs --overview 读出任务状态,经过集成周期仍能读出(决策 105 起 parallel.mjs 并入 overview)。
 
 import assert from "node:assert/strict";

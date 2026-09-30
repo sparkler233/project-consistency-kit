@@ -25,7 +25,7 @@ catchup  ->  正常工作  ->  wrapup
 
 1. 新 Session 开始时运行 catchup。它先读 `PROJECT.md`、运行规则和脚本给出的 Git 概况,汇报自上次收尾以来的变化、当前状态和建议的下一步,再按任务读需要的细节。在 feature branch 上,它还会读出这个分支最近一次收尾写下的目标、进度与还剩,以及主线自分叉以来的变化与本分支是否相关;在 canonical branch 上,它列出其他分支各自的任务与进度。这个过程只读,不修改文件。上下文被压缩后不用重跑,Agent 按 `AGENTS.md` 里的指令重读 PROJECT 与运行规则即可。
 2. 中间照常和 Agent 协作。拍板的决策会立即写进 `PROJECT.md` 的「待提交」区,不等收尾。
-3. 一段工作结束时运行 wrapup。canonical branch 比较自上次 `synced` 以来的全部改动;并行 feature branch 改用它与 canonical 的 merge-base。它把维护计划、拟提交文件、完整提交说明和 `synced` 条件一次展示给你,一次确认后才写入文件、把决策全文迁入提交说明并创建本地提交;只有 canonical branch 能通过确定性 guard 推进 `synced`。在 feature branch 上收尾时,这次提交就是任务检查点;任务还没做完或之后可能换 Session 接手时,提交说明里写上目标、进度、还剩三行,供接手时读取。数行数、生成提交说明这类机械步骤由随附脚本完成。
+3. 一段工作结束时运行 wrapup。canonical branch 比较自上次 `synced` 以来的全部改动;并行 feature branch 改用它与 canonical 的 merge-base。在 canonical branch 上,它把维护计划、拟提交文件、完整提交说明和 `synced` 条件一次展示给你,一次确认后才写入文件、把决策全文迁入提交说明并创建本地提交;只有 canonical branch 能通过确定性 guard 推进 `synced`。在 feature branch 上收尾时,这次提交就是任务检查点,不等确认、提交后报告;任务还没做完或之后可能换 Session 接手时,提交说明里写上目标、进度、还剩三行,供接手时读取。数行数、生成提交说明这类机械步骤由随附脚本完成。
 
 | 运行环境 | 会话初始化引入 | 会话收尾 |
 | --- | --- | --- |
@@ -37,7 +37,7 @@ catchup  ->  正常工作  ->  wrapup
 
 ## 安装
 
-需要 Git 和 Node.js。macOS、Linux 用户还需要 `curl`、`tar` 以及 `sha256sum` 或 `shasum`；Windows 用户需要 Git for Windows。
+需要 Git 和 Node.js；实验性的多会话并行需要 Git 2.38 及以上。macOS、Linux 用户还需要 `curl`、`tar` 以及 `sha256sum` 或 `shasum`；Windows 用户需要 Git for Windows。
 
 先把安装器装到用户级 Skill 目录：
 
@@ -68,21 +68,21 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 | `.agents/skills/catchup/` | 定义如何恢复项目状态 |
 | `.agents/skills/wrapup/` | 定义如何检查联动、迁出决策、确认提交并推进 `synced`;随附范围(含联动规则的路径匹配)、决策与 guard 脚本和文档整理细则 |
 | `一致性机制/文件联动目录.md` | 记录哪些文件变化时需要一起检查其他内容;规则的触发写出文件或目录路径时,wrapup 会列出本次改动命中的规则 |
-| `.agents/hooks/` 和宿主配置 | 检测到未同步改动时提醒运行 wrapup;Windows Codex 通过薄 PowerShell 适配器转到同一 Node 逻辑 |
+| `.agents/hooks/` 和宿主配置 | 三项提醒:有还没收尾的改动时提醒运行 wrapup;并行时主线的变化与本分支相关就提示;上下文被压缩后提醒重读规则。Windows Codex 通过薄 PowerShell 适配器转到同一 Node 逻辑 |
 | `一致性机制/VERSION` | 记录项目当前安装的套件版本 |
 
 `synced` 是一个本地 Git 标签，表示 canonical branch 上一次已经完成项目级联动检查的位置。它和 `HEAD` 分开，因此中途手工提交过的改动不会被 wrapup 跳过。canonical branch 由用户确认后保存在当前 clone 的 Git config;guard 会检查 branch、祖先关系、冲突和工作区状态,再用原子 ref 更新推进 tag。非 canonical branch 可以保存 branch checkpoint,但不会移动项目级 horizon。
 
 ## 支持范围
 
-- Codex 可以直接发现仓库级 catchup 和 wrapup Skill；项目 hook(收尾提醒、并行时的每轮提示、上下文压缩后的提醒)通过 `.codex/hooks.json` 接入，首次使用或配置变化后需要用户审查并信任。
+- Codex 可以直接发现仓库级 catchup 和 wrapup Skill；项目 hook(收尾提醒、并行时的每轮提示、上下文压缩后的提醒)通过 `.codex/hooks.json` 接入，首次使用或配置变化后需要用户审查并信任；没批准时 hook 不运行，也不报错。Codex 桌面端可能不弹出审查窗口，这时在项目目录的终端里打开 Codex，用 `/hooks` 批准一次即可。
 - Claude Code 通过 `/catchup`、`/wrapup` 和 `CLAUDE.md` 适配同一套规则，hook 配置位于 `.claude/settings.json`。
 - 其他能读取 `AGENTS.md` 或 Agent Skills 的运行环境可以复用项目规则和工作流；如果没有等价的生命周期 hook，就不会获得自动收尾提醒。
 - 核心脚本支持 macOS、Linux 和原生 Windows。Windows Codex 使用仓库内 `.ps1` 薄适配器，避免会话 PowerShell 预先展开内联命令中的变量；Hook 还需用户完成项目与命令信任。
 
 ## 它不会做什么
 
-- wrapup 不会自动推送远端，也不会在用户确认前修改文件或创建提交。
+- wrapup 不会自动推送远端；在 canonical branch 上不会在用户确认前修改文件或创建提交(并行的任务分支上，收尾提交是任务检查点，不等确认、提交后报告)。
 - catchup 只能从仓库恢复已经落盘的信息，无法找回早已丢失的旧会话内容。
 - 文件联动规则需要结合项目实际情况维护，安装器无法替项目决定所有领域关系。
 - `synced` 默认是本地标签。多台机器共同使用时，需要自行同步标签并处理不同设备的基准差异。
@@ -93,7 +93,7 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 
 2.0.0-preview.3 起提供实验性的并行:你同时驾驶几个会话,每个会话在自己的 branch + worktree 上工作,主线上不放会话;对哪个会话说「并进主线」,就由它自己同步主线、检查、合并并推进 `synced`。机制只守三条:主线只通过检查过的合并前进;停下时把目标、进度、还剩写进分支上的检查点;不动别的分支和别人未提交的改动。开工、同步、合并、收工由 `task.mjs` 完成;主线变化与某个分支相关时,那个会话在下一轮开始时收到提示(你也看得到);要不要同步由你决定。
 
-这部分还是实验性的:只在 macOS 上经过少量真实会话验证,每种设置只跑过一次;两个会话先后合并时,`PROJECT.md` 总体状态一段常要解冲突;长会话被压缩后模型是否仍守规则还没验证;Codex 沙箱下并进主线需要把主线目录设为可写;Claude Code 桌面版把 worktree 建在仓库内的 `.claude/worktrees/`,需要加进 `.gitignore`。
+这部分还是实验性的:只在 macOS 上经过少量真实会话验证,每种设置只跑过一次;两个会话先后合并时,`PROJECT.md` 总体状态一段常要解冲突;上下文压缩后的提醒已在 Codex 上见到送达,但压缩后模型是否仍照规则做还没验证;需要 Git 2.38 及以上;Codex 沙箱下并进主线需要把主线目录设为可写;Claude Code 桌面版把 worktree 建在仓库内的 `.claude/worktrees/`,需要加进 `.gitignore`。
 
 两个 Session 直接操作同一个 worktree 仍不受支持:它们会共享未提交文件和索引,机制无法可靠判断改动归属。
 
@@ -114,7 +114,7 @@ Git 和脚本能够检查文件是否发生变化，却无法仅凭确定性程�
 1. 先更新机器上的安装器(重新运行上面的 `npx skills add` 命令)。v1.3.0 的安装器会因为新包里没有决策档案模板而拒绝它。
 2. 在项目里告诉 Agent:“给这个项目引入一致性机制,使用 v2.0.0-preview.3”。预览版在 GitHub 上标为预发布,不会被当作“最新版”自动取用。
 
-**从 v1.3.0 升级**:安装器会把 `PROJECT.md` 改为入口式,把决策档案逐字写进升级提交后删除,并清理 AGENTS 里旧模板带来的机制条款;所有删除都会先列进计划,经你确认。更早的版本请先升到 v1.3.0。**从 v2.0.0-preview.1 或 preview.2 升级**:只替换机制文件,并补上每轮提示与压缩后提醒两个 hook 的接线,PROJECT、AGENTS 与联动目录的内容不动;联动目录里你自己的规则可以改成新模板的「小标题 + 触发 + 动作」写法,安装器会列出来由你决定。2.0 不提供降级;升级是单独的一次提交,需要时用 `git revert` 撤销它。预览版之间可能不兼容,每个预览版只保证能从上一站升级上来。
+**从 v1.3.0 升级**:安装器会把 `PROJECT.md` 改为入口式,把决策档案逐字写进升级提交后删除(也可以选择保留为只读旧历史),并清理 AGENTS 里旧模板带来的机制条款;所有删除都会先列进计划,经你确认。更早的版本请先升到 v1.3.0。**从 v2.0.0-preview.1 或 preview.2 升级**:只替换机制文件,并补上每轮提示与压缩后提醒两个 hook 的接线,PROJECT、AGENTS 与联动目录的内容不动;联动目录里你自己的规则可以改成新模板的「小标题 + 触发 + 动作」写法,安装器会列出来由你决定。2.0 不提供降级;升级是单独的一次提交,需要时用 `git revert` 撤销它。预览版之间可能不兼容,每个预览版只保证能从上一站升级上来。
 
 ## 进一步阅读
 

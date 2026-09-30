@@ -1,4 +1,4 @@
-# 一致性机制 version: 2026-09-29
+# 一致性机制 version: 2026-09-30
 name: Validate and publish clean distribution
 
 on:
@@ -40,6 +40,9 @@ jobs:
           scripts/build-distribution.sh \
             --output-dir "$RUNNER_TEMP/project-consistency-release" \
             --source-ref "$SOURCE_REF"
+          # 再按安装时的口径校验一次:获取脚本里按版本要求的文件清单是手写的,与分发清单不一致时在这里发现
+          bash skills/project-consistency-installer/scripts/fetch-kit.sh \
+            --verify-dir "$RUNNER_TEMP/project-consistency-release/project-consistency-kit"
 
   validate-windows:
     name: Validate Windows adapters

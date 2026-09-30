@@ -4,7 +4,7 @@
 > 任何机制文件发生真实变化:判断 SemVer 影响、全部修订日期一起 bump 到当天,并在此记入对应版本。
 > 本文件**套件专属,不随模板进项目**(绿地 rsync 已排除;安装器也不拷它)。
 
-## v2.0.0-preview.3 — 2026-09-29
+## v2.0.0-preview.3 — 2026-09-30
 
 **预发布(决策 115)。** 加入 Core 并行(实验性):一个人同时驾驶多个会话,各在自己的分支与 worktree 上工作,谁合并谁负责。与 preview.1 / preview.2 兼容:PROJECT、AGENTS 与联动目录的结构不变,升级替换机制文件、补上两个新 hook 的接线;从 v1.3.0 仍按升级细则。GitHub 上仍标为 prerelease,须 `--release v2.0.0-preview.3` 明确获取。
 
@@ -16,13 +16,23 @@
   - `scope.mjs --overview`:每个分支另报是否已全部进主线、未提交改动、还没进主线的决策、找不到检查点(`handoff_missing`)与和别的分支共有未进主线的提交(`shares_unmerged_with`);分支上另报主线一侧命中的联动规则(`rules_hit_by_canonical`);新增本 worktree「待提交」里的决策(`pending_decisions`)。
   - `decisions.mjs`:分支上的检查点不必先跑 `plan`,三行由 `--goal` / `--progress` / `--remaining` 传入,没给的行沿用上一个检查点;`--land` 合并模式在分支上迁出决策并记下 `Land-Checked`;`--commit` 由脚本暂存 PROJECT、提交并核对;`plan` 的 `next` 列出要处理的事(新决策提到旧决策、撞号、认不出的内容),新增 `--mention` 表示只是提到;「最近决策」改为按 git 历史整段生成,被手改坏或合并冲突后下一次提交自动恢复;新增 `regen`。
   - wrapup:分支上的提交(含并进主线)不先确认,事后报告,主线上照旧确认一次(决策 111);描述写明用户说「收尾」「并进主线」时使用;分支段与决策问题的处理说明移进脚本输出,Skill 文字减少。catchup 报告各分支是否已进主线、未提交改动、还没进主线的决策与不变式提醒。
-  - 已知限制:Windows 上未经真实会话验证(由 CI 跑回归测试);Codex 与 Claude Code 实测每种设置只跑过一次;联动内容是否真正核对仍靠模型;长会话压缩后模型是否照规则做未验证;两个会话先后合并时 PROJECT 总体状态一段常有冲突;用户拍板的事可能没被记成决策;hook 只在项目受信任时运行;Codex 沙箱下并进主线须把主线目录列为可写;Claude Code 桌面版的 worktree 在仓库内 `.claude/worktrees/`,须加进 `.gitignore`(安装器会列入计划)。
+  - 已知限制:需要 Git 2.38 及以上;Windows 上未经真实会话验证(由 CI 跑回归测试);Codex 与 Claude Code 实测每种设置只跑过一次;联动内容是否真正核对仍靠模型;压缩后的提醒已在 Codex 上见到送达,之后模型是否照规则做未验证;两个会话先后合并时 PROJECT 总体状态一段常有冲突;用户拍板的事可能没被记成决策;hook 只在项目受信任时运行,Codex 桌面端可能不弹出 hook 审查窗口,要在终端里打开 Codex 批准一次;Codex 沙箱下并进主线须把主线目录列为可写;Claude Code 桌面版的 worktree 在仓库内 `.claude/worktrees/`,须加进 `.gitignore`(安装器会列入计划)。
 - **安装器**:新增文件与三项 hook 接线(Stop、UserPromptSubmit、SessionStart);从 preview.1 / preview.2 升级时补上新接线;`.gitignore` 缺 `.claude/worktrees/` 时列入计划。`fetch-kit.sh` 对 preview.3 起的包要求新增的 5 个文件。
-- **分发**:清单新增 `task.mjs`、`checkpoints.mjs`、`parallel-notice.mjs`、`compact-reminder.mjs`、`run-hook.ps1`(41 个文件);全部机制文件修订日期统一为 2026-09-29。并行的回归测试并入 CI(Linux 与 Windows)。
+- **分发**:清单新增 `task.mjs`、`checkpoints.mjs`、`parallel-notice.mjs`、`compact-reminder.mjs`、`run-hook.ps1`(41 个文件);全部机制文件修订日期统一为 2026-09-30。并行的回归测试并入 CI(Linux 与 Windows)。
+- **发布前审查的修正(2026-09-30,决策 116)**:
+  - `decisions.mjs apply --commit` 没有 `--title` 时拒绝执行、不做任何改动。此前会照样提交:提交说明的第一段被 Git 当成标题;新分支上说明只有一行 `Task:` 时它不再是 trailer,这个检查点之后找不到(`handoff_missing`)。迁出决策时标题末尾的〔决策 N〕由脚本补上,写错的会被换掉。
+  - `scope.mjs --overview` 的最近提交沿 first-parent,一次并进主线只占一行。此前合并提交与它的第二父提交标题相同,再加同步提交与合并前检查点,一次合并占两三行。
+  - 分发文件里删去套件仓库自己的决策编号(wrapup Skill、`task.mjs` 的输出与说明、`scope.mjs` 的说明、两个 hook 的注释,共 7 处):用户项目的决策也从 1 编号,模型会把它当成自己项目的决策。分发校验脚本新增这项检查。
+  - Claude Code 的 `/wrapup` 命令描述写明用户说「收尾」「并进主线」时使用(此前只有 Codex 读的 Skill 描述写了)。
+  - `task.mjs` 开头检查 Git 版本,低于 2.38 时拦下并说明(`git_older_than_2.38`)。此前低于 2.35 时同步会以看不懂的错误失败。
+  - 收尾提醒的文字改为「N 个文件自上次收尾后有改动,结束前建议执行 wrapup」。原为「自上次同步后」,而「同步」现在指同步主线。
+  - 安装器:计划末尾与最终报告把 Codex 的 hook 审查单独列为需要用户做的一步(桌面端可能不弹出审查窗口,在终端里打开 Codex 批准一次;没批准时三项 hook 都不运行,也不报错);Git 低于 2.38 时注明并行用不了。初始化指南同样写明。
+  - 说法更正:运行规则里机制的 hook 接线写全三项;`synced-guard.mjs` 与安装器不再称 guard 是 synced 的唯一入口(并行时 `task.mjs land --finish` 也推进它);公开 README 写明只有主线上才先确认、分支上的收尾不等确认,决策档案可以保留为只读,并行需要 Git 2.38。
+  - CI:Linux 任务也对构建出的包跑 `fetch-kit.sh --verify-dir`(此前只有 Windows 任务跑)。
 
 以下为 preview.2 之后、与并行无关的修复:
 
-- **发布脚本**(套件仓库内部工具,不在分发包里):`scripts/publish-public.sh` 默认把内部历史接在最初的公开 main 之后,不再接在公开仓库当前的 main 之后(那样会把已公开的提交整段再重放一遍);生成后检查公开 main 原样包含在新历史里、新提交不重复已公开的提交,否则报错;没有新提交时说明无需推送。`--base-ref` 改为 `--base` 与 `--public-ref`。
+- **发布脚本**(套件仓库内部工具,不在分发包里):`scripts/publish-public.sh` 默认把内部历史接在最初的公开 main 之后,不再接在公开仓库当前的 main 之后(那样会把已公开的提交整段再重放一遍);生成后检查公开 main 原样包含在新历史里、新提交不重复已公开的提交,否则报错;没有新提交时说明无需推送。`--base-ref` 改为 `--base` 与 `--public-ref`。另按只放在本机的私人信息词表(内部仓库的 `.git/info/pck-private-words`,或 `--words` 指定)检查新增提交的说明与改动:触及公开文件的提交,它的说明会原样公开;出现词表中的词、或没有词表时报错,不打印推送命令(决策 116)。
 - **决策脚本**(`decisions.mjs`,边界情况修复):
   - 「待提交」「最近决策」里有认不出的内容(如编号列表、段落)时列入 problems 且 apply 不执行。此前 plan 不报错、apply 会把它当空区清掉,内容既不在 PROJECT 也不进提交正文。
   - HEAD 不在任何分支上(detached)时不迁出决策。此前按主线处理,决策会迁进一个不在任何分支上的提交。

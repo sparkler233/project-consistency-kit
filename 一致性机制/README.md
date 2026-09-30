@@ -1,6 +1,6 @@
 # 一致性机制 —— 套件仓库的机制索引
 
-<!-- 一致性机制 version: 2026-09-29 -->
+<!-- 一致性机制 version: 2026-09-30 -->
 
 > 本文件是套件仓库的内部索引,给维护者看,2.0 起不再装进用户项目(决策 77)。用户项目里机制怎么运行见 [`运行规则.md`](运行规则.md);设计动机见 [`机制设计说明.md`](机制设计说明.md)。
 
@@ -36,8 +36,8 @@
 | 整理细则 | `.agents/skills/wrapup/references/document-maintenance.md` | 只在明确要求整理时由 wrapup 读取 |
 | 安装器行为正本 | `skills/project-consistency-installer/`(含 v1.3.0 升级细则与获取脚本) | skills.sh 分发,机器级使用,不进入用户项目 |
 | 干净分发白名单 | `distribution/manifest.txt` | 发布边界独立于源码目录,新增产品文件需显式评审 |
-| GitHub 公开范围 | `distribution/public-paths.txt`、`scripts/publish-public.sh` | 本仓库是内部工作仓库;公开版历史按白名单由脚本生成,内部文档与实验不公开 |
-| 分发构建、验证与测试 | `scripts/` | 源码工具:生成 Release 资产、阻断自举状态泄漏、回归测试 |
+| GitHub 公开范围 | `distribution/public-paths.txt`、`scripts/publish-public.sh` | 本仓库是内部工作仓库;公开版历史按白名单由脚本生成,内部文档与实验不公开;生成后按只放在本机的私人信息词表检查新增提交的说明与改动 |
+| 分发构建、验证与测试 | `scripts/` | 源码工具:生成 Release 资产、阻断自举状态泄漏与套件决策编号进入分发文件、回归测试 |
 | GitHub Release 工作流 | `.github/workflows/distribution.yml` | 普通变更只验证;`v*` 标签才创建 Release,带 `-` 的为预发布 |
 | Claude Code 适配器 | `.claude/commands/catchup.md`、`wrapup.md`、`引入一致性机制.md` | 斜杠入口,只转发到对应 Skill,不复制流程 |
 | 二进制排除与 LFS 规则 | `.gitignore`、`.gitattributes`(仓库根) | git 要它们在根才全局生效 |

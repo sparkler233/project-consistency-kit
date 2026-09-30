@@ -5,7 +5,7 @@ metadata:
   version: "2.0.0-preview.3"
 ---
 
-<!-- 一致性机制 version: 2026-09-29 -->
+<!-- 一致性机制 version: 2026-09-30 -->
 
 # Project Consistency Installer
 
@@ -76,6 +76,7 @@ metadata:
 在 `TARGET_DIR` 中执行只读检查:
 
 ```bash
+git --version
 git rev-parse --is-inside-work-tree 2>/dev/null
 git rev-parse -q --verify HEAD
 git rev-parse -q --verify refs/tags/synced
@@ -99,7 +100,7 @@ test -L AGENTS.md && readlink AGENTS.md
 test -L CLAUDE.md && readlink CLAUDE.md
 ```
 
-另检查旧版 `.claude/commands/同步.md` 和仍含完整流程的 `catchup.md` / `wrapup.md`。
+另检查旧版 `.claude/commands/同步.md` 和仍含完整流程的 `catchup.md` / `wrapup.md`。Git 低于 2.38 时在计划与最终报告中注明:并行(`task.mjs` 与每轮提示的试合并)用不了,其余照常。
 
 把目标 `一致性机制/VERSION` 记为 `TARGET_VERSION`:不存在时标为“旧版或未标记”,不得从日期行反推 SemVer。`SOURCE_VERSION > TARGET_VERSION` 是升级,相等时仍检查实际 diff,`SOURCE_VERSION < TARGET_VERSION` 是降级请求,必须单独提示并再次确认;目标缺少版本时使用统一修订日期和实际内容规划迁移。
 
@@ -170,6 +171,8 @@ test -L CLAUDE.md && readlink CLAUDE.md
 - 项目是否含图片、设计稿、字体或媒体;
 - 不是 Git 仓库时是否允许 `git init`;
 - 升级时:决策档案删除还是保留;PROJECT、AGENTS、联动目录改造中的每一项删除(写明删什么、原文去哪)。
+
+新增或变化了 hook 接线时,计划末尾单独列出「装完后需要你做的一步」,不要只留到最后的报告:Codex 的项目 hook 要用户审查批准后才运行,没批准时收尾提醒、每轮提示、压缩后提醒都不会运行,也不报错。Codex 桌面端可能不弹出审查窗口,这时在项目目录的终端里打开 Codex(CLI),用 `/hooks` 审查并批准,只需一次。Claude Code 按它自己的提示确认 hook。
 
 ## 步骤 4 · 建立 PROJECT、AGENTS 与 CLAUDE 适配
 
@@ -251,7 +254,7 @@ Codex 本地客户端使用同样三份 Node 脚本,但接线必须先识别目�
   ```
   `UserPromptSubmit`、`SessionStart` 两项写法相同,`command` 换成对应的 `parallel-notice.mjs`、`compact-reminder.mjs`,`command_windows` 调用 `run-hook.ps1` 并在末尾写 hook 名(`… '.agents/hooks/run-hook.ps1') parallel-notice`),与套件 `.codex/hooks.json` 一致;
 - 两种 Codex hook 表示已经并存 → 标为待整理,展示现状并由用户选择保留哪一种;不得继续制造重复 entry;
-- Codex 项目 hook 只覆盖本地客户端。写入后提醒用户在 Codex CLI 用 `/hooks` 审查并信任新配置;未信任或项目 `.codex/` 层未受信任时,hook 会被跳过。原生 Windows 必须同时写入 `commandWindows`,并让它调用包内 `.ps1` 薄适配器,不得内联带 PowerShell 变量的第二层命令字符串;配置存在不等于当前 Codex 版本已经成功运行,最终报告应区分“已接线 / 已信任 / 已实测”。
+- Codex 项目 hook 只覆盖本地客户端。写入后提醒用户在 Codex CLI 用 `/hooks` 审查并信任新配置;未信任或项目 `.codex/` 层未受信任时,hook 会被跳过,没有任何报错。Codex 桌面端可能不弹出审查窗口:请用户在项目目录的终端里打开 Codex 完成审查,一次即可。原生 Windows 必须同时写入 `commandWindows`,并让它调用包内 `.ps1` 薄适配器,不得内联带 PowerShell 变量的第二层命令字符串;配置存在不等于当前 Codex 版本已经成功运行,最终报告应区分“已接线 / 已信任 / 已实测”。
 
 ## 步骤 6 · 发现中枢、领域规则与二进制策略
 
@@ -282,11 +285,11 @@ Codex 本地客户端使用同样三份 Node 脚本,但接线必须先识别目�
 - 升级时:决策档案已按用户选择处理;v1.3.0 模板带来的旧机制条款已不在 AGENTS;升级提交已按确认完成或明确报告未提交;
 - AGENTS 是实体正本,CLAUDE 是只含 `@AGENTS.md` 的普通文件适配器;
 - catchup / wrapup 两个仓库级 Skill 存在且通过 Skill 校验;
-- synced guard 存在,`node .agents/skills/wrapup/scripts/synced-guard.mjs inspect` 可运行并给出 branch 与 `scope_base`;catchup 与 wrapup 都消费它给出的 branch / `scope_base`,安装器与 wrapup 不保留第二套自动 tag 迁移逻辑;
+- synced guard 存在,`node .agents/skills/wrapup/scripts/synced-guard.mjs inspect` 可运行并给出 branch 与 `scope_base`;catchup 与 wrapup 都消费它给出的 branch / `scope_base`,安装器不另写 tag 操作(并行时 `task.mjs land --finish` 在主线前进后推进 synced,属于机制脚本自身);
 - catchup 不重复读取 Agent 指令;
 - Claude 的 catchup / wrapup 文件只是薄适配器;
 - Claude Code 与 Codex 本地客户端的 Stop、UserPromptSubmit、SessionStart 配置分别指向包内的收尾提醒、每轮提示、压缩后提醒 Node 脚本;Codex 含不内联变量脚本的 `commandWindows`(Stop 调 `wrapup-reminder.ps1`,另两项调 `run-hook.ps1`),并安装两个 `.ps1` 薄适配器,且没有重复的 JSON / TOML hook 表示;`node .agents/skills/wrapup/scripts/task.mjs --help` 可运行;
-- Codex 新增或变化的项目 hook 已明确报告“待用户信任”或“已由用户信任”,不把配置存在误报为已经运行;
+- Codex 新增或变化的项目 hook 已明确报告“待用户信任”或“已由用户信任”,不把配置存在误报为已经运行;报告把「需要你做的一步」单独列在最前面,不混在验证清单里:在项目目录的终端里打开 Codex,用 `/hooks` 审查并批准(桌面端可能不弹出审查窗口),没批准时三项 hook 都不会运行;
 - 完整安装时目标 `一致性机制/VERSION` 等于来源版本;部分安装或失败时 VERSION 未被错误推进;
 - README 不存在或完全改写时工作流仍可运行;
 - 联动目录的「关键资料的受影响条件」表已登记项目真实的关键资料;

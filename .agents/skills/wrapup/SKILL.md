@@ -3,7 +3,7 @@ name: wrapup
 description: Reconcile project records and necessary linkage within the branch-safe Git scope, then prepare a user-confirmed local commit. Use for wrapup, project record synchronization or a repository checkpoint, and when the user says 收尾 or 并进主线 (merge a parallel branch into the main line); add document restructuring only when explicitly requested.
 ---
 
-<!-- 一致性机制 version: 2026-09-29 -->
+<!-- 一致性机制 version: 2026-09-30 -->
 
 默认在已有结构内完成必要记录和联动，不例行整理全项目。用户明确要求文档整理时，才读取 [文档整理细则](references/document-maintenance.md)，按其中的目的与范围提出整理计划，复用本流程确认、执行与提交；有日常工作要收尾时，先完成日常提交，再整理并单独提交。没有要求整理时，看到可以整理的地方只在报告末尾提出(见第 5 节)，不扩大本次维护范围。
 
@@ -47,13 +47,13 @@ node .agents/skills/wrapup/scripts/decisions.mjs plan
 
 ## 3. 一次确认
 
-在非 canonical 分支上(包括并进主线时的合并版 wrapup)跳过本节：不展示、不等确认，直接执行并提交，报告照常(决策 111)。
+在非 canonical 分支上(包括并进主线时的合并版 wrapup)跳过本节：不展示、不等确认，直接执行并提交，报告照常。
 
 默认只确认一次。一起展示：
 
 - 维护计划：改哪里、改什么、为什么；
 - 实际拟提交的文件清单，每个文件用文字标明状态(已修改、新建未跟踪、已删除等)，不贴 git 状态代号；标出计划外的文件；本次会话之前就存在的未提交改动注明来历，不说成本次所做；
-- 提交说明全文，原样贴出，不能只给标题或概述：自写的标题(带脚本给的 `title_tag`)与可选说明段，后接脚本给的 `body`；
+- 提交说明全文，原样贴出，不能只给标题或概述：自写的标题(末尾带脚本给的 `title_tag`；提交时没写的话脚本会补上)与可选说明段，后接脚本给的 `body`；
 - synced 能否推进及条件。
 
 用户一句确认即执行维护、提交，并在条件满足时推进 synced；同一事项已有明确授权则沿用，不重复询问。以下情况要补充确认：实际拟提交范围超出计划(如混有其他工作的改动)、执行中计划改变、新增实质改动、超范围或授权冲突。用户确认时追加要求(如“再记一条决策”)也算计划改变：新增或改写的决策原文会进入提交正文，先展示再确认。只要求保存不提交时，确认的只是维护计划，到报告为止。
@@ -64,7 +64,7 @@ node .agents/skills/wrapup/scripts/decisions.mjs plan
 
 执行后实际改动与确认时不一致(文件清单或提交说明需实质改变)时，先补确认。按批准的路径暂存，只有明确批准整个工作区时才可 `git add -A`；检查实际暂存内容与授权一致，保留已有暂存内容；混有其他工作、无法分离时停下，不擅自提交或重置。没有新改动不制造空提交。
 
-提交一律由脚本完成，有无决策、是否在分支上都一样：其余维护完成、按批准路径暂存后运行 `decisions.mjs apply --commit`，选项与确认时的 `plan` 相同，并用 `--title` 传入确认过的标题、`--intro` 传入说明段(可选；分支上另按上文加三个选项)；宿主要求的额外 trailer(如 `Co-Authored-By`)用 `--trailer "键: 值"` 传入。脚本写好提交说明、暂存它改动的 PROJECT(分支上它不改 PROJECT)、提交并核对，bash、PowerShell 写法相同：
+提交一律由脚本完成，有无决策、是否在分支上都一样：其余维护完成、按批准路径暂存后运行 `decisions.mjs apply --commit`，选项与确认时的 `plan` 相同，并用 `--title` 传入标题(必须给；主线上用确认过的那个)、`--intro` 传入说明段(可选；分支上另按上文加三个选项)；宿主要求的额外 trailer(如 `Co-Authored-By`)用 `--trailer "键: 值"` 传入。脚本写好提交说明、暂存它改动的 PROJECT(分支上它不改 PROJECT)、提交并核对，bash、PowerShell 写法相同：
 
 ```bash
 node .agents/skills/wrapup/scripts/decisions.mjs apply --commit --title "<确认过的标题>" [其他选项]
