@@ -25,7 +25,7 @@ catchup  ->  正常工作  ->  wrapup
 
 1. 新 Session 开始时运行 catchup。它先读 `PROJECT.md`、运行规则和脚本给出的 Git 概况,汇报自上次收尾以来的变化、当前状态和建议的下一步,再按任务读需要的细节。在 feature branch 上,它还会读出这个分支最近一次收尾写下的目标、进度与还剩,以及主线自分叉以来的变化与本分支是否相关;在 canonical branch 上,它列出其他分支各自的任务与进度。这个过程只读,不修改文件。上下文被压缩后不用重跑,Agent 按 `AGENTS.md` 里的指令重读 PROJECT 与运行规则即可。
 2. 中间照常和 Agent 协作。拍板的决策会立即写进 `PROJECT.md` 的「待提交」区,不等收尾。
-3. 一段工作结束时运行 wrapup。canonical branch 比较自上次 `synced` 以来的全部改动;并行 feature branch 改用它与 canonical 的 merge-base。在 canonical branch 上,它把维护计划、拟提交文件、完整提交说明和 `synced` 条件一次展示给你,一次确认后才写入文件、把决策全文迁入提交说明并创建本地提交;只有 canonical branch 能通过确定性 guard 推进 `synced`。在 feature branch 上收尾时,这次提交就是任务检查点,不等确认、提交后报告;任务还没做完或之后可能换 Session 接手时,提交说明里写上目标、进度、还剩三行,供接手时读取。数行数、生成提交说明这类机械步骤由随附脚本完成。
+3. 一段工作结束时运行 wrapup。canonical branch 比较自上次 `synced` 以来的全部改动;并行 feature branch 改用它与 canonical 的 merge-base。在 canonical branch 上,它把维护计划、拟提交文件、完整提交说明和 `synced` 条件一次展示给你,一次确认后才写入文件、把决策全文迁入提交说明并创建本地提交;只有 canonical branch 能通过确定性 guard 推进 `synced`。在 feature branch 上收尾时,这次提交就是任务检查点,不等确认、提交后报告;任务还没做完或之后可能换 Session 接手时,提交说明里写上目标、进度、还剩三行,供接手时读取。数行数、生成提交说明这类机械步骤由随附脚本完成。一项工作做完(改动已验证、没有紧接着的下一步)时,Agent 会主动建议收尾,工作进行中不打断;在 canonical branch 上等你决定,在 feature branch 上直接写检查点、事后报告。
 
 | 运行环境 | 会话初始化引入 | 会话收尾 |
 | --- | --- | --- |
