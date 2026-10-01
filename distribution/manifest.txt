@@ -12,11 +12,13 @@
 .agents/skills/wrapup/scripts/synced-guard.mjs
 .agents/skills/wrapup/scripts/task.mjs
 .agents/skills/wrapup/scripts/checkpoints.mjs
+.agents/skills/wrapup/scripts/hook-trace.mjs
 .agents/hooks/wrapup-reminder.mjs
 .agents/hooks/wrapup-reminder.ps1
 .agents/hooks/parallel-notice.mjs
 .agents/hooks/compact-reminder.mjs
 .agents/hooks/run-hook.ps1
+.agents/hooks/selfcheck.mjs
 .codex/hooks.json
 .claude/commands/catchup.md
 .claude/commands/wrapup.md

@@ -4,6 +4,18 @@
 > 任何机制文件发生真实变化:判断 SemVer 影响、全部修订日期一起 bump 到当天,并在此记入对应版本。
 > 本文件**套件专属,不随模板进项目**(绿地 rsync 已排除;安装器也不拷它)。
 
+## v2.0.0-preview.4 — 2026-10-01
+
+**预发布,未发布。** 与 preview.3 兼容:PROJECT、AGENTS、联动目录与 hook 接线都不变,升级只替换机制文件。
+
+- **hook 可观测性(决策 121)**:hook 出错时照旧静默放行,不挡宿主;此前坏掉的 hook 和「没什么可提醒」看起来一样,preview.3 发布时 Windows CI 由此逼出四个静默问题,其中适配器静默退出自 v1.2.x 就在。
+  - 新命令 `node .agents/hooks/selfcheck.mjs`(hook 自检):读项目的 `.claude/settings.json`、`.codex/hooks.json` 或 `.codex/config.toml` 里机制的 hook 项,在临时仓库(复制项目的 `.agents/` 与接线文件,造出三个 hook 都该出声的场景)里按接线原样运行每个 hook,逐项报告退出码、有无输出、输出是否为合法 JSON 并带预期字段,少接的事件也报出;只跑当前平台的接线,Codex 另一平台的写法注明未测;`--json` 给机器读。全部通过退出码为 0。安装器接线后运行它;用户觉得提醒没了时也可运行。
+  - 失败留痕:hook 外层捕获到异常、输入非空却解析不出 JSON、状态文件写不了,以及 Windows 适配器找到仓库但脚本缺失或 node 非 0 退出时,在 Git 公共目录(各 worktree 共用)的 `pck-hook-failures.log` 追加一行(时间、hook、宿主、原因;输入只记长度与开头几个字符的码位,不记内容),只留最后 100 行。自检全部通过时追加 `selfcheck ok`。
+  - `scope.mjs --overview` 新增 `hook_failures`(上次自检通过以来的失败条数与最近几行),catchup 有内容时用一行提到并建议运行自检。
+  - 三个 hook 读输入的代码合为一份(新文件 `.agents/skills/wrapup/scripts/hook-trace.mjs`,与留痕在一起);收尾提醒因此也依赖 wrapup 的脚本目录,与另两个 hook 相同。
+  - 限制:hook 模块根本没跑起来(如导入的文件缺失)或适配器连 Git 都找不到时无处可写,只能靠自检发现;自检只证明接线在干净场景里能出声,宿主是否信任、宿主自己的 PATH 里有没有 node 测不到。
+- **分发**:清单新增 `hook-trace.mjs`、`selfcheck.mjs`(43 个文件);`fetch-kit.sh` 对 preview.4 起的包要求这两个文件。CI(Linux 与 Windows)新增失败留痕与自检的回归测试,并对本仓库接线跑一次自检。
+
 ## v2.0.0-preview.3 — 2026-10-01
 
 **预发布(决策 115)。** 加入 Core 并行(实验性):一个人同时驾驶多个会话,各在自己的分支与 worktree 上工作,谁合并谁负责。与 preview.1 / preview.2 兼容:PROJECT、AGENTS 与联动目录的结构不变,升级替换机制文件、补上两个新 hook 的接线;从 v1.3.0 仍按升级细则。GitHub 上仍标为 prerelease,须 `--release v2.0.0-preview.3` 明确获取。

@@ -33,6 +33,10 @@ jobs:
           node scripts/test-parallel.mjs
           node scripts/test-task-state.mjs
           node scripts/test-recent-decisions.mjs
+      - name: Test hook failure trace and self-check
+        run: |
+          node scripts/test-hook-observability.mjs
+          node .agents/hooks/selfcheck.mjs
       - name: Build and verify
         env:
           SOURCE_REF: ${{ github.ref_name }}
@@ -64,6 +68,10 @@ jobs:
           node scripts/test-parallel.mjs
           node scripts/test-task-state.mjs
           node scripts/test-recent-decisions.mjs
+      - name: Test hook failure trace and self-check
+        run: |
+          node scripts/test-hook-observability.mjs
+          node .agents/hooks/selfcheck.mjs
       - name: Validate Windows adapters and clean distribution
         shell: powershell
         env:

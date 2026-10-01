@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 一致性机制 version: 2026-10-01
 // 并行提示 hook:每轮开始时运行(Claude Code 与 Codex 都接在 UserPromptSubmit)。
-// 只按 Git 事实生成提示,不写仓库文件,不做任何 Git 改动;出错一律静默,不阻塞宿主。
+// 只按 Git 事实生成提示,不写仓库文件,不做任何 Git 改动;出错一律静默,不阻塞宿主,只在 Git 目录留一行失败记录。
 // 在分支上:主线有本分支没有的提交,且与本分支相关(改了同样的文件,含未提交的;主线一侧命中联动规则;试合并冲突)、
 // 这个主线位置还没提示过时,提示主线新增的提交标题、交集、命中的规则、试合并结果。只报事实,不要求同步:
 // 要不要为此打断手上的事由用户决定,所以同一段文字既进模型上下文(additionalContext),也显示给用户(systemMessage)。
@@ -13,6 +13,7 @@ import path from "node:path";
 import process from "node:process";
 import { gitIn, projectBody } from "../skills/wrapup/scripts/checkpoints.mjs";
 import { LINKAGE, parseLinkage, ruleHits } from "../skills/wrapup/scripts/linkage.mjs";
+import { readHookInput, traceFailure } from "../skills/wrapup/scripts/hook-trace.mjs";
 
 const SUBJECTS = 5, FILES = 8;
 
@@ -21,15 +22,11 @@ function asciiJson(value) {
   return JSON.stringify(value).replace(/[\u007f-\uffff]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
 }
 
-function readInput() {
-  // 输入总是一个 JSON 对象,从第一个 { 读起:PowerShell 转发时开头可能多出 BOM,或按错的编码解出的 BOM 字符
-  try { const t = fs.readFileSync(0, "utf8"); const i = t.indexOf("{"); return i >= 0 ? JSON.parse(t.slice(i)) : {}; } catch { return {}; }
-}
 const lines = (s) => (s || "").split("\n").filter(Boolean);
 const list = (items, max) => items.slice(0, max).map((x) => `\`${x}\``).join("、") + (items.length > max ? ` 等 ${items.length} 个` : "");
 
 function main() {
-  const input = readInput();
+  const input = readHookInput("parallel-notice");
   const start = input.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const top = gitIn(start)(["rev-parse", "--show-toplevel"]);
   if (top.status !== 0) return null;
@@ -48,7 +45,7 @@ function main() {
   const statePath = path.join(gitDir, "pck-notice.json");
   let state = {};
   try { state = JSON.parse(fs.readFileSync(statePath, "utf8")); } catch {}
-  const save = () => { try { fs.writeFileSync(statePath, JSON.stringify(state)); } catch {} };
+  const save = () => { try { fs.writeFileSync(statePath, JSON.stringify(state)); } catch (e) { traceFailure("parallel-notice", `notice state not saved: ${e.code || e.message}`, root); } };
 
   if (current === canonical) return null;
   const behind = Number((ok(["rev-list", "--count", `HEAD..${canonicalRef}`]) || "0").trim()) || 0;
@@ -91,7 +88,8 @@ function main() {
 try {
   const text = main();
   if (text) process.stdout.write(asciiJson({ systemMessage: text, hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: text } }));
-} catch {
-  // 提示只是补充信息,任何意外都静默
+} catch (error) {
+  // 提示只是补充信息,任何意外都静默,只留一行记录
+  traceFailure("parallel-notice", error);
 }
 process.exitCode = 0;

@@ -2,7 +2,7 @@
 name: project-consistency-installer
 description: Fetch Project Consistency Kit from a trusted local source or its verified clean GitHub Release, then safely integrate or upgrade PROJECT.md, AGENTS.md, the CLAUDE.md adapter, catchup and wrapup repository Skills, linkage rules, and hooks without silently overwriting project content. Use when the user asks to install, introduce, bootstrap, migrate, or update the consistency mechanism in the current repository.
 metadata:
-  version: "2.0.0-preview.3"
+  version: "2.0.0-preview.4"
 ---
 
 <!-- 一致性机制 version: 2026-10-01 -->
@@ -63,7 +63,7 @@ metadata:
    - `templates/PROJECT.md`
    - `templates/AGENTS.md`
    - `templates/一致性机制/文件联动目录.md`
-   versioned 分发包或当前源码 checkout 还必须包含 `.codex/hooks.json` 与 `一致性机制/VERSION`;v1.2.0+ 还必须包含 `fetch-kit.ps1` 与 `.agents/hooks/wrapup-reminder.mjs`;v1.2.2+ 还必须包含 `.agents/hooks/wrapup-reminder.ps1`;v1.3.0+ 还必须包含 `.agents/skills/wrapup/scripts/synced-guard.mjs`;v1.3.0 及更早的包还含 `templates/一致性机制/决策档案.md`;v2.0.0-preview.1+ 还必须包含 `一致性机制/运行规则.md`、`.agents/skills/wrapup/scripts/scope.mjs`、`.agents/skills/wrapup/scripts/decisions.mjs`、`.agents/skills/wrapup/references/document-maintenance.md` 与本 Skill 的 `references/upgrade-from-v1.3.md`;v2.0.0-preview.2+ 还必须包含 `.agents/skills/wrapup/scripts/linkage.mjs`;v2.0.0-preview.3+ 还必须包含 `.agents/skills/wrapup/scripts/task.mjs`、`.agents/skills/wrapup/scripts/checkpoints.mjs`、`.agents/hooks/parallel-notice.mjs`、`.agents/hooks/compact-reminder.mjs` 与 `.agents/hooks/run-hook.ps1`;旧包按各自版本的最低集合验证,不得用新版本文件要求反向否决旧 Release。
+   versioned 分发包或当前源码 checkout 还必须包含 `.codex/hooks.json` 与 `一致性机制/VERSION`;v1.2.0+ 还必须包含 `fetch-kit.ps1` 与 `.agents/hooks/wrapup-reminder.mjs`;v1.2.2+ 还必须包含 `.agents/hooks/wrapup-reminder.ps1`;v1.3.0+ 还必须包含 `.agents/skills/wrapup/scripts/synced-guard.mjs`;v1.3.0 及更早的包还含 `templates/一致性机制/决策档案.md`;v2.0.0-preview.1+ 还必须包含 `一致性机制/运行规则.md`、`.agents/skills/wrapup/scripts/scope.mjs`、`.agents/skills/wrapup/scripts/decisions.mjs`、`.agents/skills/wrapup/references/document-maintenance.md` 与本 Skill 的 `references/upgrade-from-v1.3.md`;v2.0.0-preview.2+ 还必须包含 `.agents/skills/wrapup/scripts/linkage.mjs`;v2.0.0-preview.3+ 还必须包含 `.agents/skills/wrapup/scripts/task.mjs`、`.agents/skills/wrapup/scripts/checkpoints.mjs`、`.agents/hooks/parallel-notice.mjs`、`.agents/hooks/compact-reminder.mjs` 与 `.agents/hooks/run-hook.ps1`;v2.0.0-preview.4+ 还必须包含 `.agents/skills/wrapup/scripts/hook-trace.mjs` 与 `.agents/hooks/selfcheck.mjs`;旧包按各自版本的最低集合验证,不得用新版本文件要求反向否决旧 Release。
 6. 记录版本与来源并在计划和最终报告回显:
    - 干净分发目录必须有 `DISTRIBUTION-METADATA.txt` 与 `DISTRIBUTION-MANIFEST.sha256`;记录其中的 `kit_version`、`mechanism_revision`、规范仓库、release ref 与 source commit;缺少版本字段的 schema 1 旧包标为 `legacy`,版本可从 `vX.Y.Z` release ref 派生展示,但必须标明不是包内 VERSION;
    - 本地源码 checkout 必须是 Git 仓库;读取 `一致性机制/VERSION` 为 `SOURCE_VERSION`,读取源内安装器 `metadata.version`,两者必须一致;另记录统一修订日期、`git rev-parse HEAD` 与当前 ref,有未提交改动时明确标出;
@@ -216,6 +216,7 @@ test -L CLAUDE.md && readlink CLAUDE.md
 - `一致性机制/运行规则.md`(机制文件,整体替换,项目不手改);机制设计说明与机制 README 只留在套件仓库,不装进项目;
 - `.agents/hooks/wrapup-reminder.mjs`(收尾提醒,ASCII 固定路径的跨平台逻辑正本)、`.agents/hooks/wrapup-reminder.ps1`(Windows Codex 薄适配器,只定位并转发到 Node)与 `一致性机制/hooks/收尾提醒.sh`(旧 Unix 接线兼容包装;随后 `chmod +x`);
 - `.agents/hooks/parallel-notice.mjs`(每轮提示:在任务分支上,主线变化与本分支相关时报出事实)、`.agents/hooks/compact-reminder.mjs`(压缩后提醒:上下文被压缩后提醒重读规则)与 `.agents/hooks/run-hook.ps1`(Windows Codex 通用薄适配器,按名字转发到这两个 Node hook);
+- `.agents/hooks/selfcheck.mjs`(hook 自检:按项目实际接线在临时仓库里把每个 hook 跑一遍;hook 的失败留痕在 wrapup 的 `scripts/hook-trace.mjs`,随 wrapup 目录安装);
 - `一致性机制/LICENSE.project-consistency-kit`(从套件根 LICENSE 新建,已有不覆盖)。
 
 `一致性机制/VERSION` 不参与内容合并,但只能在本轮用户批准的机制件全部写入并通过步骤 8 验证后,最后原样写入 `SOURCE_VERSION`。用户跳过任一必需升级、出现未解决冲突或验证失败时不得推进 VERSION;报告目标处于 mixed / pending 状态,避免把部分安装伪装成完整版本。
@@ -289,6 +290,7 @@ Codex 本地客户端使用同样三份 Node 脚本,但接线必须先识别目�
 - catchup 不重复读取 Agent 指令;
 - Claude 的 catchup / wrapup 文件只是薄适配器;
 - Claude Code 与 Codex 本地客户端的 Stop、UserPromptSubmit、SessionStart 配置分别指向包内的收尾提醒、每轮提示、压缩后提醒 Node 脚本;Codex 含不内联变量脚本的 `commandWindows`(Stop 调 `wrapup-reminder.ps1`,另两项调 `run-hook.ps1`),并安装两个 `.ps1` 薄适配器,且没有重复的 JSON / TOML hook 表示;`node .agents/skills/wrapup/scripts/task.mjs --help` 可运行;
+- 接线写入后运行 `node .agents/hooks/selfcheck.mjs`:它按项目实际接线在临时仓库里把每个 hook 跑一遍,逐项报告有无输出;失败的项照实列出,不说成已装好。它只证明接线能出声,不代表宿主已信任、已经运行;
 - Codex 新增或变化的项目 hook 已明确报告“待用户信任”或“已由用户信任”,不把配置存在误报为已经运行;报告把「需要你做的一步」单独列在最前面,不混在验证清单里:在项目目录的终端里打开 Codex,用 `/hooks` 审查并批准(桌面端可能不弹出审查窗口),没批准时三项 hook 都不会运行;
 - 完整安装时目标 `一致性机制/VERSION` 等于来源版本;部分安装或失败时 VERSION 未被错误推进;
 - README 不存在或完全改写时工作流仍可运行;
@@ -306,6 +308,6 @@ Codex 本地客户端使用同样三份 Node 脚本,但接线必须先识别目�
 - AGENTS 是项目自己的指令正本,机制规则只在 `一致性机制/运行规则.md`;CLAUDE 只用 `@AGENTS.md` 做导入适配。
 - PROJECT 是项目入口;决策全文先在「待提交」,wrapup 后在 git 提交正文。
 - catchup / wrapup 以目标仓库 `.agents/skills/` 为行为正本。
-- 收尾提醒、每轮提示、压缩后提醒各以 `.agents/hooks/` 下的同名 `.mjs` 为跨平台逻辑正本;`wrapup-reminder.ps1` 与 `run-hook.ps1` 只做 Windows Codex 路径定位与 stdin 转发,`一致性机制/hooks/收尾提醒.sh` 只兼容旧 Unix 接线,宿主配置只做接线。
+- 收尾提醒、每轮提示、压缩后提醒各以 `.agents/hooks/` 下的同名 `.mjs` 为跨平台逻辑正本;`wrapup-reminder.ps1` 与 `run-hook.ps1` 只做 Windows Codex 路径定位与 stdin 转发,`一致性机制/hooks/收尾提醒.sh` 只兼容旧 Unix 接线,宿主配置只做接线;`selfcheck.mjs` 只做自检,失败留痕只在 `hook-trace.mjs`。
 - `一致性机制/VERSION` 是正式套件版本正本;日期版本行只用于修订与混合版本检测。
 - 不擅自 `git init`、commit 或 push;升级提交只在用户看过提交说明全文并确认后进行。

@@ -32,7 +32,7 @@
 |------|----------|----------------------|
 | catchup / wrapup 行为正本 | `.agents/skills/catchup/`、`.agents/skills/wrapup/` | Codex 与兼容 Harness 从仓库级 Skill 发现;Claude Code 命令也转发到这里 |
 | wrapup 脚本 | `.agents/skills/wrapup/scripts/`(`scope.mjs` 及其联动匹配 `linkage.mjs`、`decisions.mjs`、`synced-guard.mjs`、并行的 `task.mjs`,检查点找法 `checkpoints.mjs`) | Skill 随附的机械步骤;guard 独占 `synced` 的状态迁移,并进主线时由 `task.mjs land --finish` 在主线前进后推进 |
-| hook 逻辑 | `.agents/hooks/`(`wrapup-reminder.mjs` 收尾提醒、`parallel-notice.mjs` 每轮提示、`compact-reminder.mjs` 压缩后提醒;`wrapup-reminder.ps1`、`run-hook.ps1` 为 Windows Codex 薄适配器) | 宿主接线指向固定 ASCII 路径的跨平台 Node 脚本 |
+| hook 逻辑 | `.agents/hooks/`(`wrapup-reminder.mjs` 收尾提醒、`parallel-notice.mjs` 每轮提示、`compact-reminder.mjs` 压缩后提醒;`wrapup-reminder.ps1`、`run-hook.ps1` 为 Windows Codex 薄适配器;`selfcheck.mjs` 为 hook 自检;失败留痕在 wrapup 的 `scripts/hook-trace.mjs`) | 宿主接线指向固定 ASCII 路径的跨平台 Node 脚本 |
 | 整理细则 | `.agents/skills/wrapup/references/document-maintenance.md` | 只在明确要求整理时由 wrapup 读取 |
 | 安装器行为正本 | `skills/project-consistency-installer/`(含 v1.3.0 升级细则与获取脚本) | skills.sh 分发,机器级使用,不进入用户项目 |
 | 干净分发白名单 | `distribution/manifest.txt` | 发布边界独立于源码目录,新增产品文件需显式评审 |

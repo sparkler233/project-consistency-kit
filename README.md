@@ -68,7 +68,7 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 | `.agents/skills/catchup/` | 定义如何恢复项目状态 |
 | `.agents/skills/wrapup/` | 定义如何检查联动、迁出决策、确认提交并推进 `synced`;随附范围(含联动规则的路径匹配)、决策与 guard 脚本和文档整理细则 |
 | `一致性机制/文件联动目录.md` | 记录哪些文件变化时需要一起检查其他内容;规则的触发写出文件或目录路径时,wrapup 会列出本次改动命中的规则 |
-| `.agents/hooks/` 和宿主配置 | 三项提醒:有还没收尾的改动时提醒运行 wrapup;并行时主线的变化与本分支相关就提示;上下文被压缩后提醒重读规则。Windows Codex 通过薄 PowerShell 适配器转到同一 Node 逻辑 |
+| `.agents/hooks/` 和宿主配置 | 三项提醒:有还没收尾的改动时提醒运行 wrapup;并行时主线的变化与本分支相关就提示;上下文被压缩后提醒重读规则。Windows Codex 通过薄 PowerShell 适配器转到同一 Node 逻辑。hook 出错时不挡宿主,只在 Git 目录留一行记录,catchup 会提到;`node .agents/hooks/selfcheck.mjs` 按项目实际接线把每个 hook 跑一遍,报告哪些能出声 |
 | `一致性机制/VERSION` | 记录项目当前安装的套件版本 |
 
 `synced` 是一个本地 Git 标签，表示 canonical branch 上一次已经完成项目级联动检查的位置。它和 `HEAD` 分开，因此中途手工提交过的改动不会被 wrapup 跳过。canonical branch 由用户确认后保存在当前 clone 的 Git config;guard 会检查 branch、祖先关系、冲突和工作区状态,再用原子 ref 更新推进 tag。非 canonical branch 可以保存 branch checkpoint,但不会移动项目级 horizon。

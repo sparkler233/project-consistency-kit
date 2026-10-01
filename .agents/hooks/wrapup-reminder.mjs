@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 一致性机制 version: 2026-10-01
 // Project Consistency Kit cross-platform Stop hook.
-// Always fails open: it only emits one systemMessage per dirty cycle.
+// Always fails open: it only emits one systemMessage per dirty cycle; a swallowed error leaves one line in the Git directory.
 // Baseline: `synced` on the canonical branch; on other branches the latest task checkpoint
 // (a commit with a `Task:` trailer, looked up in the branch reflog, then along first-parent),
 // or the merge-base with the canonical branch when the branch has no checkpoint yet.
@@ -12,6 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { spawnSync } from "node:child_process";
+import { readHookInput, traceFailure } from "../skills/wrapup/scripts/hook-trace.mjs";
 
 function git(cwd, args) {
   const result = spawnSync("git", args, {
@@ -78,18 +79,6 @@ function changedFiles(repoRoot) {
   return new Set([...tracked, ...untracked]);
 }
 
-function readInput() {
-  try {
-    // The input is always a JSON object; start at the first "{" so a BOM (or a BOM decoded with the wrong
-    // code page) that PowerShell adds in front does not break JSON.parse.
-    const text = fs.readFileSync(0, "utf8");
-    const start = text.indexOf("{");
-    return start >= 0 ? JSON.parse(text.slice(start)) : {};
-  } catch {
-    return {};
-  }
-}
-
 function asciiJson(value) {
   return JSON.stringify(value).replace(/[\u007f-\uffff]/g, (character) =>
     `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`,
@@ -97,7 +86,7 @@ function asciiJson(value) {
 }
 
 function main() {
-  const input = readInput();
+  const input = readHookInput("wrapup-reminder");
   const isClaude = Boolean(process.env.CLAUDE_PROJECT_DIR);
   const startDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const rootBuffer = git(startDir, ["rev-parse", "--show-toplevel"]);
@@ -121,8 +110,9 @@ function main() {
   if (count === 0) {
     try {
       fs.rmSync(state, { force: true });
-    } catch {
+    } catch (error) {
       // Reminder state is best-effort and must never block the host.
+      traceFailure("wrapup-reminder", `reminder state not cleared: ${error?.code || error?.message}`, repoRoot);
     }
     return;
   }
@@ -131,6 +121,7 @@ function main() {
     fs.writeFileSync(state, "", { flag: "wx" });
   } catch (error) {
     if (error?.code === "EEXIST") return;
+    traceFailure("wrapup-reminder", `reminder state not written: ${error?.code || error?.message}`, repoRoot);
     return;
   }
 
@@ -144,8 +135,9 @@ function main() {
 
 try {
   main();
-} catch {
-  // Stop hooks are reminders, not gates. Unexpected failures stay silent.
+} catch (error) {
+  // Stop hooks are reminders, not gates. Unexpected failures stay silent and leave one line in the Git directory.
+  traceFailure("wrapup-reminder", error);
 }
 
 process.exitCode = 0;
