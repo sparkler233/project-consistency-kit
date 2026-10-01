@@ -250,8 +250,15 @@ function relation(against, mine) {
   return { related: overlap.length > 0 || rules.length > 0, canonical_changed: theirs.slice(0, 50), overlap, rules };
 }
 
+// 别的任务分支还在进行:有主线没有的提交(只有开工检查点也算),或 worktree 里有未提交改动;已并进主线还没收工的不算
 function otherTaskBranches() {
-  return taskBranches().filter((b) => b !== current && git(["diff", "--quiet", (ok(["merge-base", canonicalRef, `refs/heads/${b}`]) || "").trim() || canonicalRef, `refs/heads/${b}`, "--"]).status !== 0);
+  const wtOf = Object.fromEntries(worktrees().filter((w) => w.branch).map((w) => [w.branch, w.path]));
+  return taskBranches().filter((b) => {
+    if (b === current) return false;
+    if (git(["merge-base", "--is-ancestor", `refs/heads/${b}`, canonicalRef]).status !== 0) return true;
+    const p = wtOf[b];
+    return Boolean(p && existsSync(p) && lines(gitIn(p)(["status", "--porcelain"]).out).length);
+  });
 }
 
 // 做合并提交,快进主线,推进 synced,本分支随之前进。任何一步前的检查不通过都不改动东西

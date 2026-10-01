@@ -340,6 +340,23 @@ try {
   assert.equal(stT.handoff_missing, false);
   assert.equal(task(repo, ["close", "task/t", "--abandon"]).abandoned, true);
 
+  // 并进主线后报告别的任务分支:刚开工只有空检查点的、worktree 里有未提交改动的都算;已并进主线还没收工的、什么都没做的不算
+  const u = task(repo, ["start", "task/u", "--goal", "刚开工"]).worktree;
+  const v = task(repo, ["start", "task/v"]).worktree;
+  write(v, "v.md", "v\n");
+  task(repo, ["start", "task/w"]);
+  const y = task(repo, ["start", "task/y"]).worktree;
+  write(y, "y.md", "y\n");
+  git(y, "add", "y.md");
+  landAll(y, "并入 Y");
+  const x = task(repo, ["start", "task/x"]).worktree;
+  write(x, "x.md", "x\n");
+  git(x, "add", "x.md");
+  assert.deepEqual(landAll(x, "并入 X").other_task_branches, ["task/u", "task/v"]);
+  fs.rmSync(path.join(v, "v.md"));
+  for (const br of ["task/u", "task/v", "task/w", "task/x", "task/y"]) assert.equal(task(repo, ["close", br]).abandoned, false, br);
+  assert.equal(fs.existsSync(u), false);
+
   console.log("并行生命周期测试通过");
 } finally {
   for (const t of temps) fs.rmSync(t, { recursive: true, force: true });
