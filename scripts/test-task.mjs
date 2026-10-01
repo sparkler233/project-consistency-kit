@@ -166,6 +166,8 @@ try {
   assert.equal(compact(b, "resume"), null);
   const bom = run(process.execPath, [COMPACT], repo, 0, "\uFEFF" + JSON.stringify({ cwd: repo, source: "compact" }));
   assert.ok(bom && JSON.parse(bom).hookSpecificOutput.additionalContext, "输入开头带 BOM(PowerShell 按 UTF-8 转发)时照常提醒");
+  const garbled = run(process.execPath, [COMPACT], repo, 0, "\u00ef\u00bb\u00bf" + JSON.stringify({ cwd: repo, source: "compact" }));
+  assert.ok(garbled && JSON.parse(garbled).hookSpecificOutput.additionalContext, "BOM 按错的编码解成三个字符时照常提醒");
   assert.match(compact(repo, "compact"), /^\[一致性机制\] 上下文刚被压缩:继续工作前先重读 `PROJECT\.md` 与 `一致性机制\/运行规则\.md`;用户说「收尾」就运行 wrapup。$/, "主线上只提醒重读");
   assert.match(compact(b, "compact"), /任务分支 `task\/b` 上并行工作.*task\.mjs land.*task\.mjs sync`,不手抄/, "分支上附三条与做法");
   // C 没改相关文件:主线改了第三章与 PROJECT 生成的两段,与 C 不相关 → 不提示

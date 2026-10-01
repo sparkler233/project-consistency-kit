@@ -139,6 +139,27 @@ try {
             # The compaction reminder needs stdin (source=compact); check where the input or output is lost.
             $probe = Join-Path $fixture "stdin-probe.ps1"
             Set-Content -LiteralPath $probe -Encoding ASCII -Value '$t = [Console]::In.ReadToEnd(); "stdin chars: " + $t.Length + " text: " + $t'
+            # Probes that follow run-hook.ps1 step by step: what the adapter reads, with and without its param block,
+            # and which bytes Node receives when the adapter forwards the input.
+            $nodeProbe = Join-Path $fixture "stdin-probe.mjs"
+            Set-Content -LiteralPath $nodeProbe -Encoding ASCII -Value 'import fs from "node:fs"; let r; try { const b = fs.readFileSync(0); r = "bytes=" + b.length + " head=" + [...b.subarray(0, 6)].join(","); } catch (e) { r = "error " + e.code; } console.log(process.version + " " + r);'
+            $readBody = @'
+$ErrorActionPreference = 'Stop'
+try {
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    [Console]::InputEncoding = $utf8
+    [Console]::OutputEncoding = $utf8
+    $OutputEncoding = $utf8
+    $t = [Console]::In.ReadToEnd()
+    "read chars=" + $t.Length + " head=" + (($t.ToCharArray() | Select-Object -First 4 | ForEach-Object { [int]$_ }) -join ",")
+    FORWARD
+} catch { "adapter error: " + $_.Exception.Message }
+'@
+            $paramHead = "[CmdletBinding()]`nparam([Parameter(Mandatory = `$true, Position = 0)][string]`$Hook)`n"
+            $probeA = Join-Path $fixture "probe-a.ps1"; $probeB = Join-Path $fixture "probe-b.ps1"; $probeC = Join-Path $fixture "probe-c.ps1"
+            Set-Content -LiteralPath $probeA -Encoding ASCII -Value ($paramHead + $readBody.Replace('FORWARD', ''))
+            Set-Content -LiteralPath $probeB -Encoding ASCII -Value $readBody.Replace('FORWARD', '')
+            Set-Content -LiteralPath $probeC -Encoding ASCII -Value ($paramHead + $readBody.Replace('FORWARD', ('$t | & node ''' + $nodeProbe + '''')))
             $diagnostics = & {
                 $ErrorActionPreference = 'Continue'
                 "node direct: $($compactInput | & node (Join-Path $fixture '.agents\hooks\compact-reminder.mjs') 2>&1 | Out-String) exit=$LASTEXITCODE"
@@ -146,6 +167,11 @@ try {
                 "probe, one layer: $($compactInput | & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probe 2>&1 | Out-String)"
                 "probe, two layers: $($compactInput | & powershell.exe -NoProfile -NonInteractive -Command "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File '$probe'" 2>&1 | Out-String)"
                 "two layers again: $($compactInput | & powershell.exe -NoProfile -NonInteractive -Command $compactHandler.commandWindows 2>&1 | Out-String)"
+                "node probe direct: $($compactInput | & node $nodeProbe 2>&1 | Out-String)"
+                "probe A (param block): $($compactInput | & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probeA compact-reminder 2>&1 | Out-String)"
+                "probe B (no param block): $($compactInput | & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probeB 2>&1 | Out-String)"
+                "probe C (forward to node): $($compactInput | & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probeC compact-reminder 2>&1 | Out-String)"
+                "test process OutputEncoding: $($OutputEncoding.WebName) preamble=$($OutputEncoding.GetPreamble().Length); console in=$([Console]::InputEncoding.WebName) out=$([Console]::OutputEncoding.WebName)"
             } | Out-String
             throw "Codex SessionStart commandWindows returned no output. Diagnostics:`n$diagnostics"
         }

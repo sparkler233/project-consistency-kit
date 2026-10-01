@@ -22,8 +22,8 @@ function asciiJson(value) {
 }
 
 function readInput() {
-  // PowerShell 按 UTF-8 转发时会在开头加 BOM,JSON.parse 认不出
-  try { const t = fs.readFileSync(0, "utf8").replace(/^\uFEFF/, ""); return t ? JSON.parse(t) : {}; } catch { return {}; }
+  // 输入总是一个 JSON 对象,从第一个 { 读起:PowerShell 转发时开头可能多出 BOM,或按错的编码解出的 BOM 字符
+  try { const t = fs.readFileSync(0, "utf8"); const i = t.indexOf("{"); return i >= 0 ? JSON.parse(t.slice(i)) : {}; } catch { return {}; }
 }
 const lines = (s) => (s || "").split("\n").filter(Boolean);
 const list = (items, max) => items.slice(0, max).map((x) => `\`${x}\``).join("、") + (items.length > max ? ` 等 ${items.length} 个` : "");

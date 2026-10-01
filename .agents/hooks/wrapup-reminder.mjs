@@ -80,9 +80,11 @@ function changedFiles(repoRoot) {
 
 function readInput() {
   try {
-    // PowerShell forwards UTF-8 with a leading BOM, which JSON.parse rejects.
-    const text = fs.readFileSync(0, "utf8").replace(/^\uFEFF/, "");
-    return text ? JSON.parse(text) : {};
+    // The input is always a JSON object; start at the first "{" so a BOM (or a BOM decoded with the wrong
+    // code page) that PowerShell adds in front does not break JSON.parse.
+    const text = fs.readFileSync(0, "utf8");
+    const start = text.indexOf("{");
+    return start >= 0 ? JSON.parse(text.slice(start)) : {};
   } catch {
     return {};
   }

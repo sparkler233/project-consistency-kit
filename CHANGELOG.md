@@ -32,7 +32,7 @@
 - **Windows 实机检查的修正(2026-10-01)**:推送公开 main 后 Windows CI 失败,在一台 Windows PowerShell 5.1(GBK)机器上排查:
   - 每轮提示与压缩后提醒的输出改为只用 ASCII 的 JSON(中文转成 `\uXXXX`),与收尾提醒相同。此前直接输出中文,在 Windows PowerShell 5.1 里经管道转发、存进变量时按系统代码页解码,中文被解乱、JSON 解析失败。
   - Windows 适配测试(不在分发包里)的注释改为 ASCII:PowerShell 5.1 按 ANSI 代码页读没有 BOM 的脚本,GBK 下一行中文注释吞掉了换行,把下一行代码也变成了注释,脚本无法解析。
-  - 三个 hook 读输入时去掉开头的 BOM。PowerShell 的 `$OutputEncoding` 为 UTF-8(带 BOM)时,传给 Node 的 JSON 开头多一个 BOM,`JSON.parse` 失败,hook 当成没有输入:压缩后提醒不出声(要靠 `source=compact`),每轮提示读不到会话与目录,收尾提醒读不到会话 id、同一会话只提醒一次的去重失效。适配器自己读 stdin 时也不去 BOM,会原样转给 Node。CI 上 Windows 检查连续失败即此原因(在 Windows 实机上把 `$OutputEncoding` 设为 UTF-8 后复现了同样的诊断输出);新增两项回归测试(带 BOM 的输入),Windows 适配测试在 hook 没有输出时打印各层诊断。
+  - 三个 hook 从输入的第一个 `{` 读起,跳过开头的 BOM 或按错的编码解出的 BOM 字符。PowerShell 的 `$OutputEncoding` 为 UTF-8(带 BOM)时,传给 Node 的 JSON 开头多一个 BOM,`JSON.parse` 失败,hook 当成没有输入:压缩后提醒不出声(要靠 `source=compact`),每轮提示读不到会话与目录,收尾提醒读不到会话 id、同一会话只提醒一次的去重失效。适配器自己读 stdin 时也不去 BOM,会原样转给 Node。CI 上 Windows 检查连续失败与此有关(在 Windows 实机上把 `$OutputEncoding` 设为 UTF-8 后复现了同样的诊断输出;改后 CI 上直接运行 hook 已正常,经 `run-hook.ps1` 一路仍无输出,实机上未复现,原因待诊断确认);新增三项回归测试(带 BOM、带按错编码解出的 BOM 的输入),Windows 适配测试在 hook 没有输出时逐层打印诊断。
 
 以下为 preview.2 之后、与并行无关的修复:
 
