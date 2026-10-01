@@ -53,5 +53,6 @@ node .agents/skills/wrapup/scripts/scope.mjs --overview
 - “自上次收尾以来”(每次都有)：基线之后的新提交标题、未提交与未跟踪改动、「待提交」中未迁出的决策(`pending_decisions`，逐条写出)；都没有写一行“无变化”；基线不可靠时写无法比较。
 - 在分支上：任务名、目标、进度、还剩(找不到检查点时注明)，以及主线变化是否与本分支相关。
 - `other_branches`、`anomalies` 每项一行：分支写任务、还剩与是否已全部进主线；有未提交改动、还没进主线的决策、找不到检查点(`handoff_missing`)或与别的分支共有未进主线的提交(`shares_unmerged_with`)时注明；为空不写。
+- `hook_failures` 有内容时写一行：hook 留下了几条失败记录、最近一条，建议运行 `node .agents/hooks/selfcheck.mjs`；没有不写。
 
 只调用 catchup 则报告后结束。同时授权了后续任务且没有阻塞，就直接继续，不追问；关键缺口未解时，不做依赖它的动作。

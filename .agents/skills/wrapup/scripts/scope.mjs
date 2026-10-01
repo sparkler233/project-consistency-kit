@@ -7,7 +7,8 @@
 //                                   其他分支的任务、领先 / 落后、是否已全部进主线、未提交改动、还没进主线的决策)、推送异常;
 //                                   不变式的提醒:分支有主线之外的提交却找不到检查点(handoff_missing,如 rebase 之后),
 //                                   与别的分支共有还没进主线的提交(shares_unmerged_with,分支之间直接合并过,对方的决策会被一起带进主线);
-//                                   分支上另给主线一侧改动命中的联动规则(rules_hit_by_canonical)
+//                                   分支上另给主线一侧改动命中的联动规则(rules_hit_by_canonical);
+//                                   上次 hook 自检通过以来 hook 留下的失败记录(hook_failures:条数与最近几行,没有则不给)
 // 默认模式另给 hints:整理线索(本次涉及的文档中大量重复的行、没有被任何文档引用的文档),只供模型判断是否提醒整理;
 // 以及 linkage:本次范围(基线后已提交与工作区改动)按路径命中的联动规则 rules_hit,和脚本判断不全、要模型自行判断的
 // rules_not_checked(触发里没有路径,或还有文字条件而按路径没命中);是否成立、要不要改由模型按规则原文判断
@@ -19,6 +20,7 @@ import { existsSync, openSync, readSync, closeSync, lstatSync, readlinkSync, rea
 import { fileURLToPath } from "node:url";
 import { LINKAGE, parseLinkage, ruleHits, notChecked } from "./linkage.mjs";
 import { taskState as taskStateAt, remainingLine, pendingDecisions, pendingIn, leadingComments, gitAtLeast } from "./checkpoints.mjs";
+import { failuresSinceSelfcheck } from "./hook-trace.mjs";
 
 // --help 只打印开头这段说明,不做任何改动;不认识的参数报错且不执行
 {
@@ -237,7 +239,9 @@ function overviewInfo(guard) {
   let pending_decisions = [];
   try { pending_decisions = pendingIn(readFileSync(path.join(root, "PROJECT.md"), "utf8")); } catch {}
   // 最近提交沿 first-parent:并进主线的合并提交与它的第二父提交标题相同,再加同步提交,逐条列出会把一次合并写成两三行
-  return { recent_commits: commits("HEAD", ["-15", "--first-parent"]), pending_decisions, top_files, tree, ...branches, anomalies };
+  const hook_failures = failuresSinceSelfcheck(root);
+  return { recent_commits: commits("HEAD", ["-15", "--first-parent"]), pending_decisions, top_files, tree, ...branches, anomalies,
+    ...(hook_failures ? { hook_failures } : {}) };
 }
 
 const MECH = [".agents/", ".claude/", ".codex/", "一致性机制/"];

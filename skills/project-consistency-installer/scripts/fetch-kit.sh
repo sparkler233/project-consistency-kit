@@ -137,6 +137,11 @@ version_at_least_2_0_preview_3() {
   version_at_least_2_0_preview_2 "$1" && [ "$1" != "2.0.0-preview.2" ]
 }
 
+# preview.4 起含 hook 自检与失败留痕
+version_at_least_2_0_preview_4() {
+  version_at_least_2_0_preview_3 "$1" && [ "$1" != "2.0.0-preview.3" ]
+}
+
 version_at_least_1_3() {
   local version_core="${1%%-*}"
   local major minor patch
@@ -337,6 +342,14 @@ EOF
         .agents/hooks/run-hook.ps1; do
         [ -f "$distribution_dir/$relative_path" ] \
           || fail "v2.0.0-preview.3+ distribution is incomplete: missing $relative_path"
+      done
+    fi
+    if version_at_least_2_0_preview_4 "$validated_version"; then
+      for relative_path in \
+        .agents/skills/wrapup/scripts/hook-trace.mjs \
+        .agents/hooks/selfcheck.mjs; do
+        [ -f "$distribution_dir/$relative_path" ] \
+          || fail "v2.0.0-preview.4+ distribution is incomplete: missing $relative_path"
       done
     fi
   fi

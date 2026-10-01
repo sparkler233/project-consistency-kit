@@ -6,10 +6,18 @@
 
 ## v2.0.0-preview.4 — 2026-10-01
 
-**预发布(进行中,尚未发布)。** 与 preview.3 兼容:不新增文件、不改接线与结构,从 preview.3 升级只替换机制文件。GitHub 上仍标为 prerelease,须 `--release v2.0.0-preview.4` 明确获取。本节随 preview.4 的各项改动累加。
+**预发布(进行中,尚未发布)。** 与 preview.3 兼容:不改接线与结构,从 preview.3 升级只替换机制文件并补上两个新文件(hook 自检与失败留痕)。GitHub 上仍标为 prerelease,须 `--release v2.0.0-preview.4` 明确获取。本节随 preview.4 的各项改动累加。
 
 - **做完一项工作时建议收尾(决策 118 转正)**:运行规则第三节新增一条——一项工作做完(改动已验证、没有紧接着的下一步)时,模型主动向用户建议收尾,进行中不打断,是不是到了段落按当前任务的具体情况判断;主线上收尾要先经用户确认,只建议、等用户决定,任务分支上收尾只是写检查点,可以直接做、事后报告。此前只在套件源仓库自己的 `AGENTS.md` 里试用。「做完了」Git 看不出来,只能由模型判断,所以只靠这一句规则,不新增 hook。按上下文用量的提示仍是仓库内的试用,不在这一版里。
 - **并进主线后漏报刚开工的分支**:`task.mjs land --finish` 报告别的任务分支(`other_task_branches`)时,原先只看分支已提交的内容与分叉点有没有差别,只有开工检查点、或改动还没提交的分支被漏掉,并说「已没有别的任务分支在并行,可以回到主线单线程工作」。现在有主线没有的提交(只有开工检查点也算)、或 worktree 里有未提交改动,就算还在进行;已并进主线还没收工的仍不算。每轮提示不受影响(它在各分支自己的会话里判断)。新增一项回归测试。
+- **hook 可观测性(决策 121)**:hook 出错时照旧静默放行,不挡宿主;此前坏掉的 hook 和「没什么可提醒」看起来一样,preview.3 发布时 Windows CI 由此逼出四个静默问题,其中适配器静默退出自 v1.2.x 就在。
+  - 新命令 `node .agents/hooks/selfcheck.mjs`(hook 自检):读项目的 `.claude/settings.json`、`.codex/hooks.json` 或 `.codex/config.toml` 里机制的 hook 项,在临时仓库(复制项目的 `.agents/` 与接线文件,造出三个 hook 都该出声的场景)里按接线原样运行每个 hook,逐项报告退出码、有无输出、输出是否为合法 JSON 并带预期字段,少接的事件也报出;只跑当前平台的接线,Codex 另一平台的写法注明未测;`--json` 给机器读。全部通过退出码为 0。安装器接线后运行它;用户觉得提醒没了时也可运行。
+  - 失败留痕:hook 外层捕获到异常、输入非空却解析不出 JSON、状态文件写不了,以及 Windows 适配器找到仓库但脚本缺失或 node 非 0 退出时,在 Git 公共目录(各 worktree 共用)的 `pck-hook-failures.log` 追加一行(时间、hook、宿主、原因;输入只记长度与开头几个字符的码位,不记内容),只留最后 100 行。自检全部通过时追加 `selfcheck ok`。
+  - `scope.mjs --overview` 新增 `hook_failures`(上次自检通过以来的失败条数与最近几行),catchup 有内容时用一行提到并建议运行自检。
+  - 三个 hook 读输入的代码合为一份(新文件 `.agents/skills/wrapup/scripts/hook-trace.mjs`,与留痕在一起);收尾提醒因此也依赖 wrapup 的脚本目录,与另两个 hook 相同。
+  - 限制:hook 模块根本没跑起来(如导入的文件缺失)或适配器连 Git 都找不到时无处可写,只能靠自检发现;自检只证明接线在干净场景里能出声,宿主是否信任、宿主自己的 PATH 里有没有 node 测不到。
+  - Windows 实测(PowerShell 5.1、GBK 代码页、Node 24):失败留痕与自检的回归测试、Windows 适配测试、本仓库接线与分发包内的自检均通过(Codex 一侧经 `commandWindows` 与 PowerShell 适配器)。实测中发现 Windows 上 Node 24 的 `fs.cpSync` 遇到非 ASCII 路径(`一致性机制/hooks`)会让进程直接崩溃,自检改为逐个文件复制。
+- **分发**:清单新增 `hook-trace.mjs`、`selfcheck.mjs`(43 个文件);`fetch-kit.sh` 对 preview.4 起的包要求这两个文件。CI(Linux 与 Windows)新增失败留痕与自检的回归测试,并对本仓库接线跑一次自检。
 
 ## v2.0.0-preview.3 — 2026-10-01
 

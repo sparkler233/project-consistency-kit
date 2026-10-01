@@ -90,6 +90,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $kit ".agents\hooks\compact-reminder.mjs") -Destination (Join-Path $fixture ".agents\hooks\compact-reminder.mjs")
     New-Item -ItemType Directory -Path (Join-Path $fixture ".agents\skills\wrapup\scripts") -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $kit ".agents\skills\wrapup\scripts\checkpoints.mjs") -Destination (Join-Path $fixture ".agents\skills\wrapup\scripts\checkpoints.mjs")
+    Copy-Item -LiteralPath (Join-Path $kit ".agents\skills\wrapup\scripts\hook-trace.mjs") -Destination (Join-Path $fixture ".agents\skills\wrapup\scripts\hook-trace.mjs")
     Set-Content -LiteralPath (Join-Path $mechanismDir.FullName $linkageName) -Value "# fixture" -Encoding UTF8
     Set-Content -LiteralPath (Join-Path $fixture "tracked.txt") -Value "clean" -Encoding UTF8
 
