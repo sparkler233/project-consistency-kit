@@ -24,11 +24,21 @@ function run(command, args, cwd, { input, env, expected = 0 } = {}) {
 const git = (cwd, ...args) => run("git", args, cwd).stdout.trim();
 const logOf = (dir) => { try { return fs.readFileSync(path.join(dir, ".git", LOG), "utf8").split("\n").filter(Boolean); } catch { return []; } };
 
+// 逐个文件复制,不用 fs.cpSync:Windows 上 Node 24 的 cpSync 遇到非 ASCII 路径(如「一致性机制」)会让进程直接崩溃
+function copyDir(from, to) {
+  fs.mkdirSync(to, { recursive: true });
+  for (const e of fs.readdirSync(from, { withFileTypes: true })) {
+    const a = path.join(from, e.name), b = path.join(to, e.name);
+    if (e.isDirectory()) copyDir(a, b);
+    else if (e.isFile()) fs.copyFileSync(a, b);
+  }
+}
+
 // 一个装了本套件 hook 与接线的项目(复制 .agents/ 与三份接线文件)
 function project() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "pck-observe-测试-")));
   temps.push(dir);
-  fs.cpSync(path.join(kitRoot, ".agents"), path.join(dir, ".agents"), { recursive: true });
+  copyDir(path.join(kitRoot, ".agents"), path.join(dir, ".agents"));
   for (const rel of [".claude/settings.json", ".codex/hooks.json"]) {
     fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
     fs.copyFileSync(path.join(kitRoot, rel), path.join(dir, rel));
@@ -133,8 +143,18 @@ try {
   bad = failed(selfcheck(p, 1));
   assert.equal(bad.length, 2, JSON.stringify(bad));
   for (const r of bad) assert.equal(r.event, "SessionStart");
-  // POSIX 上 node 直接以 1 退出;Windows 上 Codex 经适配器,适配器发现脚本缺失、静默放行
+  // POSIX 上 node 直接以 1 退出;Windows 上 Codex 经适配器,适配器发现脚本缺失、静默放行并留一行
+  const codexDetail = (list) => list.find((r) => r.host === "Codex").detail;
   assert.ok(bad.some((r) => /退出码 1/.test(r.detail)), JSON.stringify(bad));
+  if (process.platform === "win32") assert.match(codexDetail(bad), /没有输出;hook 留下的失败记录:adapter: hook script missing: \.agents\/hooks\/compact-reminder\.mjs/);
+  else assert.match(codexDetail(bad), /退出码 1/);
+
+  // 脚本语法错误:node 以非 0 退出;Windows 上适配器记下 node 的退出码
+  fs.writeFileSync(compactPath, "this is not javascript (\n");
+  bad = failed(selfcheck(p, 1));
+  assert.equal(bad.length, 2, JSON.stringify(bad));
+  if (process.platform === "win32") assert.match(codexDetail(bad), /没有输出;hook 留下的失败记录:adapter: node exited 1/);
+  else assert.match(codexDetail(bad), /退出码 1/);
   fs.writeFileSync(compactPath, compactText);
 
   // 少接一项、接线文件坏掉

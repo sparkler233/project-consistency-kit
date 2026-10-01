@@ -102,6 +102,16 @@ function fromToml(rel) {
 
 // ---------- 临时仓库 ----------
 
+// 逐个文件复制,不用 fs.cpSync:Windows 上 Node 24 的 cpSync 遇到非 ASCII 路径(如「一致性机制」)会让进程直接崩溃
+function copyDir(from, to) {
+  fs.mkdirSync(to, { recursive: true });
+  for (const e of fs.readdirSync(from, { withFileTypes: true })) {
+    const a = path.join(from, e.name), b = path.join(to, e.name);
+    if (e.isDirectory()) copyDir(a, b);
+    else if (e.isFile()) fs.copyFileSync(a, b);
+  }
+}
+
 function makeScratch() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "pck-selfcheck-")));
   const g = (...a) => {
@@ -109,11 +119,11 @@ function makeScratch() {
     if (r.status !== 0) throw new Error(`git ${a.join(" ")}:${(r.stderr || "").trim()}`);
   };
   const write = (rel, text) => { fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true }); fs.writeFileSync(path.join(dir, rel), text); };
-  fs.cpSync(path.join(root, ".agents"), path.join(dir, ".agents"), { recursive: true });
+  copyDir(path.join(root, ".agents"), path.join(dir, ".agents"));
   for (const rel of [".claude/settings.json", ".codex/hooks.json", ".codex/config.toml"]) {
     if (fs.existsSync(path.join(root, rel))) { fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true }); fs.copyFileSync(path.join(root, rel), path.join(dir, rel)); }
   }
-  if (fs.existsSync(path.join(root, "一致性机制", "hooks"))) fs.cpSync(path.join(root, "一致性机制", "hooks"), path.join(dir, "一致性机制", "hooks"), { recursive: true });
+  if (fs.existsSync(path.join(root, "一致性机制", "hooks"))) copyDir(path.join(root, "一致性机制", "hooks"), path.join(dir, "一致性机制", "hooks"));
   write("一致性机制/文件联动目录.md", "# 文件联动目录\n");
   write("PROJECT.md", "# 自检\n");
   write("shared.txt", "base\n");
