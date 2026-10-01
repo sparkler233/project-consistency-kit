@@ -16,6 +16,7 @@
   - `scope.mjs --overview` 新增 `hook_failures`(上次自检通过以来的失败条数与最近几行),catchup 有内容时用一行提到并建议运行自检。
   - 三个 hook 读输入的代码合为一份(新文件 `.agents/skills/wrapup/scripts/hook-trace.mjs`,与留痕在一起);收尾提醒因此也依赖 wrapup 的脚本目录,与另两个 hook 相同。
   - 限制:hook 模块根本没跑起来(如导入的文件缺失)或适配器连 Git 都找不到时无处可写,只能靠自检发现;自检只证明接线在干净场景里能出声,宿主是否信任、宿主自己的 PATH 里有没有 node 测不到。
+  - Windows 实测(PowerShell 5.1、GBK 代码页、Node 24):失败留痕与自检的回归测试、Windows 适配测试、本仓库接线与分发包内的自检均通过(Codex 一侧经 `commandWindows` 与 PowerShell 适配器)。实测中发现 Windows 上 Node 24 的 `fs.cpSync` 遇到非 ASCII 路径(`一致性机制/hooks`)会让进程直接崩溃,自检改为逐个文件复制。
 - **分发**:清单新增 `hook-trace.mjs`、`selfcheck.mjs`(43 个文件);`fetch-kit.sh` 对 preview.4 起的包要求这两个文件。CI(Linux 与 Windows)新增失败留痕与自检的回归测试,并对本仓库接线跑一次自检。
 
 ## v2.0.0-preview.3 — 2026-10-01
