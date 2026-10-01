@@ -4,7 +4,7 @@
 > 任何机制文件发生真实变化:判断 SemVer 影响、全部修订日期一起 bump 到当天,并在此记入对应版本。
 > 本文件**套件专属,不随模板进项目**(绿地 rsync 已排除;安装器也不拷它)。
 
-## v2.0.0-preview.3 — 2026-09-30
+## v2.0.0-preview.3 — 2026-10-01
 
 **预发布(决策 115)。** 加入 Core 并行(实验性):一个人同时驾驶多个会话,各在自己的分支与 worktree 上工作,谁合并谁负责。与 preview.1 / preview.2 兼容:PROJECT、AGENTS 与联动目录的结构不变,升级替换机制文件、补上两个新 hook 的接线;从 v1.3.0 仍按升级细则。GitHub 上仍标为 prerelease,须 `--release v2.0.0-preview.3` 明确获取。
 
@@ -18,7 +18,7 @@
   - wrapup:分支上的提交(含并进主线)不先确认,事后报告,主线上照旧确认一次(决策 111);描述写明用户说「收尾」「并进主线」时使用;分支段与决策问题的处理说明移进脚本输出,Skill 文字减少。catchup 报告各分支是否已进主线、未提交改动、还没进主线的决策与不变式提醒。
   - 已知限制:需要 Git 2.38 及以上;Windows 上未经真实会话验证(由 CI 跑回归测试);Codex 与 Claude Code 实测每种设置只跑过一次;联动内容是否真正核对仍靠模型;压缩后的提醒已在 Codex 上见到送达,之后模型是否照规则做未验证;两个会话先后合并时 PROJECT 总体状态一段常有冲突;用户拍板的事可能没被记成决策;hook 只在项目受信任时运行,Codex 桌面端可能不弹出 hook 审查窗口,要在终端里打开 Codex 批准一次;Codex 沙箱下并进主线须把主线目录列为可写;Claude Code 桌面版的 worktree 在仓库内 `.claude/worktrees/`,须加进 `.gitignore`(安装器会列入计划)。
 - **安装器**:新增文件与三项 hook 接线(Stop、UserPromptSubmit、SessionStart);从 preview.1 / preview.2 升级时补上新接线;`.gitignore` 缺 `.claude/worktrees/` 时列入计划。`fetch-kit.sh` 对 preview.3 起的包要求新增的 5 个文件。
-- **分发**:清单新增 `task.mjs`、`checkpoints.mjs`、`parallel-notice.mjs`、`compact-reminder.mjs`、`run-hook.ps1`(41 个文件);全部机制文件修订日期统一为 2026-09-30。并行的回归测试并入 CI(Linux 与 Windows)。
+- **分发**:清单新增 `task.mjs`、`checkpoints.mjs`、`parallel-notice.mjs`、`compact-reminder.mjs`、`run-hook.ps1`(41 个文件);全部机制文件修订日期统一为 2026-10-01。并行的回归测试并入 CI(Linux 与 Windows)。
 - **发布前审查的修正(2026-09-30,决策 116)**:
   - `decisions.mjs apply --commit` 没有 `--title` 时拒绝执行、不做任何改动。此前会照样提交:提交说明的第一段被 Git 当成标题;新分支上说明只有一行 `Task:` 时它不再是 trailer,这个检查点之后找不到(`handoff_missing`)。迁出决策时标题末尾的〔决策 N〕由脚本补上,写错的会被换掉。
   - `scope.mjs --overview` 的最近提交沿 first-parent,一次并进主线只占一行。此前合并提交与它的第二父提交标题相同,再加同步提交与合并前检查点,一次合并占两三行。
@@ -29,6 +29,10 @@
   - 安装器:计划末尾与最终报告把 Codex 的 hook 审查单独列为需要用户做的一步(桌面端可能不弹出审查窗口,在终端里打开 Codex 批准一次;没批准时三项 hook 都不运行,也不报错);Git 低于 2.38 时注明并行用不了。初始化指南同样写明。
   - 说法更正:运行规则里机制的 hook 接线写全三项;`synced-guard.mjs` 与安装器不再称 guard 是 synced 的唯一入口(并行时 `task.mjs land --finish` 也推进它);公开 README 写明只有主线上才先确认、分支上的收尾不等确认,决策档案可以保留为只读,并行需要 Git 2.38。
   - CI:Linux 任务也对构建出的包跑 `fetch-kit.sh --verify-dir`(此前只有 Windows 任务跑)。
+- **Windows 实机检查的修正(2026-10-01)**:推送公开 main 后 Windows CI 失败,在一台 Windows PowerShell 5.1(GBK)机器上排查:
+  - 每轮提示与压缩后提醒的输出改为只用 ASCII 的 JSON(中文转成 `\uXXXX`),与收尾提醒相同。此前直接输出中文,在 Windows PowerShell 5.1 里经管道转发、存进变量时按系统代码页解码,中文被解乱、JSON 解析失败。
+  - Windows 适配测试(不在分发包里)的注释改为 ASCII:PowerShell 5.1 按 ANSI 代码页读没有 BOM 的脚本,GBK 下一行中文注释吞掉了换行,把下一行代码也变成了注释,脚本无法解析。
+  - Windows 适配测试在 Stop 提醒没有输出时打印各层的诊断(工作区状态、直接运行 node 与只经一层适配器的结果)。CI 上的这次失败在 Windows 实机上没有复现,原因待诊断输出确认。
 
 以下为 preview.2 之后、与并行无关的修复:
 

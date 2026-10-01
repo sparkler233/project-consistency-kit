@@ -3,7 +3,7 @@ name: catchup
 description: Restore task-relevant project context from the project entry, current artifacts and Git without modifying the repository. Use when asked to catch up, recover prior work or load project state before continuing a task.
 ---
 
-<!-- 一致性机制 version: 2026-09-30 -->
+<!-- 一致性机制 version: 2026-10-01 -->
 
 恢复本次范围内足以判断下一步的信息。全程只读：不改文件、不修入口、不运行测试或实验、不操作提交或 synced。报告只覆盖实际读到的范围，不说成全项目核验。
 

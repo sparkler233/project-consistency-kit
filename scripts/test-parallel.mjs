@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-09-30
+// 一致性机制 version: 2026-10-01
 // 并行事实回归测试:在临时仓库里造出各种并行情形,核对 scope.mjs --overview 给出的分支与主线关系(决策 105 起 parallel.mjs 并入 overview)。
 
 import assert from "node:assert/strict";

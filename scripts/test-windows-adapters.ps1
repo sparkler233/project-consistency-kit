@@ -1,4 +1,4 @@
-# 一致性机制 version: 2026-09-30
+# 一致性机制 version: 2026-10-01
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
@@ -26,7 +26,9 @@ if ($handler.commandWindows -notmatch '(?i)-File') {
     throw "Codex commandWindows must invoke the PowerShell adapter with -File"
 }
 
-# 每轮提示与压缩后提醒:commandWindows 经通用薄适配器 run-hook.ps1 按名字转发
+# Per-turn notice and post-compaction reminder: commandWindows forwards by name through run-hook.ps1.
+# Keep comments in .ps1 files ASCII: PowerShell 5.1 reads BOM-less scripts in the ANSI code page, and under GBK a
+# UTF-8 comment can swallow its line break and comment out the next line.
 foreach ($event in @('UserPromptSubmit', 'SessionStart')) {
     $h = $codexHooks.hooks.$event[0].hooks[0]
     if (-not $h.commandWindows -or $h.commandWindows -notmatch 'run-hook\.ps1' -or $h.commandWindows -notmatch '(?i)-File') {
@@ -108,6 +110,21 @@ try {
         $output = $inputJson | & powershell.exe -NoProfile -NonInteractive -Command $handler.commandWindows
         if ($LASTEXITCODE -ne 0) {
             throw "Codex commandWindows failed through an outer PowerShell: exit $LASTEXITCODE"
+        }
+        if (-not $output) {
+            # Empty Stop output: collect what each layer sees, with fresh session ids so duplicate suppression does not hide output.
+            $diagnostics = & {
+                $ErrorActionPreference = 'Continue'
+                "cwd: $((Get-Location).Path)"
+                "tmp: $([System.IO.Path]::GetTempPath())"
+                "toplevel: $(& git rev-parse --show-toplevel 2>&1)"
+                "status: $(& git status --porcelain 2>&1 | Out-String)"
+                $direct = @{ session_id = "windows-adapter-diag-node"; hook_event_name = "Stop" } | ConvertTo-Json -Compress
+                "node direct: $($direct | & node (Join-Path $fixture '.agents\hooks\wrapup-reminder.mjs') 2>&1 | Out-String) exit=$LASTEXITCODE"
+                $adapter = @{ session_id = "windows-adapter-diag-ps1"; hook_event_name = "Stop" } | ConvertTo-Json -Compress
+                "adapter only: $($adapter | & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $fixture '.agents\hooks\wrapup-reminder.ps1') 2>&1 | Out-String) exit=$LASTEXITCODE"
+            } | Out-String
+            throw "Codex commandWindows returned no Stop output. Diagnostics:`n$diagnostics"
         }
         $duplicate = $inputJson | & powershell.exe -NoProfile -NonInteractive -Command $handler.commandWindows
         if ($LASTEXITCODE -ne 0) {

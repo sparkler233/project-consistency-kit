@@ -5,7 +5,7 @@ metadata:
   version: "2.0.0-preview.3"
 ---
 
-<!-- 一致性机制 version: 2026-09-30 -->
+<!-- 一致性机制 version: 2026-10-01 -->
 
 # Project Consistency Installer
 

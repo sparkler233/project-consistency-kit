@@ -1,4 +1,4 @@
-// 一致性机制 version: 2026-09-30
+// 一致性机制 version: 2026-10-01
 // 任务检查点的共享找法,供 scope.mjs、decisions.mjs、task.mjs 与每轮提示 hook 使用,只此一份。
 // 检查点是分支上带 `Task:` trailer 的提交;合并版 wrapup 的提交另带 `Land-Checked:`(检查时依据的主线提交)。
 // 先查分支的 reflog(分支先后指向过的提交;快进接回主线后仍在,新开的分支里没有别人的检查点),查不到再沿 first-parent 往回找。

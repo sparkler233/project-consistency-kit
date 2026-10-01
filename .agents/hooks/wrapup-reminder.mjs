@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-09-30
+// 一致性机制 version: 2026-10-01
 // Project Consistency Kit cross-platform Stop hook.
 // Always fails open: it only emits one systemMessage per dirty cycle.
 // Baseline: `synced` on the canonical branch; on other branches the latest task checkpoint

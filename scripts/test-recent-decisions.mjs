@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-09-30
+// 一致性机制 version: 2026-10-01
 // 「最近决策」按 git 整段生成(决策 81、88):索引被改坏后自动修复、推翻的决策以后都不再出现、部分调整注记持续保留、条数上限。
 
 import assert from "node:assert/strict";

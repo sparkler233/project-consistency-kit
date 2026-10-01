@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-09-30
+// 一致性机制 version: 2026-10-01
 // 并行提示 hook:每轮开始时运行(Claude Code 与 Codex 都接在 UserPromptSubmit)。
 // 只按 Git 事实生成提示,不写仓库文件,不做任何 Git 改动;出错一律静默,不阻塞宿主。
 // 在分支上:主线有本分支没有的提交,且与本分支相关(改了同样的文件,含未提交的;主线一侧命中联动规则;试合并冲突)、
@@ -15,6 +15,11 @@ import { gitIn, projectBody } from "../skills/wrapup/scripts/checkpoints.mjs";
 import { LINKAGE, parseLinkage, ruleHits } from "../skills/wrapup/scripts/linkage.mjs";
 
 const SUBJECTS = 5, FILES = 8;
+
+// 输出只用 ASCII(中文转成 \uXXXX):Windows PowerShell 5.1 经管道转发时按系统代码页解码,非 ASCII 会被解乱(与收尾提醒相同)
+function asciiJson(value) {
+  return JSON.stringify(value).replace(/[\u007f-\uffff]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
+}
 
 function readInput() {
   try { const t = fs.readFileSync(0, "utf8"); return t ? JSON.parse(t) : {}; } catch { return {}; }
@@ -84,7 +89,7 @@ function main() {
 
 try {
   const text = main();
-  if (text) process.stdout.write(JSON.stringify({ systemMessage: text, hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: text } }));
+  if (text) process.stdout.write(asciiJson({ systemMessage: text, hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: text } }));
 } catch {
   // 提示只是补充信息,任何意外都静默
 }
