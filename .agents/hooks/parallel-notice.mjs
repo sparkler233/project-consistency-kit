@@ -22,7 +22,8 @@ function asciiJson(value) {
 }
 
 function readInput() {
-  try { const t = fs.readFileSync(0, "utf8"); return t ? JSON.parse(t) : {}; } catch { return {}; }
+  // PowerShell 按 UTF-8 转发时会在开头加 BOM,JSON.parse 认不出
+  try { const t = fs.readFileSync(0, "utf8").replace(/^\uFEFF/, ""); return t ? JSON.parse(t) : {}; } catch { return {}; }
 }
 const lines = (s) => (s || "").split("\n").filter(Boolean);
 const list = (items, max) => items.slice(0, max).map((x) => `\`${x}\``).join("、") + (items.length > max ? ` 等 ${items.length} 个` : "");

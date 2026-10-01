@@ -164,6 +164,8 @@ try {
   // 压缩后提醒:只在 source 为 compact 时出现;主线上只提醒重读,分支上另附三条与同步、合并的做法
   assert.equal(compact(b, "startup"), null, "新会话不提醒,由 catchup 读取规则");
   assert.equal(compact(b, "resume"), null);
+  const bom = run(process.execPath, [COMPACT], repo, 0, "\uFEFF" + JSON.stringify({ cwd: repo, source: "compact" }));
+  assert.ok(bom && JSON.parse(bom).hookSpecificOutput.additionalContext, "输入开头带 BOM(PowerShell 按 UTF-8 转发)时照常提醒");
   assert.match(compact(repo, "compact"), /^\[一致性机制\] 上下文刚被压缩:继续工作前先重读 `PROJECT\.md` 与 `一致性机制\/运行规则\.md`;用户说「收尾」就运行 wrapup。$/, "主线上只提醒重读");
   assert.match(compact(b, "compact"), /任务分支 `task\/b` 上并行工作.*task\.mjs land.*task\.mjs sync`,不手抄/, "分支上附三条与做法");
   // C 没改相关文件:主线改了第三章与 PROJECT 生成的两段,与 C 不相关 → 不提示

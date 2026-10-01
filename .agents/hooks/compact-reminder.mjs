@@ -15,7 +15,8 @@ function asciiJson(value) {
 }
 
 function readInput() {
-  try { const t = fs.readFileSync(0, "utf8"); return t ? JSON.parse(t) : {}; } catch { return {}; }
+  // PowerShell 按 UTF-8 转发时会在开头加 BOM,JSON.parse 认不出
+  try { const t = fs.readFileSync(0, "utf8").replace(/^\uFEFF/, ""); return t ? JSON.parse(t) : {}; } catch { return {}; }
 }
 
 function main() {

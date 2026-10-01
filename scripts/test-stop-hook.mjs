@@ -32,14 +32,14 @@ function git(...args) {
   return run("git", args);
 }
 
-function invoke(session, { cwd = fixture, claude = false } = {}) {
+function invoke(session, { cwd = fixture, claude = false, bom = false } = {}) {
   const env = { ...process.env };
   delete env.CLAUDE_PROJECT_DIR;
   if (claude) env.CLAUDE_PROJECT_DIR = fixture;
   const output = run(process.execPath, [hook], {
     cwd,
     env,
-    input: JSON.stringify({ session_id: session }),
+    input: (bom ? "\uFEFF" : "") + JSON.stringify({ session_id: session }),
   });
   assert.equal(Buffer.byteLength(output, "utf8"), output.length, "hook JSON transport must be ASCII-safe");
   return output ? JSON.parse(output) : null;
@@ -64,6 +64,8 @@ try {
   assert.match(first.systemMessage, /\$wrapup$/);
   assert.equal("decision" in first, false, "Stop reminder must never block or continue");
   assert.equal(invoke("dirty-cycle"), null, "same dirty cycle must only remind once");
+  assert.ok(invoke("bom-cycle", { bom: true }), "a BOM-prefixed input still reminds");
+  assert.equal(invoke("bom-cycle"), null, "the session id is read despite a leading BOM");
 
   fs.rmSync(path.join(fixture, "untracked.txt"));
   assert.equal(invoke("dirty-cycle"), null, "clean state must rearm silently");

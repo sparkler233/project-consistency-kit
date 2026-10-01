@@ -80,7 +80,8 @@ function changedFiles(repoRoot) {
 
 function readInput() {
   try {
-    const text = fs.readFileSync(0, "utf8");
+    // PowerShell forwards UTF-8 with a leading BOM, which JSON.parse rejects.
+    const text = fs.readFileSync(0, "utf8").replace(/^\uFEFF/, "");
     return text ? JSON.parse(text) : {};
   } catch {
     return {};
