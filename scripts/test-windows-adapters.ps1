@@ -135,6 +135,20 @@ try {
         if ($LASTEXITCODE -ne 0) {
             throw "Codex SessionStart commandWindows failed through an outer PowerShell: exit $LASTEXITCODE"
         }
+        if (-not $compactOutput) {
+            # The compaction reminder needs stdin (source=compact); check where the input or output is lost.
+            $probe = Join-Path $fixture "stdin-probe.ps1"
+            Set-Content -LiteralPath $probe -Encoding ASCII -Value '$t = [Console]::In.ReadToEnd(); "stdin chars: " + $t.Length + " text: " + $t'
+            $diagnostics = & {
+                $ErrorActionPreference = 'Continue'
+                "node direct: $($compactInput | & node (Join-Path $fixture '.agents\hooks\compact-reminder.mjs') 2>&1 | Out-String) exit=$LASTEXITCODE"
+                "adapter only: $($compactInput | & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $fixture '.agents\hooks\run-hook.ps1') compact-reminder 2>&1 | Out-String) exit=$LASTEXITCODE"
+                "probe, one layer: $($compactInput | & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probe 2>&1 | Out-String)"
+                "probe, two layers: $($compactInput | & powershell.exe -NoProfile -NonInteractive -Command "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File '$probe'" 2>&1 | Out-String)"
+                "two layers again: $($compactInput | & powershell.exe -NoProfile -NonInteractive -Command $compactHandler.commandWindows 2>&1 | Out-String)"
+            } | Out-String
+            throw "Codex SessionStart commandWindows returned no output. Diagnostics:`n$diagnostics"
+        }
         $startupInput = @{ session_id = "windows-adapter"; hook_event_name = "SessionStart"; source = "startup" } | ConvertTo-Json -Compress
         $startupOutput = $startupInput | & powershell.exe -NoProfile -NonInteractive -Command $compactHandler.commandWindows
     } finally {

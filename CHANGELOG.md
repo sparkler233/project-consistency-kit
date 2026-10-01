@@ -32,7 +32,7 @@
 - **Windows 实机检查的修正(2026-10-01)**:推送公开 main 后 Windows CI 失败,在一台 Windows PowerShell 5.1(GBK)机器上排查:
   - 每轮提示与压缩后提醒的输出改为只用 ASCII 的 JSON(中文转成 `\uXXXX`),与收尾提醒相同。此前直接输出中文,在 Windows PowerShell 5.1 里经管道转发、存进变量时按系统代码页解码,中文被解乱、JSON 解析失败。
   - Windows 适配测试(不在分发包里)的注释改为 ASCII:PowerShell 5.1 按 ANSI 代码页读没有 BOM 的脚本,GBK 下一行中文注释吞掉了换行,把下一行代码也变成了注释,脚本无法解析。
-  - Windows 适配测试在 Stop 提醒没有输出时打印各层的诊断(工作区状态、直接运行 node 与只经一层适配器的结果)。CI 上的这次失败在 Windows 实机上没有复现,原因待诊断输出确认。
+  - Windows 适配测试在 Stop 提醒或压缩后提醒没有输出时打印各层的诊断(直接运行 node、只经一层适配器、两层 PowerShell 各收到多少 stdin)。CI 上 Windows 检查连续失败(先是 Stop 提醒、改后是压缩后提醒,重跑同样失败),在 Windows 实机上没有复现,原因待诊断输出确认。
 
 以下为 preview.2 之后、与并行无关的修复:
 
