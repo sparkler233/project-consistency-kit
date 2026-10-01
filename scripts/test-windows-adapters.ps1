@@ -103,77 +103,67 @@ try {
         throw "Windows adapter fixture setup failed"
     }
 
+    # Diagnostics for an empty hook output: an instrumented copy of the real adapter prints its early exits, the
+    # exception it would swallow and node's exit code; it runs 10 times and the outcomes are tallied.
+    function Get-AdapterDiagnostics([string]$Adapter, [string]$HookArg, [string]$EventName) {
+        $ErrorActionPreference = 'Continue'
+        $source = Get-Content -LiteralPath (Join-Path $fixture ".agents\hooks\$Adapter") -Raw
+        $debug = $source -replace '(?m)^([ \t]+)exit 0[ \t]*\r?$', '$1"early exit: git=$$gitExit root=[$$repoRoot] lastexit=$$LASTEXITCODE"; exit 0'
+        $debug = $debug -replace '(?m)^([ \t]+)#[^\r\n]*advisory[^\r\n]*$', '$1"adapter error: " + $$_.Exception.GetType().FullName + ": " + $$_.Exception.Message + " (line " + $$_.InvocationInfo.ScriptLineNumber + ")"'
+        $debug = $debug -replace '(& node \$\w+)', '$1; "node exit=$$LASTEXITCODE"'
+        $copy = Join-Path $fixture ".agents\hooks\debug-$Adapter"
+        Set-Content -LiteralPath $copy -Value $debug -Encoding ASCII
+        $tally = @{}
+        for ($n = 1; $n -le 10; $n++) {
+            $json = @{ session_id = "windows-adapter-debug-$n"; hook_event_name = $EventName; source = "compact" } | ConvertTo-Json -Compress
+            $psArgs = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $copy)
+            if ($HookArg) { $psArgs += $HookArg }
+            $lines = @($json | & powershell.exe @psArgs 2>&1 | ForEach-Object { "$_" })
+            $key = (@($lines | ForEach-Object { if ($_ -match 'systemMessage|hookSpecificOutput') { '<hook output>' } else { $_ } }) -join ' | ')
+            if (-not $key) { $key = '<nothing>' }
+            if ($tally.ContainsKey($key)) { $tally[$key]++ } else { $tally[$key] = 1 }
+        }
+        $nodeScript = if ($HookArg) { "$HookArg.mjs" } else { 'wrapup-reminder.mjs' }
+        $direct = @{ session_id = "windows-adapter-debug-node"; hook_event_name = $EventName; source = "compact" } | ConvertTo-Json -Compress
+        $nodeOut = ($direct | & node (Join-Path $fixture ".agents\hooks\$nodeScript") 2>&1 | Out-String).Trim()
+        $report = @("node direct: $nodeOut", "instrumented $Adapter, 10 runs:")
+        $report += @($tally.GetEnumerator() | ForEach-Object { "  $($_.Value) x $($_.Key)" })
+        $report += "test process OutputEncoding: $($OutputEncoding.WebName) preamble=$($OutputEncoding.GetPreamble().Length); console in=$([Console]::InputEncoding.WebName) out=$([Console]::OutputEncoding.WebName)"
+        $report -join "`n"
+    }
+
     Set-Content -LiteralPath (Join-Path $fixture "dirty.txt") -Value "dirty" -Encoding UTF8
     Push-Location (Join-Path $fixture "nested")
     try {
+        # Each chain runs several times, so an intermittent empty output cannot slip through on a lucky run.
+        $repeat = 10
         $inputJson = @{ session_id = "windows-adapter"; hook_event_name = "Stop" } | ConvertTo-Json -Compress
         $output = $inputJson | & powershell.exe -NoProfile -NonInteractive -Command $handler.commandWindows
         if ($LASTEXITCODE -ne 0) {
             throw "Codex commandWindows failed through an outer PowerShell: exit $LASTEXITCODE"
         }
         if (-not $output) {
-            # Empty Stop output: collect what each layer sees, with fresh session ids so duplicate suppression does not hide output.
-            $diagnostics = & {
-                $ErrorActionPreference = 'Continue'
-                "cwd: $((Get-Location).Path)"
-                "tmp: $([System.IO.Path]::GetTempPath())"
-                "toplevel: $(& git rev-parse --show-toplevel 2>&1)"
-                "status: $(& git status --porcelain 2>&1 | Out-String)"
-                $direct = @{ session_id = "windows-adapter-diag-node"; hook_event_name = "Stop" } | ConvertTo-Json -Compress
-                "node direct: $($direct | & node (Join-Path $fixture '.agents\hooks\wrapup-reminder.mjs') 2>&1 | Out-String) exit=$LASTEXITCODE"
-                $adapter = @{ session_id = "windows-adapter-diag-ps1"; hook_event_name = "Stop" } | ConvertTo-Json -Compress
-                "adapter only: $($adapter | & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $fixture '.agents\hooks\wrapup-reminder.ps1') 2>&1 | Out-String) exit=$LASTEXITCODE"
-            } | Out-String
-            throw "Codex commandWindows returned no Stop output. Diagnostics:`n$diagnostics"
+            throw "Codex commandWindows returned no Stop output on the first run.`n$(Get-AdapterDiagnostics 'wrapup-reminder.ps1' '' 'Stop')"
         }
         $duplicate = $inputJson | & powershell.exe -NoProfile -NonInteractive -Command $handler.commandWindows
         if ($LASTEXITCODE -ne 0) {
             throw "Codex commandWindows duplicate-cycle check failed: exit $LASTEXITCODE"
         }
-        $compactInput = @{ session_id = "windows-adapter"; hook_event_name = "SessionStart"; source = "compact" } | ConvertTo-Json -Compress
-        $compactOutput = $compactInput | & powershell.exe -NoProfile -NonInteractive -Command $compactHandler.commandWindows
-        if ($LASTEXITCODE -ne 0) {
-            throw "Codex SessionStart commandWindows failed through an outer PowerShell: exit $LASTEXITCODE"
+        for ($i = 1; $i -le $repeat; $i++) {
+            $again = @{ session_id = "windows-adapter-repeat-$i"; hook_event_name = "Stop" } | ConvertTo-Json -Compress
+            if (-not ($again | & powershell.exe -NoProfile -NonInteractive -Command $handler.commandWindows)) {
+                throw "Codex commandWindows returned no Stop output on repeat $i of $repeat.`n$(Get-AdapterDiagnostics 'wrapup-reminder.ps1' '' 'Stop')"
+            }
         }
-        if (-not $compactOutput) {
-            # The compaction reminder needs stdin (source=compact); check where the input or output is lost.
-            $probe = Join-Path $fixture "stdin-probe.ps1"
-            Set-Content -LiteralPath $probe -Encoding ASCII -Value '$t = [Console]::In.ReadToEnd(); "stdin chars: " + $t.Length + " text: " + $t'
-            # Probes that follow run-hook.ps1 step by step: what the adapter reads, with and without its param block,
-            # and which bytes Node receives when the adapter forwards the input.
-            $nodeProbe = Join-Path $fixture "stdin-probe.mjs"
-            Set-Content -LiteralPath $nodeProbe -Encoding ASCII -Value 'import fs from "node:fs"; let r; try { const b = fs.readFileSync(0); r = "bytes=" + b.length + " head=" + [...b.subarray(0, 6)].join(","); } catch (e) { r = "error " + e.code; } console.log(process.version + " " + r);'
-            $readBody = @'
-$ErrorActionPreference = 'Stop'
-try {
-    $utf8 = New-Object System.Text.UTF8Encoding($false)
-    [Console]::InputEncoding = $utf8
-    [Console]::OutputEncoding = $utf8
-    $OutputEncoding = $utf8
-    $t = [Console]::In.ReadToEnd()
-    "read chars=" + $t.Length + " head=" + (($t.ToCharArray() | Select-Object -First 4 | ForEach-Object { [int]$_ }) -join ",")
-    FORWARD
-} catch { "adapter error: " + $_.Exception.Message }
-'@
-            $paramHead = "[CmdletBinding()]`nparam([Parameter(Mandatory = `$true, Position = 0)][string]`$Hook)`n"
-            $probeA = Join-Path $fixture "probe-a.ps1"; $probeB = Join-Path $fixture "probe-b.ps1"; $probeC = Join-Path $fixture "probe-c.ps1"
-            Set-Content -LiteralPath $probeA -Encoding ASCII -Value ($paramHead + $readBody.Replace('FORWARD', ''))
-            Set-Content -LiteralPath $probeB -Encoding ASCII -Value $readBody.Replace('FORWARD', '')
-            Set-Content -LiteralPath $probeC -Encoding ASCII -Value ($paramHead + $readBody.Replace('FORWARD', ('$t | & node ''' + $nodeProbe + '''')))
-            $diagnostics = & {
-                $ErrorActionPreference = 'Continue'
-                "node direct: $($compactInput | & node (Join-Path $fixture '.agents\hooks\compact-reminder.mjs') 2>&1 | Out-String) exit=$LASTEXITCODE"
-                "adapter only: $($compactInput | & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $fixture '.agents\hooks\run-hook.ps1') compact-reminder 2>&1 | Out-String) exit=$LASTEXITCODE"
-                "probe, one layer: $($compactInput | & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probe 2>&1 | Out-String)"
-                "probe, two layers: $($compactInput | & powershell.exe -NoProfile -NonInteractive -Command "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File '$probe'" 2>&1 | Out-String)"
-                "two layers again: $($compactInput | & powershell.exe -NoProfile -NonInteractive -Command $compactHandler.commandWindows 2>&1 | Out-String)"
-                "node probe direct: $($compactInput | & node $nodeProbe 2>&1 | Out-String)"
-                "probe A (param block): $($compactInput | & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probeA compact-reminder 2>&1 | Out-String)"
-                "probe B (no param block): $($compactInput | & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probeB 2>&1 | Out-String)"
-                "probe C (forward to node): $($compactInput | & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probeC compact-reminder 2>&1 | Out-String)"
-                "test process OutputEncoding: $($OutputEncoding.WebName) preamble=$($OutputEncoding.GetPreamble().Length); console in=$([Console]::InputEncoding.WebName) out=$([Console]::OutputEncoding.WebName)"
-            } | Out-String
-            throw "Codex SessionStart commandWindows returned no output. Diagnostics:`n$diagnostics"
+        $compactInput = @{ session_id = "windows-adapter"; hook_event_name = "SessionStart"; source = "compact" } | ConvertTo-Json -Compress
+        for ($i = 1; $i -le $repeat; $i++) {
+            $compactOutput = $compactInput | & powershell.exe -NoProfile -NonInteractive -Command $compactHandler.commandWindows
+            if ($LASTEXITCODE -ne 0) {
+                throw "Codex SessionStart commandWindows failed through an outer PowerShell: exit $LASTEXITCODE"
+            }
+            if (-not $compactOutput) {
+                throw "Codex SessionStart commandWindows returned no output on run $i of $repeat.`n$(Get-AdapterDiagnostics 'run-hook.ps1' 'compact-reminder' 'SessionStart')"
+            }
         }
         $startupInput = @{ session_id = "windows-adapter"; hook_event_name = "SessionStart"; source = "startup" } | ConvertTo-Json -Compress
         $startupOutput = $startupInput | & powershell.exe -NoProfile -NonInteractive -Command $compactHandler.commandWindows

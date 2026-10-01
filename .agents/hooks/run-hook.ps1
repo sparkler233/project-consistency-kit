@@ -16,12 +16,17 @@ try {
     [Console]::OutputEncoding = $utf8
     $OutputEncoding = $utf8
     $hookInput = [Console]::In.ReadToEnd()
-    $repoRoot = (& git rev-parse --show-toplevel 2>$null | Select-Object -First 1)
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repoRoot)) {
+    # Read git's exit code at once and without a pipeline: stopping a pipeline early (Select-Object -First 1) can
+    # leave $LASTEXITCODE unset, and under 'Stop' Windows PowerShell 5.1 turns any stderr from git into an error.
+    $ErrorActionPreference = 'Continue'
+    $repoRoot = @(& git rev-parse --show-toplevel 2>$null)
+    $gitExit = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($gitExit -ne 0 -or $repoRoot.Count -eq 0 -or [string]::IsNullOrWhiteSpace($repoRoot[0])) {
         exit 0
     }
 
-    $target = Join-Path $repoRoot.Trim() ".agents\hooks\$Hook.mjs"
+    $target = Join-Path $repoRoot[0].Trim() ".agents\hooks\$Hook.mjs"
     if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
         exit 0
     }
