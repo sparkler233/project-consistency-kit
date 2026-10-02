@@ -33,7 +33,7 @@
 | wrapup 脚本 | `.agents/skills/wrapup/scripts/`(`scope.mjs`、启动静态检查 `startup-check.mjs` 及其联动匹配 `linkage.mjs`、`decisions.mjs`、`synced-guard.mjs`、并行的 `task.mjs`,检查点找法 `checkpoints.mjs`) | Skill 随附的机械步骤;guard 独占 `synced` 的状态迁移,并进主线时由 `task.mjs land --finish` 在主线前进后推进 |
 | hook 逻辑 | `.agents/hooks/`(`parallel-notice.mjs` 每轮提示、`compact-reminder.mjs` 压缩后提醒;`run-hook.ps1` 为 Windows Codex 薄适配器;`selfcheck.mjs` 为 hook 自检;失败留痕在 wrapup 的 `scripts/hook-trace.mjs`) | 宿主接线指向固定 ASCII 路径的跨平台 Node 脚本 |
 | 整理细则 | `.agents/skills/wrapup/references/document-maintenance.md` | 只在明确要求整理时由 wrapup 读取 |
-| 安装器行为正本 | `skills/project-consistency-installer/`(含 v1.3.0 升级细则与获取脚本) | skills.sh 分发,机器级使用,不进入用户项目 |
+| 安装器行为正本 | `skills/project-consistency-installer/`(含获取脚本) | skills.sh 分发,机器级使用,不进入用户项目 |
 | 干净分发白名单 | `distribution/manifest.txt` | 发布边界独立于源码目录,新增产品文件需显式评审 |
 | GitHub 公开范围 | `distribution/public-paths.txt`、`scripts/publish-public.sh` | 本仓库是内部工作仓库;公开版历史按白名单由脚本生成,内部文档与实验不公开;生成后按只放在本机的私人信息词表检查新增提交的说明与改动 |
 | 分发构建、验证与测试 | `scripts/` | 源码工具:生成 Release 资产、阻断自举状态泄漏与套件决策编号进入分发文件、回归测试 |
@@ -51,7 +51,7 @@
 ## 版本、源码与发布面
 
 - `VERSION` 是正式 SemVer 正本,文件里的日期版本行只是修订标识。
-- GitHub `main` 是套件源码仓库,保留本仓库自己的 PROJECT、AGENTS、联动规则与决策历史;与 VERSION 一致的 `v*` 标签生成的 Release 才是干净分发源。2.0 起带 `-` 的版本(如 `2.0.0-preview.1`)发为预发布,须 `--release` 明确指定(决策 76)。
+- GitHub `main` 是套件源码仓库,保留本仓库自己的 PROJECT、AGENTS、联动规则与决策历史;与 VERSION 一致的 `v*` 标签生成的 Release 才是干净分发源。带 `-` 的版本(如 `2.0.0-preview.1`)发为预发布,须 `--release` 明确指定(决策 76);不带 `-` 的正式版成为 latest,默认获取。
 - 用户项目的 PROJECT / AGENTS / 联动目录从 `templates/` 生成,不得复制本仓库实况。
 
 ## 改了机制怎么办

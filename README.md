@@ -6,7 +6,7 @@
 [![Distribution](https://github.com/sparkler233/project-consistency-kit/actions/workflows/distribution.yml/badge.svg?branch=main)](https://github.com/sparkler233/project-consistency-kit/actions/workflows/distribution.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f6f4e.svg)](LICENSE)
 
-> **2.0 预览版**:已发布的 `v2.0.0-preview.3` 采用 2.0 的新流程(决策历史进 Git、PROJECT 改为入口式、运行规则独立、wrapup 一次确认),并加入实验性的多会话并行。当前源码继续开发尚未发布的 `2.0.0-preview.4`,本页包含其变化;默认安装仍取稳定版 v1.3.0;获取与升级方式见下文「发布与升级」。
+> **2.0.0**:决策历史进 Git、PROJECT 改为入口式、运行规则独立、wrapup 一次确认,并加入实验性的多会话并行。从 v1.3.0 或 2.0 预览版过来,先更新机器级安装器;旧版本项目不支持直接升级,见下文「发布与升级」。
 
 ## 它解决什么
 
@@ -89,6 +89,25 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 - 文件联动规则需要结合项目实际情况维护，安装器无法替项目决定所有领域关系。
 - `synced` 是本地维护指针,同一仓库的 worktree 共享,独立 clone 不自动获得。多机使用需明确各自检查边界;普通推送标签不会带走它,显式推送该引用或镜像推送仍会。
 
+## 兼容承诺
+
+2.x 内分三档。**稳定**的部分保持兼容,改动须能读取旧格式或提供迁移;**实验性**的部分可以调整,见下一节;**不承诺**的是套件内部接口,随同一版本一起改。“稳定”是发布政策,不表示模型行为已有可靠性保证。
+
+| 稳定对象 | 内容 |
+| --- | --- |
+| 文件与职责 | `PROJECT.md`、`AGENTS.md`、只含 `@AGENTS.md` 的 `CLAUDE.md`、`一致性机制/运行规则.md`、项目所有的 `一致性机制/文件联动目录.md`、`一致性机制/VERSION` |
+| PROJECT 中脚本读取的部分 | `### 待提交`、`### 最近决策` 两个小节;待提交条目首行 `- 日期 · 决策 N:标题` 加缩进子项;最近决策每行一条、由脚本生成。其余章节、标题与排版不冻结 |
+| 决策历史 | 提交正文的 `决策 N · 日期 · 标题` 行与 `Decision:`、`Decision-Archive:`、`Supersedes:`、`Adjusts: 旧 by 新`;已写入的历史继续可检索 |
+| 联动目录 | 规则为小标题加「触发」「动作」;触发里反引号路径(含目录与 `*`)由脚本判断,其余交模型 |
+| 用户入口 | catchup / wrapup(Claude Code `/catchup` `/wrapup`,Codex `$catchup` `$wrapup`),说「收尾」即 wrapup;安装入口 `/引入一致性机制` 与安装器 Skill |
+| 关键行为 | catchup 只读;wrapup 在主线上确认后本地提交、不推送;`synced` 只在主线上、检查通过后推进;没有可靠基线时不猜 |
+| Git 本地状态 | 收尾指针 `refs/pck/synced`;主线配置 `projectConsistency.canonicalBranch` |
+| hook 接线 | 每轮提示(UserPromptSubmit)与压缩后提醒(SessionStart)两项;Claude Code 接 `.claude/settings.json`,Codex 接 `.codex/hooks.json`,Windows 经 `run-hook.ps1`;升级保留用户其他 hook |
+| 面向用户的命令 | 获取脚本 `fetch-kit.sh` / `.ps1` 的 `--release TAG\|latest`、`--cache-dir`、`--offline`、`--verify-dir`;hook 自检 `node .agents/hooks/selfcheck.mjs` |
+| 版本身份 | `VERSION` 写 SemVer,修订日期标记与之分开;获取脚本依赖的 Release 资产名与校验方式不静默改变 |
+
+**不承诺**:`scope`、`decisions`、`synced-guard`、`startup-check`、`linkage` 等脚本的命令行选项与 JSON 字段可以直接调用,但不对外承诺稳定;`base`、`can_advance` 等字段的事实与安全含义不会被偷换。运行规则与 Skill 的措辞、步骤和报告格式,hook 文案,分发包内部布局与其他 metadata 字段也不冻结。不支持混装不同版本的机制文件。
+
 ## 实验性范围
 
 实验性能力的流程与接口在 2.x 内可能不兼容地调整。调整时须说明迁移与旧任务接续方式,仍保护已有成果、历史和其他工作区,不越过用户授权。
@@ -100,13 +119,15 @@ CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` �
 | 跨 Session 通信与自动协调 | 研究方向,有实验材料,尚非产品能力 |
 | 脚本无法恢复时由 Agent 手工完成保存流程 | 尚未实现,列为后续实验方向;当前不开放手工接管 Git 操作 |
 
+并行一项具体包括:`task.mjs` 的 `start / sync / land / close` 及其选项、并进主线流程、任务检查点的写法与查找约定(`Task:`、`Land-Checked:`,目标 / 进度 / 还剩三行)、概览里的分支信息、每轮提示的策略,以及单线程与并行之间的切换方式(仍是后续方向,尚未实现)。它们分布在多个文件里,不按整个文件划界;同一脚本里的稳定能力仍按上一节承诺。旧检查点会通过兼容读取或明确迁移保持可恢复。不保证同一 worktree 多会话协作,不承诺跨会话自动编排或压缩后无损恢复。
+
 启动检查、压缩后反馈和文件联动不整体列为实验性;验证覆盖与已知限制另行说明。列入实验方向不表示能力已经提供,也不开放当前规则禁止的操作。
 
 ## 仍未解决的问题
 
 ### 多个 Session 并行工作的边界
 
-2.0.0-preview.3 起提供实验性的并行:你同时驾驶几个会话,每个会话在自己的 branch + worktree 上工作,主线上不放会话;对哪个会话说「并进主线」,就由它自己同步主线、检查、合并并推进 `synced`。机制只守三条:主线只通过检查过的合并前进;停下时把目标、进度、还剩写进分支上的检查点;不动别的分支和别人未提交的改动。开工、同步、合并、收工由 `task.mjs` 完成;主线变化与某个分支相关时,那个会话在下一轮开始时收到提示(你也看得到);要不要同步由你决定。
+2.0 起提供实验性的并行:你同时驾驶几个会话,每个会话在自己的 branch + worktree 上工作,主线上不放会话;对哪个会话说「并进主线」,就由它自己同步主线、检查、合并并推进 `synced`。机制只守三条:主线只通过检查过的合并前进;停下时把目标、进度、还剩写进分支上的检查点;不动别的分支和别人未提交的改动。开工、同步、合并、收工由 `task.mjs` 完成;主线变化与某个分支相关时,那个会话在下一轮开始时收到提示(你也看得到);要不要同步由你决定。
 
 这部分还是实验性的:只在 macOS 上经过少量真实会话验证,每种设置只跑过一次;两个会话先后合并时,`PROJECT.md` 总体状态一段常要解冲突;上下文压缩后的提醒已在 Codex 上见到送达,但压缩后模型是否仍照规则做还没验证;需要 Git 2.38 及以上;Codex 沙箱下并进主线需要把主线目录设为可写;Claude Code 桌面版把 worktree 建在仓库内的 `.claude/worktrees/`,需要加进 `.gitignore`。
 
@@ -124,10 +145,7 @@ Git 和脚本能够检查文件是否发生变化，却无法仅凭确定性程�
 
 安装器默认使用[最新稳定版本](https://github.com/sparkler233/project-consistency-kit/releases/latest)，也可以固定到指定的 `v*` 标签。校验失败时不会静默回退到源码 `main`。
 
-**获取 2.0 预览版**:
-
-1. 先更新机器上的安装器(重新运行上面的 `npx skills add` 命令)。v1.3.0 的安装器会因为新包里没有决策档案模板而拒绝它。
-2. 在项目里告诉 Agent:“给这个项目引入一致性机制,使用 v2.0.0-preview.3”。预览版在 GitHub 上标为预发布,不会被当作“最新版”自动取用。
+**从旧版本的安装器过来**:先更新机器上的安装器(重新运行上面的 `npx skills add` 命令)。v1.3.0 与 2.0 各预览版的安装器按旧版的文件集合校验,会拒收 2.0.0 的包。
 
 **旧版本项目**:安装器只负责全新引入和 2.0 以后的版本升级。v1.3.0 及更早版本、2.0 各预览版的项目不支持直接升级,需要自行迁移(例如让模型对照新版模板手工完成);旧版 `refs/tags/synced` 标签不再读取。2.0 不提供降级;升级是单独的一次提交,需要时用 `git revert` 撤销它。
 
