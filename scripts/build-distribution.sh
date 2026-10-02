@@ -85,8 +85,8 @@ mechanism_revision=$(sed -n 's/^<!-- 一致性机制 version: \([0-9][0-9-]*\) -
   || fail "mechanism revision is missing or invalid"
 revision_values=$(
   {
-    # 实验证据与已转正的候选快照保持原样,不参与修订日期一致性检查
-    git -C "$source_root" grep -hE '^(<!-- |# |// )一致性机制 version: [0-9]{4}-[0-9]{2}-[0-9]{2}' -- . ':!docs/experiments' ':!docs/core-upgrade-candidate' ':!docs/parallel-candidate'
+    # 实验证据、已转正的候选快照与试用记录保持原样,不参与修订日期一致性检查
+    git -C "$source_root" grep -hE '^(<!-- |# |// )一致性机制 version: [0-9]{4}-[0-9]{2}-[0-9]{2}' -- . ':!docs/experiments' ':!docs/core-upgrade-candidate' ':!docs/parallel-candidate' ':(exclude,glob)docs/*-trial/**'
     grep -hE '^<!-- 一致性机制:接入 begin \(version: [0-9]{4}-[0-9]{2}-[0-9]{2}\) -->$' \
       "$source_root/AGENTS.md" "$source_root/templates/AGENTS.md"
   } | sed -E 's/.*version: ([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/' | LC_ALL=C sort -u
