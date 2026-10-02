@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-10-01
+// 一致性机制 version: 2026-10-02
 // 并行提示 hook:每轮开始时运行(Claude Code 与 Codex 都接在 UserPromptSubmit)。
 // 只按 Git 事实生成提示,不写仓库文件,不做任何 Git 改动;出错一律静默,不阻塞宿主,只在 Git 目录留一行失败记录。
 // 在分支上:主线有本分支没有的提交,且与本分支相关(改了同样的文件,含未提交的;主线一侧命中联动规则;试合并冲突)、
@@ -17,7 +17,7 @@ import { readHookInput, traceFailure } from "../skills/wrapup/scripts/hook-trace
 
 const SUBJECTS = 5, FILES = 8;
 
-// 输出只用 ASCII(中文转成 \uXXXX):Windows PowerShell 5.1 经管道转发时按系统代码页解码,非 ASCII 会被解乱(与收尾提醒相同)
+// 输出只用 ASCII(中文转成 \uXXXX):Windows PowerShell 5.1 经管道转发时按系统代码页解码,非 ASCII 会被解乱
 function asciiJson(value) {
   return JSON.stringify(value).replace(/[\u007f-\uffff]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
 }

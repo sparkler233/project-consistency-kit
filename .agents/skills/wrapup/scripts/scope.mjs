@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-10-01
+// 一致性机制 version: 2026-10-02
 // 一次输出 catchup / wrapup 需要的 Git 范围,JSON 格式,模型直接取值,不再抄写哈希。
 // 用法:node scope.mjs            → 基线、基线后提交、改动清单、工作区(含未跟踪文件摘要)
 //       node scope.mjs --overview → 另加最近 15 条提交标题(沿 first-parent:一次并进主线只占一行,被合并进来的分支提交不逐条列出)、
@@ -9,6 +9,7 @@
 //                                   与别的分支共有还没进主线的提交(shares_unmerged_with,分支之间直接合并过,对方的决策会被一起带进主线);
 //                                   分支上另给主线一侧改动命中的联动规则(rules_hit_by_canonical);
 //                                   上次 hook 自检通过以来 hook 留下的失败记录(hook_failures:条数与最近几行,没有则不给)
+// --overview 可加 --host codex|claude|unknown,另给 startup_check:只读检查必要文件与当前宿主项目级接线;不执行 hook、不证明宿主已信任或运行。
 // 默认模式另给 hints:整理线索(本次涉及的文档中大量重复的行、没有被任何文档引用的文档),只供模型判断是否提醒整理;
 // 以及 linkage:本次范围(基线后已提交与工作区改动)按路径命中的联动规则 rules_hit,和脚本判断不全、要模型自行判断的
 // rules_not_checked(触发里没有路径,或还有文字条件而按路径没命中);是否成立、要不要改由模型按规则原文判断
@@ -23,13 +24,21 @@ import { taskState as taskStateAt, remainingLine, pendingDecisions, pendingIn, l
 import { failuresSinceSelfcheck } from "./hook-trace.mjs";
 
 // --help 只打印开头这段说明,不做任何改动;不认识的参数报错且不执行
+let startupHost = null;
 {
   const args = process.argv.slice(2);
   if (args.includes("--help") || args.includes("-h")) {
     process.stdout.write(leadingComments(readFileSync(fileURLToPath(import.meta.url), "utf8")));
     process.exit(0);
   }
-  const bad = args.filter((a) => !["--overview"].includes(a));
+  const bad = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--overview') continue;
+    if (args[i] === '--host' && startupHost === null && ['codex', 'claude', 'unknown'].includes(args[i + 1])) {
+      startupHost = args[++i];
+    } else bad.push(args[i]);
+  }
+  if (startupHost && !args.includes('--overview')) bad.push('--host requires --overview');
   if (bad.length) {
     process.stdout.write(JSON.stringify({ error: `unknown_option: ${bad.join(" ")}`, hint: "node scope.mjs --help 查看用法;未做任何改动" }) + "\n");
     process.exit(2);
@@ -294,6 +303,9 @@ const out = {
   base,
   head: guard.head ?? null,
   synced: guard.synced ?? null,
+  synced_source: guard.synced_source ?? null,
+  legacy_synced_present: guard.legacy_synced_present ?? false,
+  migration_command: guard.migration_command ?? null,
   can_advance: guard.can_advance ?? false,
   blockers: guard.blockers ?? [],
   commits_since_base: base ? commits(`${base}..HEAD`) : null,
@@ -302,6 +314,16 @@ const out = {
 };
 if (!base) out.note = "no_reliable_base: 不猜替代基线,见 guard 字段";
 if (guard.error) out.guard_error = guard.error;
-if (overview) Object.assign(out, overviewInfo(guard));
+if (overview) {
+  Object.assign(out, overviewInfo(guard));
+  if (startupHost) {
+    try {
+      const { inspectStartup } = await import('./startup-check.mjs');
+      out.startup_check = inspectStartup(root, startupHost);
+    } catch {
+      out.startup_check = { host: startupHost, issues: [{ code: 'startup_check_unavailable', source: '.agents/skills/wrapup/scripts/startup-check.mjs' }], unchecked: [] };
+    }
+  }
+}
 else { out.linkage = linkageInfo(out); const h = hints(out); if (h) out.hints = h; }
 process.stdout.write(JSON.stringify(out) + "\n");

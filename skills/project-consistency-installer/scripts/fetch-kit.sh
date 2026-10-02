@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-10-01
+# 一致性机制 version: 2026-10-02
 set -euo pipefail
 
 canonical_repository="https://github.com/sparkler233/project-consistency-kit.git"
@@ -137,7 +137,7 @@ version_at_least_2_0_preview_3() {
   version_at_least_2_0_preview_2 "$1" && [ "$1" != "2.0.0-preview.2" ]
 }
 
-# preview.4 起含 hook 自检与失败留痕
+# preview.4 统一包含自检、失败留痕与启动检查,并退役 Stop 文件
 version_at_least_2_0_preview_4() {
   version_at_least_2_0_preview_3 "$1" && [ "$1" != "2.0.0-preview.3" ]
 }
@@ -256,6 +256,13 @@ validate_distribution() {
       || fail "invalid mechanism revision in metadata"
   fi
 
+  if [ "$validated_profile" != "versioned" ] || ! version_at_least_2_0_preview_4 "$validated_version"; then
+    [ -f "$distribution_dir/一致性机制/hooks/收尾提醒.sh" ] || fail "legacy distribution missing Stop shell wrapper"
+    if [ "$validated_profile" = "versioned" ] && version_at_least_1_2 "$validated_version"; then
+      [ -f "$distribution_dir/.agents/hooks/wrapup-reminder.mjs" ] || fail "legacy distribution missing Stop hook"
+    fi
+  fi
+
   required_paths='skills/project-consistency-installer/SKILL.md
 skills/project-consistency-installer/scripts/fetch-kit.sh
 .agents/skills/catchup/SKILL.md
@@ -266,7 +273,6 @@ skills/project-consistency-installer/scripts/fetch-kit.sh
 templates/PROJECT.md
 templates/AGENTS.md
 templates/一致性机制/文件联动目录.md
-一致性机制/hooks/收尾提醒.sh
 LICENSE'
   while IFS= read -r relative_path; do
     [ -f "$distribution_dir/$relative_path" ] \
@@ -304,13 +310,12 @@ EOF
 
     if version_at_least_1_2 "$validated_version"; then
       for relative_path in \
-        skills/project-consistency-installer/scripts/fetch-kit.ps1 \
-        .agents/hooks/wrapup-reminder.mjs; do
+        skills/project-consistency-installer/scripts/fetch-kit.ps1; do
         [ -f "$distribution_dir/$relative_path" ] \
           || fail "v1.2+ distribution is incomplete: missing $relative_path"
       done
     fi
-    if version_at_least_1_2_2 "$validated_version"; then
+    if ! version_at_least_2_0_preview_4 "$validated_version" && version_at_least_1_2_2 "$validated_version"; then
       [ -f "$distribution_dir/.agents/hooks/wrapup-reminder.ps1" ] \
         || fail "v1.2.2+ distribution is incomplete: missing .agents/hooks/wrapup-reminder.ps1"
     fi
@@ -347,11 +352,16 @@ EOF
     if version_at_least_2_0_preview_4 "$validated_version"; then
       for relative_path in \
         .agents/skills/wrapup/scripts/hook-trace.mjs \
-        .agents/hooks/selfcheck.mjs; do
+        .agents/hooks/selfcheck.mjs \
+        .agents/skills/wrapup/scripts/synced-ref.mjs; do
         [ -f "$distribution_dir/$relative_path" ] \
           || fail "v2.0.0-preview.4+ distribution is incomplete: missing $relative_path"
       done
     fi
+  fi
+  if [ "$validated_profile" = "versioned" ] && version_at_least_2_0_preview_4 "$validated_version"; then
+    [ -f "$distribution_dir/.agents/skills/wrapup/scripts/startup-check.mjs" ] \
+      || fail "v2.0.0-preview.4+ distribution is incomplete: missing startup-check.mjs"
   fi
   if [ "$validated_profile" != "versioned" ] || ! version_at_least_2_0 "$validated_version"; then
     for relative_path in \

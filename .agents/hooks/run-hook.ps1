@@ -1,11 +1,13 @@
-# 一致性机制 version: 2026-10-01
+# 一致性机制 version: 2026-10-02
 # Thin Windows adapter for the kit's cross-platform Node hooks: locates .agents/hooks/<Hook>.mjs and forwards stdin.
-# Used by Codex commandWindows for the per-turn notice and the post-compaction reminder; wrapup-reminder.ps1 stays for existing Stop wiring.
+# Used by Codex commandWindows for the per-turn notice and the post-compaction reminder.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('parallel-notice', 'compact-reminder', 'wrapup-reminder')]
-    [string]$Hook
+    [ValidateSet('parallel-notice', 'compact-reminder')]
+    [string]$Hook,
+
+    [switch]$Codex
 )
 
 $ErrorActionPreference = 'Stop'
@@ -51,10 +53,12 @@ try {
         exit 0
     }
 
+    $nodeArgs = @()
+    if ($Codex) { $nodeArgs += '--host=codex' }
     if ([string]::IsNullOrEmpty($hookInput)) {
-        & node $target
+        & node $target @nodeArgs
     } else {
-        $hookInput | & node $target
+        $hookInput | & node $target @nodeArgs
     }
     if ($LASTEXITCODE -ne 0) {
         Write-HookFailure "node exited $LASTEXITCODE"

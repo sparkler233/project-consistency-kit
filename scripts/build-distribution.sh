@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-10-01
+# 一致性机制 version: 2026-10-02
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

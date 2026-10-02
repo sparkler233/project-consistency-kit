@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-10-01
+// 一致性机制 version: 2026-10-02
 // hook 自检:按本项目的实际接线(`.claude/settings.json`、`.codex/hooks.json` 或 `.codex/config.toml` 里机制的 hook 项),
-// 在临时仓库里把每个 hook 跑一遍,报告哪些有输出。临时仓库复制本项目的 `.agents/` 与接线文件,造出三个 hook 都该出声的场景:
-// 任务分支上有未收尾的改动(收尾提醒)、主线新增了改同一文件的提交(每轮提示)、上下文刚被压缩(压缩后提醒)。
+// 在临时仓库里把每个 hook 跑一遍,报告哪些有输出。临时仓库复制本项目的 `.agents/` 与接线文件,造出两个 hook 都该出声的场景:
+// 主线新增了改同一文件的提交(每轮提示)、上下文刚被压缩(压缩后提醒)。
 // 只跑当前平台的接线:Codex 在 Windows 上跑 commandWindows,其他平台跑 command;另一侧注明未测。
 // 只验证这套接线在干净场景里能出声,不解释真实项目里某次为什么没提示;宿主自己的 PATH(如找不到 node)也测不到。
 // 不改本项目的文件;全部通过时在 Git 目录的 hook 失败记录里追加 `selfcheck ok`,之前的失败 catchup 不再报告。
@@ -35,7 +35,6 @@ const windows = process.platform === "win32";
 
 // 每个事件该接哪个 hook、输出里该有什么
 const EVENTS = {
-  Stop: { hook: "wrapup-reminder", field: "systemMessage", ok: (o) => typeof o.systemMessage === "string" && o.systemMessage.length > 0 },
   UserPromptSubmit: { hook: "parallel-notice", field: "additionalContext", ok: (o) => o.hookSpecificOutput?.hookEventName === "UserPromptSubmit" && Boolean(o.hookSpecificOutput.additionalContext) },
   SessionStart: { hook: "compact-reminder", field: "additionalContext", ok: (o) => o.hookSpecificOutput?.hookEventName === "SessionStart" && Boolean(o.hookSpecificOutput.additionalContext) },
 };
@@ -138,7 +137,7 @@ function makeScratch() {
   write("shared.txt", "base\nmain\n");
   g("commit", "-q", "--no-verify", "-am", "自检:主线改动");
   g("checkout", "-q", "selfcheck-task");
-  write("shared.txt", "base\ntask\n"); // 未提交:收尾提醒有改动可报,每轮提示与主线有交集
+  write("shared.txt", "base\ntask\n"); // 未提交:每轮提示与主线有交集
   return dir;
 }
 
@@ -215,7 +214,6 @@ function check() {
     results.push({ host: null, source: null, event: null, hook: null, status: "fail", detail: `临时仓库准备失败:${e.message}` });
   } finally {
     if (scratch) fs.rmSync(scratch, { recursive: true, force: true });
-    try { for (const f of fs.readdirSync(os.tmpdir())) if (f.startsWith(`project-consistency-reminder-${run.id}-`)) fs.rmSync(path.join(os.tmpdir(), f), { force: true }); } catch {}
   }
   return results;
 }

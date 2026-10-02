@@ -1,18 +1,6 @@
 {
   "description": "Project Consistency Kit lifecycle hooks.",
   "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/wrapup-reminder.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path (git rev-parse --show-toplevel) '.agents/hooks/wrapup-reminder.ps1')",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
     "UserPromptSubmit": [
       {
         "hooks": [
@@ -30,8 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/compact-reminder.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path (git rev-parse --show-toplevel) '.agents/hooks/run-hook.ps1') compact-reminder",
+            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/compact-reminder.mjs\" --host=codex",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path (git rev-parse --show-toplevel) '.agents/hooks/run-hook.ps1') compact-reminder -Codex",
             "timeout": 10
           }
         ]

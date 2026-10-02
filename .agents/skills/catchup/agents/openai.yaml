@@ -1,5 +1,5 @@
-# 一致性机制 version: 2026-10-01
+# 一致性机制 version: 2026-10-02
 interface:
   display_name: "Catch Up"
-  short_description: "Restore project context from PROJECT.md and Git"
+  short_description: "Understand the project and current working state"
   default_prompt: "Use $catchup to restore this repository's current project state before continuing."

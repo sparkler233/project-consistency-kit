@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-10-01
+// 一致性机制 version: 2026-10-02
 // 并行生命周期回归测试(决策 107–110):开工 → 工作 → 谁合并谁负责(land:自动检查点 → 同步 → 合并版 wrapup → 快进主线、推进 synced)
 // → 收工;以及每轮提示只在相关时出现、合并冲突在本分支解决、快进失败后重试(不相关时跳过重新检查、相关时要求重新检查)、
 // 「最近决策」冲突由脚本重新生成、主线目录不干净时拒绝、主线没检出时直接更新引用、合并后继续工作与新分支不沿用别人的任务名。
@@ -128,15 +128,21 @@ try {
   const cA = rev(a, "HEAD");
   assert.match(git(a, "log", "-1", "--format=%B"), /Decision: 2\nTask: 改写第三章\nLand-Checked: [0-9a-f]{40}/);
   const oldMain = rev(repo, "main");
+  git(repo, "update-ref", "refs/pck/synced", cA);
+  assert.ok(task(a, ["land", "--finish"], 3).blockers.includes("synced_refs_disagree"));
+  assert.equal(rev(repo, "main"), oldMain, "新旧指针不一致时不得推进主线");
+  assert.equal(rev(a, "HEAD"), cA);
+  git(repo, "update-ref", "-d", "refs/pck/synced", cA);
   const fa = task(a, ["land", "--finish"]);
   assert.equal(fa.status, "landed");
   assert.equal(fa.synced, "advanced");
+  assert.equal(git(repo, "tag", "--list", "synced"), "", "并行合并同时退役旧标签");
   assert.equal(fa.recheck_skipped, false);
   const M = rev(repo, "main");
   assert.deepEqual(git(repo, "log", "-1", "--format=%P", M).split(" "), [oldMain, cA], "合并提交:第一父提交是原主线,第二父提交是分支");
   assert.equal(git(repo, "log", "-1", "--format=%s", M), "并入 A:第三章按口径 A〔决策 2〕");
   assert.equal(git(repo, "log", "-1", "--format=%(trailers:key=Task,valueonly)", M), "", "合并提交不带 Task:");
-  assert.equal(rev(repo, "synced"), M, "synced 推进到合并提交");
+  assert.equal(rev(repo, "refs/pck/synced"), M, "synced 推进到合并提交");
   assert.equal(rev(a, "HEAD"), M, "本分支随之前进");
   assert.equal(read(repo, "第三章.md"), chapter("A 改的第二行", "七"), "主线目录的文件已更新");
   assert.equal(git(repo, "status", "--porcelain"), "");
@@ -209,7 +215,7 @@ try {
   assert.match(recent, /底稿改口径 B\(决策 3\)/);
   assert.match(recent, /加附录\(决策 4\)/);
   assert.equal(read(repo, "底稿.md"), draft("口径 B", "来源 X"));
-  assert.equal(rev(repo, "synced"), rev(repo, "main"));
+  assert.equal(rev(repo, "refs/pck/synced"), rev(repo, "main"));
 
   // 重试,相关:G 走完合并版 wrapup 后,H 先并进主线,改了同一份底稿(另一行,合并干净)→ G 要重新走合并版 wrapup
   const g = task(repo, ["start", "task/g"]).worktree;

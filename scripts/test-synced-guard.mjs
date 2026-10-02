@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-10-01
+// 一致性机制 version: 2026-10-02
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -88,8 +88,8 @@ try {
   const nextHead = git(canonical, "rev-parse", "HEAD");
   const advanced = invoke(canonical, "advance");
   assert.equal(advanced.status, "advanced");
-  assert.equal(git(canonical, "rev-parse", "synced"), nextHead);
-  assert.match(git(canonical, "reflog", "show", "refs/tags/synced"), /Project Consistency Kit wrapup/);
+  assert.equal(git(canonical, "rev-parse", "refs/pck/synced"), nextHead);
+  assert.match(git(canonical, "reflog", "show", "refs/pck/synced"), /Project Consistency Kit wrapup/);
   assert.equal(invoke(canonical, "advance").status, "already_synced");
 
   const featureDir = fs.mkdtempSync(path.join(os.tmpdir(), "project-consistency-feature-worktree-"));
@@ -104,9 +104,9 @@ try {
   assert.equal(feature.current_branch, "feature-a");
   assert.equal(feature.scope_base, nextHead, "feature scope must stay at its merge base");
   assert.ok(feature.blockers.includes("not_canonical"));
-  const tagBeforeFeatureAdvance = git(canonical, "rev-parse", "synced");
+  const tagBeforeFeatureAdvance = git(canonical, "rev-parse", "refs/pck/synced");
   assert.equal(invoke(featureDir, "advance", 3).status, "blocked");
-  assert.equal(git(canonical, "rev-parse", "synced"), tagBeforeFeatureAdvance);
+  assert.equal(git(canonical, "rev-parse", "refs/pck/synced"), tagBeforeFeatureAdvance);
 
   const nested = path.join(canonical, "nested");
   fs.mkdirSync(nested);
@@ -120,7 +120,7 @@ try {
   fs.writeFileSync(path.join(initial, "pending.txt"), "pending\n");
   const created = invoke(initial, "advance");
   assert.equal(created.status, "created");
-  assert.equal(git(initial, "rev-parse", "synced"), git(initial, "rev-parse", "HEAD"));
+  assert.equal(git(initial, "rev-parse", "refs/pck/synced"), git(initial, "rev-parse", "HEAD"));
   assert.equal(invoke(initial, "inspect").dirty, true, "initial baseline must not hide pending files");
 
   const detached = createRepo();

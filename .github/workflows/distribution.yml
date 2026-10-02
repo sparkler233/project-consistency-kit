@@ -1,4 +1,4 @@
-# 一致性机制 version: 2026-10-01
+# 一致性机制 version: 2026-10-02
 name: Validate and publish clean distribution
 
 on:
@@ -21,10 +21,14 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v6
-      - name: Test cross-platform Stop hook
-        run: node scripts/test-stop-hook.mjs
+      - name: Test startup checks
+        run: node scripts/test-startup-check.mjs
+      - name: Test compact feedback
+        run: node scripts/test-compact-feedback.mjs
       - name: Test synced guard
         run: node scripts/test-synced-guard.mjs
+      - name: Test synced migration
+        run: node scripts/test-synced-migration.mjs
       - name: Test wrapup scope and decision scripts
         run: node scripts/test-wrapup-scripts.mjs
       - name: Test parallel scripts and hooks
@@ -56,10 +60,14 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v6
-      - name: Test cross-platform Stop hook
-        run: node scripts/test-stop-hook.mjs
+      - name: Test startup checks
+        run: node scripts/test-startup-check.mjs
+      - name: Test compact feedback
+        run: node scripts/test-compact-feedback.mjs
       - name: Test synced guard
         run: node scripts/test-synced-guard.mjs
+      - name: Test synced migration
+        run: node scripts/test-synced-migration.mjs
       - name: Test wrapup scope and decision scripts
         run: node scripts/test-wrapup-scripts.mjs
       - name: Test parallel scripts and hooks

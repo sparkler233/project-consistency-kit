@@ -1,19 +1,5 @@
 {
   "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.agents/hooks/wrapup-reminder.mjs"
-            ],
-            "timeout": 10
-          }
-        ]
-      }
-    ],
     "UserPromptSubmit": [
       {
         "hooks": [

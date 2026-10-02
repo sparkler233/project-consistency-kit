@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-10-01
+// 一致性机制 version: 2026-10-02
 // 并行的机械部分:开工、同步主线、并进主线、收工。只做 Git 操作并报告结果,JSON 格式;要判断的事留给模型与用户。
 // 三条不变式:主线只前进,每一步都经过检查;交接写在分支上;不动别人的东西。满足它们,其余怎么做由 Harness 与用户决定,
 // 本脚本只是便捷工具。存在未收工的任务分支就是在并行,全部收工即回到单线程。需要 Git 2.38 及以上,版本不够时拦下并说明。
@@ -24,6 +24,7 @@
 // 退出码:0 完成或只是报告状态;1 执行出错;2 用法错误;3 被拦下(blocked,附原因)
 
 import process from "node:process";
+import { readSynced, writeSynced } from "./synced-ref.mjs";
 import path from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -263,7 +264,10 @@ function otherTaskBranches() {
 
 // 做合并提交,快进主线,推进 synced,本分支随之前进。任何一步前的检查不通过都不改动东西
 function finishLanding(ck, recheckSkipped) {
+  const syncedBefore = readSynced(root);
+  if (syncedBefore.blockers.length) blocked(syncedBefore.blockers);
   const tip = (ok(["rev-parse", canonicalRef]) || "").trim();
+  if (syncedBefore.commit && git(["merge-base", "--is-ancestor", syncedBefore.commit, tip]).status !== 0) blocked(["synced_not_ancestor"]);
   const head = (ok(["rev-parse", "HEAD"]) || "").trim();
   const message = `${ck.subject}\n\n合并 ${current} 到 ${canonical}:本分支的检查与决策全文见第二父提交。\n`;
   const tree = (ok(["rev-parse", "HEAD^{tree}"]) || "").trim();
@@ -286,10 +290,8 @@ function finishLanding(ck, recheckSkipped) {
   // 主线已前进;本分支随之前进(内容相同,不改文件)
   const own = git(["merge", "--ff-only", "-q", landed]);
   // synced 只会落后、不会超前:主线推进之后再推进它
-  const oldSynced = (ok(["rev-parse", "-q", "--verify", "refs/tags/synced"]) || "").trim();
-  let synced = "advanced";
-  if (oldSynced && git(["merge-base", "--is-ancestor", oldSynced, landed]).status !== 0) synced = "not_advanced:synced_not_ancestor";
-  else if (git(["update-ref", "refs/tags/synced", landed, oldSynced || ""]).status !== 0) synced = "not_advanced:update_failed";
+  const updated = writeSynced(root, syncedBefore, landed, canonicalRef, landed);
+  const synced = updated.ok ? "advanced" : `not_advanced:${updated.reason}`;
   const others = otherTaskBranches();
   emit({
     status: "landed", canonical_branch: canonical, commit: landed.slice(0, 12), checked: ck.commit.slice(0, 12), recheck_skipped: recheckSkipped,

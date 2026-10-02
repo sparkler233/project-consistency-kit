@@ -5,7 +5,7 @@ metadata:
   version: "2.0.0-preview.4"
 ---
 
-<!-- 一致性机制 version: 2026-10-01 -->
+<!-- 一致性机制 version: 2026-10-02 -->
 
 # Project Consistency Installer
 
@@ -63,7 +63,7 @@ metadata:
    - `templates/PROJECT.md`
    - `templates/AGENTS.md`
    - `templates/一致性机制/文件联动目录.md`
-   versioned 分发包或当前源码 checkout 还必须包含 `.codex/hooks.json` 与 `一致性机制/VERSION`;v1.2.0+ 还必须包含 `fetch-kit.ps1` 与 `.agents/hooks/wrapup-reminder.mjs`;v1.2.2+ 还必须包含 `.agents/hooks/wrapup-reminder.ps1`;v1.3.0+ 还必须包含 `.agents/skills/wrapup/scripts/synced-guard.mjs`;v1.3.0 及更早的包还含 `templates/一致性机制/决策档案.md`;v2.0.0-preview.1+ 还必须包含 `一致性机制/运行规则.md`、`.agents/skills/wrapup/scripts/scope.mjs`、`.agents/skills/wrapup/scripts/decisions.mjs`、`.agents/skills/wrapup/references/document-maintenance.md` 与本 Skill 的 `references/upgrade-from-v1.3.md`;v2.0.0-preview.2+ 还必须包含 `.agents/skills/wrapup/scripts/linkage.mjs`;v2.0.0-preview.3+ 还必须包含 `.agents/skills/wrapup/scripts/task.mjs`、`.agents/skills/wrapup/scripts/checkpoints.mjs`、`.agents/hooks/parallel-notice.mjs`、`.agents/hooks/compact-reminder.mjs` 与 `.agents/hooks/run-hook.ps1`;v2.0.0-preview.4+ 还必须包含 `.agents/skills/wrapup/scripts/hook-trace.mjs` 与 `.agents/hooks/selfcheck.mjs`;旧包按各自版本的最低集合验证,不得用新版本文件要求反向否决旧 Release。
+   versioned 分发包或当前源码 checkout 还必须包含 `.codex/hooks.json` 与 `一致性机制/VERSION`;v1.2.0+ 还必须包含 `fetch-kit.ps1`;仅早于 v2.0.0-preview.4 的包要求旧 Stop 文件:旧 Unix 包装、v1.2.0+ 的 `.agents/hooks/wrapup-reminder.mjs`、v1.2.2+ 的 `.agents/hooks/wrapup-reminder.ps1`;v1.3.0+ 还必须包含 `.agents/skills/wrapup/scripts/synced-guard.mjs`;v1.3.0 及更早的包还含 `templates/一致性机制/决策档案.md`;v2.0.0-preview.1+ 还必须包含 `一致性机制/运行规则.md`、`.agents/skills/wrapup/scripts/scope.mjs`、`.agents/skills/wrapup/scripts/decisions.mjs`、`.agents/skills/wrapup/references/document-maintenance.md` 与本 Skill 的 `references/upgrade-from-v1.3.md`;v2.0.0-preview.2+ 还必须包含 `.agents/skills/wrapup/scripts/linkage.mjs`;v2.0.0-preview.3+ 还必须包含 `.agents/skills/wrapup/scripts/task.mjs`、`.agents/skills/wrapup/scripts/checkpoints.mjs`、`.agents/hooks/parallel-notice.mjs`、`.agents/hooks/compact-reminder.mjs` 与 `.agents/hooks/run-hook.ps1`;v2.0.0-preview.4+ 还必须包含 `.agents/skills/wrapup/scripts/hook-trace.mjs` 与 `.agents/hooks/selfcheck.mjs` 与 `.agents/skills/wrapup/scripts/synced-ref.mjs`;v2.0.0-preview.4+ 还必须包含 `.agents/skills/wrapup/scripts/startup-check.mjs`;旧包按各自版本的最低集合验证,不得用新版本文件要求反向否决旧 Release。
 6. 记录版本与来源并在计划和最终报告回显:
    - 干净分发目录必须有 `DISTRIBUTION-METADATA.txt` 与 `DISTRIBUTION-MANIFEST.sha256`;记录其中的 `kit_version`、`mechanism_revision`、规范仓库、release ref 与 source commit;缺少版本字段的 schema 1 旧包标为 `legacy`,版本可从 `vX.Y.Z` release ref 派生展示,但必须标明不是包内 VERSION;
    - 本地源码 checkout 必须是 Git 仓库;读取 `一致性机制/VERSION` 为 `SOURCE_VERSION`,读取源内安装器 `metadata.version`,两者必须一致;另记录统一修订日期、`git rev-parse HEAD` 与当前 ref,有未提交改动时明确标出;
@@ -79,6 +79,7 @@ metadata:
 git --version
 git rev-parse --is-inside-work-tree 2>/dev/null
 git rev-parse -q --verify HEAD
+git rev-parse -q --verify refs/pck/synced
 git rev-parse -q --verify refs/tags/synced
 git status --short 2>/dev/null
 cat 一致性机制/VERSION 2>/dev/null
@@ -156,8 +157,8 @@ test -L CLAUDE.md && readlink CLAUDE.md
 │ 升级提交(仅升级)                │ 展示提交说明全文,确认后提交            │ …      │
 │ 一致性机制/VERSION               │ 全部机制件验证成功后最后写入             │ …      │
 │ 文件联动目录.md                  │ 从分发模板新建或补齐结构,保留项目规则  │ …      │
-│ .claude/settings.json            │ 增量接线收尾提醒、每轮提示、压缩后提醒 │ …      │
-│ .codex hooks                     │ 同上三项接线 + 提示信任                 │ …      │
+│ .claude/settings.json            │ 增量接线每轮提示、压缩后提醒 │ …      │
+│ .codex hooks                     │ 同上两项接线 + 提示信任                 │ …      │
 │ 项目自定中枢 / 领域规则          │ 扫描候选后询问                          │ …      │
 │ .gitignore / .gitattributes      │ 按项目二进制类型询问                    │ …      │
 │ canonical / synced              │ 确认本地配置;由 guard 建立初始 horizon   │ …      │
@@ -172,7 +173,7 @@ test -L CLAUDE.md && readlink CLAUDE.md
 - 不是 Git 仓库时是否允许 `git init`;
 - 升级时:决策档案删除还是保留;PROJECT、AGENTS、联动目录改造中的每一项删除(写明删什么、原文去哪)。
 
-新增或变化了 hook 接线时,计划末尾单独列出「装完后需要你做的一步」,不要只留到最后的报告:Codex 的项目 hook 要用户审查批准后才运行,没批准时收尾提醒、每轮提示、压缩后提醒都不会运行,也不报错。Codex 桌面端可能不弹出审查窗口,这时在项目目录的终端里打开 Codex(CLI),用 `/hooks` 审查并批准,只需一次。Claude Code 按它自己的提示确认 hook。
+新增或变化了 hook 接线时,计划末尾单独列出「装完后需要你做的一步」,不要只留到最后的报告:Codex 的项目 hook 要用户审查批准后才运行,没批准时每轮提示、压缩后提醒都不会运行,也不报错。Codex 桌面端可能不弹出审查窗口,这时在项目目录的终端里打开 Codex(CLI),用 `/hooks` 审查并批准,只需一次。Claude Code 按它自己的提示确认 hook。
 
 ## 步骤 4 · 建立 PROJECT、AGENTS 与 CLAUDE 适配
 
@@ -214,7 +215,6 @@ test -L CLAUDE.md && readlink CLAUDE.md
 - `.agents/skills/catchup/`、`.agents/skills/wrapup/`(完整目录,含 `SKILL.md`、`agents/openai.yaml`、`scripts/` 与 `references/`);
 - `.claude/commands/catchup.md`、`.claude/commands/wrapup.md`;
 - `一致性机制/运行规则.md`(机制文件,整体替换,项目不手改);机制设计说明与机制 README 只留在套件仓库,不装进项目;
-- `.agents/hooks/wrapup-reminder.mjs`(收尾提醒,ASCII 固定路径的跨平台逻辑正本)、`.agents/hooks/wrapup-reminder.ps1`(Windows Codex 薄适配器,只定位并转发到 Node)与 `一致性机制/hooks/收尾提醒.sh`(旧 Unix 接线兼容包装;随后 `chmod +x`);
 - `.agents/hooks/parallel-notice.mjs`(每轮提示:在任务分支上,主线变化与本分支相关时报出事实)、`.agents/hooks/compact-reminder.mjs`(压缩后提醒:上下文被压缩后提醒重读规则)与 `.agents/hooks/run-hook.ps1`(Windows Codex 通用薄适配器,按名字转发到这两个 Node hook);
 - `.agents/hooks/selfcheck.mjs`(hook 自检:按项目实际接线在临时仓库里把每个 hook 跑一遍;hook 的失败留痕在 wrapup 的 `scripts/hook-trace.mjs`,随 wrapup 目录安装);
 - `一致性机制/LICENSE.project-consistency-kit`(从套件根 LICENSE 新建,已有不覆盖)。
@@ -235,25 +235,37 @@ test -L CLAUDE.md && readlink CLAUDE.md
 
 新版不再创建 `一致性机制/决策档案.md`:决策全文在 git 提交正文,「最近决策」由 wrapup 的决策脚本按 git 历史生成;git 中没有全文的旧行被挤出时逐字写入提交正文。升级时已有的档案按升级细则处理。
 
-宿主接线共三项,各指向一份跨平台 Node 脚本:`Stop` → 收尾提醒 `wrapup-reminder.mjs`;`UserPromptSubmit` → 每轮提示 `parallel-notice.mjs`;`SessionStart` → 压缩后提醒 `compact-reminder.mjs`(它只在压缩后输出,新会话、恢复时静默)。`.claude/settings.json` 已存在时只向这三个事件分别追加对应 entry;已有同类 entry(命令含同名脚本)就跳过,不覆盖其他 hooks。
+### 升级时退役旧 Stop hook
+
+v2.0.0-preview.4 起不再提供 Stop hook。获取此版本前先更新机器级安装器及获取脚本;旧获取器会因缺少已退役文件而拒绝新版包。新版获取器仍按旧版本要求校验历史包。
+
+将以下退役动作列入安装计划,按已有授权执行,先断开接线再删除脚本:
+
+- 检查项目 `.claude/settings.json`、存在时的 `.claude/settings.local.json`、`.codex/hooks.json` 和 `.codex/config.toml`。只移除明确调用旧机制脚本的 Stop handler: `.agents/hooks/wrapup-reminder.mjs`、`.agents/hooks/wrapup-reminder.ps1`、`一致性机制/hooks/收尾提醒.sh`,或 `run-hook.ps1 wrapup-reminder`。不得整段删除用户的 Stop 配置。
+- JSON 只删对应 handler,仅在组为空时删组、事件为空时删事件键;保留其他 handler、matcher、顺序与设置。TOML 同样只删对应 handler 表,其余内容保留;混合了自定义动作或无法判明归属的命令先展示差异,未解决则记 pending。
+- 仅删除上述三个旧脚本中确认属于套件标准内容的文件;有项目定制时先处理归属,不静默丢弃。不要清空整个 hooks 目录,也不修改项目外的宿主配置。
+- 验收确认旧机制 Stop 接线已无残留,用户其他 Stop hook 保留,两项现有提示通过检查。未解决的退役项目仍属于升级未完成,不得推进 VERSION。
+
+宿主接线共两项,各指向一份跨平台 Node 脚本:`UserPromptSubmit` → 每轮提示 `parallel-notice.mjs`;`SessionStart` → 压缩后提醒 `compact-reminder.mjs`(它只在压缩后输出,新会话、恢复时静默)。`.claude/settings.json` 已存在时只向这两个事件分别追加对应 entry;已有同类 entry(命令含同名脚本)就跳过,不覆盖其他 hooks。
 
 Claude Code 的 entry 应使用 `command: "node"` + `args: ["${CLAUDE_PROJECT_DIR}/.agents/hooks/<脚本名>.mjs"]`,避免依赖宿主 shell与非 ASCII 命令路径。
 
-Codex 本地客户端使用同样三份 Node 脚本,但接线必须先识别目标项目已有的 hook 表示:
+Codex 本地客户端使用同样两份 Node 脚本,但接线必须先识别目标项目已有的 hook 表示:
 
 - `.codex/hooks.json` 与 `.codex/config.toml` 都不存在或后者没有 inline hooks → 从套件新建 `.codex/hooks.json`;
-- 已有 `.codex/hooks.json` → 识别命令中包含 `一致性机制/hooks/收尾提醒.sh`、`wrapup-reminder.mjs`、`wrapup-reminder.ps1`、`parallel-notice.mjs`、`compact-reminder.mjs` 或 `run-hook.ps1` 的旧 / 新 entry;旧 entry 经确认原位升级,不存在才增量加入,保留其他事件、matcher 与命令;
+- 已有 `.codex/hooks.json` → 识别命令中包含 `parallel-notice.mjs`、`compact-reminder.mjs` 或 `run-hook.ps1` 的旧 / 新 entry;旧 entry 经确认原位升级,不存在才增量加入,保留其他事件、matcher 与命令;
 - `.codex/config.toml` 已含 `[hooks]` 或 `[[hooks.` → 不再创建 `hooks.json`,避免同层两种表示并存警告;经用户确认后向现有 TOML 增量加入等价接线:
   ```toml
-  [[hooks.Stop]]
+  [[hooks.SessionStart]]
 
-  [[hooks.Stop.hooks]]
+  [[hooks.SessionStart.hooks]]
   type = "command"
-  command = 'node "$(git rev-parse --show-toplevel)/.agents/hooks/wrapup-reminder.mjs"'
-  command_windows = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path (git rev-parse --show-toplevel) '.agents/hooks/wrapup-reminder.ps1')"
+  command = 'node "$(git rev-parse --show-toplevel)/.agents/hooks/compact-reminder.mjs" --host=codex'
+  command_windows = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path (git rev-parse --show-toplevel) '.agents/hooks/run-hook.ps1') compact-reminder -Codex"
   timeout = 10
   ```
-  `UserPromptSubmit`、`SessionStart` 两项写法相同,`command` 换成对应的 `parallel-notice.mjs`、`compact-reminder.mjs`,`command_windows` 调用 `run-hook.ps1` 并在末尾写 hook 名(`… '.agents/hooks/run-hook.ps1') parallel-notice`),与套件 `.codex/hooks.json` 一致;
+  Codex 的 SessionStart 接线用 `--host=codex`,Windows 用 `-Codex` 转发该参数,启用用户状态提示与 Agent 恢复后反馈;Claude 接线不加这个参数。已有同名脚本接线也要比较参数,不能仅凭名字相同跳过升级。
+  `UserPromptSubmit` 不带这两个参数,其余写法相同,`command` 换成 `parallel-notice.mjs`,`command_windows` 调用 `run-hook.ps1` 并在末尾写 hook 名(`… '.agents/hooks/run-hook.ps1') parallel-notice`),与套件 `.codex/hooks.json` 一致;
 - 两种 Codex hook 表示已经并存 → 标为待整理,展示现状并由用户选择保留哪一种;不得继续制造重复 entry;
 - Codex 项目 hook 只覆盖本地客户端。写入后提醒用户在 Codex CLI 用 `/hooks` 审查并信任新配置;未信任或项目 `.codex/` 层未受信任时,hook 会被跳过,没有任何报错。Codex 桌面端可能不弹出审查窗口:请用户在项目目录的终端里打开 Codex 完成审查,一次即可。原生 Windows 必须同时写入 `commandWindows`,并让它调用包内 `.ps1` 薄适配器,不得内联带 PowerShell 变量的第二层命令字符串;配置存在不等于当前 Codex 版本已经成功运行,最终报告应区分“已接线 / 已信任 / 已实测”。
 
@@ -274,8 +286,9 @@ Codex 本地客户端使用同样三份 Node 脚本,但接线必须先识别目�
 - 所有自动创建或推进 `synced` 的入口统一委托目标项目 `.agents/skills/wrapup/scripts/synced-guard.mjs`,安装器不得另写 `git tag` 逻辑;
 - 有 commit 且无 `synced` → 用户确认初始 horizon 后调用 guard `advance`,把当前 canonical HEAD 建为 baseline。首次创建允许工作区已有 staged / unstaged / untracked 变化,它们仍完整留在 baseline 之后等待 wrapup;
 - 无 commit → 先展示提交范围和 message,用户确认后才首 commit,再调用 guard 建立 `synced`;
-- 已有 `synced` → 不移动;调用 guard `inspect` 报告 current / canonical branch、正确 `scope_base` 与安全状态;
-- 当前不在已确认的 canonical branch、detached、冲突或历史无可靠共同祖先 → 不切 branch、不创建 tag,报告 canonical setup / horizon pending,交给用户整理。
+- 已有 `synced` → 不推进检查边界;调用 guard `inspect` 报告 current / canonical branch、正确 `scope_base` 与安全状态。preview.4 起位置为 `refs/pck/synced`,兼容读取旧 `refs/tags/synced`;旧标签存在时将 guard `migrate` 列入升级计划,按已有授权在主线上执行,它仅搬移原位置,允许保留工作区未提交改动。新旧值不同则停止处理,不得自行选择较新值、覆盖或删掉一个;无指针时 `migrate` 不创建初始基线。
+- 同一 clone 的 worktree 共享新旧引用,升级须覆盖仍在使用的机制脚本,未升级的旧 worktree 不能继续推进旧标签;各独立 clone 另行升级。只处理本地引用,不擅自删除远端旧标签。普通 `push --tags` 不带新引用,显式 refspec 或镜像推送仍可带走它;
+- 当前不在已确认的 canonical branch、detached、冲突或历史无可靠共同祖先 → 不切 branch、不创建指针,报告 canonical setup / horizon pending,交给用户整理。
 
 ## 步骤 8 · 报告与验证
 
@@ -289,9 +302,9 @@ Codex 本地客户端使用同样三份 Node 脚本,但接线必须先识别目�
 - synced guard 存在,`node .agents/skills/wrapup/scripts/synced-guard.mjs inspect` 可运行并给出 branch 与 `scope_base`;catchup 与 wrapup 都消费它给出的 branch / `scope_base`,安装器不另写 tag 操作(并行时 `task.mjs land --finish` 在主线前进后推进 synced,属于机制脚本自身);
 - catchup 不重复读取 Agent 指令;
 - Claude 的 catchup / wrapup 文件只是薄适配器;
-- Claude Code 与 Codex 本地客户端的 Stop、UserPromptSubmit、SessionStart 配置分别指向包内的收尾提醒、每轮提示、压缩后提醒 Node 脚本;Codex 含不内联变量脚本的 `commandWindows`(Stop 调 `wrapup-reminder.ps1`,另两项调 `run-hook.ps1`),并安装两个 `.ps1` 薄适配器,且没有重复的 JSON / TOML hook 表示;`node .agents/skills/wrapup/scripts/task.mjs --help` 可运行;
+- Claude Code 与 Codex 本地客户端的 UserPromptSubmit、SessionStart 配置分别指向包内的每轮提示、压缩后提醒 Node 脚本;Codex 含不内联变量脚本的 `commandWindows`(两项都调 `run-hook.ps1`),并安装这个 `.ps1` 薄适配器,且没有重复的 JSON / TOML hook 表示;`node .agents/skills/wrapup/scripts/task.mjs --help` 可运行;
 - 接线写入后运行 `node .agents/hooks/selfcheck.mjs`:它按项目实际接线在临时仓库里把每个 hook 跑一遍,逐项报告有无输出;失败的项照实列出,不说成已装好。它只证明接线能出声,不代表宿主已信任、已经运行;
-- Codex 新增或变化的项目 hook 已明确报告“待用户信任”或“已由用户信任”,不把配置存在误报为已经运行;报告把「需要你做的一步」单独列在最前面,不混在验证清单里:在项目目录的终端里打开 Codex,用 `/hooks` 审查并批准(桌面端可能不弹出审查窗口),没批准时三项 hook 都不会运行;
+- Codex 新增或变化的项目 hook 已明确报告“待用户信任”或“已由用户信任”,不把配置存在误报为已经运行;报告把「需要你做的一步」单独列在最前面,不混在验证清单里:在项目目录的终端里打开 Codex,用 `/hooks` 审查并批准(桌面端可能不弹出审查窗口),没批准时两项 hook 都不会运行;
 - 完整安装时目标 `一致性机制/VERSION` 等于来源版本;部分安装或失败时 VERSION 未被错误推进;
 - README 不存在或完全改写时工作流仍可运行;
 - 联动目录的「关键资料的受影响条件」表已登记项目真实的关键资料;
@@ -308,6 +321,6 @@ Codex 本地客户端使用同样三份 Node 脚本,但接线必须先识别目�
 - AGENTS 是项目自己的指令正本,机制规则只在 `一致性机制/运行规则.md`;CLAUDE 只用 `@AGENTS.md` 做导入适配。
 - PROJECT 是项目入口;决策全文先在「待提交」,wrapup 后在 git 提交正文。
 - catchup / wrapup 以目标仓库 `.agents/skills/` 为行为正本。
-- 收尾提醒、每轮提示、压缩后提醒各以 `.agents/hooks/` 下的同名 `.mjs` 为跨平台逻辑正本;`wrapup-reminder.ps1` 与 `run-hook.ps1` 只做 Windows Codex 路径定位与 stdin 转发,`一致性机制/hooks/收尾提醒.sh` 只兼容旧 Unix 接线,宿主配置只做接线;`selfcheck.mjs` 只做自检,失败留痕只在 `hook-trace.mjs`。
+- 每轮提示、压缩后提醒各以 `.agents/hooks/` 下的同名 `.mjs` 为跨平台逻辑正本;`run-hook.ps1` 只做 Windows Codex 路径定位与 stdin 转发,宿主配置只做接线;`selfcheck.mjs` 只做自检,失败留痕只在 `hook-trace.mjs`。
 - `一致性机制/VERSION` 是正式套件版本正本;日期版本行只用于修订与混合版本检测。
 - 不擅自 `git init`、commit 或 push;升级提交只在用户看过提交说明全文并确认后进行。

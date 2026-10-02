@@ -3,7 +3,7 @@ name: wrapup
 description: Reconcile project records and necessary linkage within the branch-safe Git scope, then prepare a user-confirmed local commit. Use for wrapup, project record synchronization or a repository checkpoint, and when the user says 收尾 or 并进主线 (merge a parallel branch into the main line); add document restructuring only when explicitly requested.
 ---
 
-<!-- 一致性机制 version: 2026-10-01 -->
+<!-- 一致性机制 version: 2026-10-02 -->
 
 默认在已有结构内完成必要记录和联动，不例行整理全项目。用户明确要求文档整理时，才读取 [文档整理细则](references/document-maintenance.md)，按其中的目的与范围提出整理计划，复用本流程确认、执行与提交；有日常工作要收尾时，先完成日常提交，再整理并单独提交。没有要求整理时，看到可以整理的地方只在报告末尾提出(见第 5 节)，不扩大本次维护范围。
 
@@ -13,7 +13,11 @@ description: Reconcile project records and necessary linkage within the branch-s
 
 回看当前仍可见的对话，找已确认但未写入文件的内容：决策应已在 `PROJECT.md`「待提交」区，漏写的列入计划补写；其他约定按归属补写。纯讨论和未确认的想法不写成有效要求；用户要求保留的备选按备选记录。没有原始对话的信息不凭空恢复。
 
-机械步骤由随附脚本负责，这些结果只由脚本产生：检查范围与基线(`scope.mjs`)、决策迁出与「最近决策」、提交说明与提交(`decisions.mjs`)、并行的开工、同步主线、并进主线与收工(`task.mjs`)、synced 的创建与推进(`synced-guard.mjs`)。直接用脚本输出的值，不自己抄写哈希、另算基线或数行数；不手工代做这些步骤，也不手改脚本生成的内容，要改就带新选项重跑。不清楚用法时运行 `node <脚本> --help`，它只打印用法、不做任何改动。脚本报错或结果与预期不符时停下，写进报告或询问用户，不绕过脚本自己做。
+机械步骤由随附脚本负责，这些结果只由脚本产生：检查范围与基线(`scope.mjs`)、决策迁出与「最近决策」、提交说明与提交(`decisions.mjs`)、并行的开工、同步主线、并进主线与收工(`task.mjs`)、synced 的创建与推进(`synced-guard.mjs`)。直接用脚本输出的值，不自己抄写哈希、另算基线或数行数；不手工代做这些步骤，也不手改脚本生成的内容，要改就带新选项重跑。不清楚用法时运行 `node <脚本> --help`，它只打印用法、不做任何改动。
+
+脚本异常时先暂停受影响的操作，查明是未能运行、执行中断，还是检查发现了真实风险。未能运行时，按已有授权尝试恢复运行条件；检查发现风险时先解决问题，不手工绕过。执行中断或结果不明时，先只读核对实际文件与 Git 状态，尤其提交是否已经发生；确认已完成的步骤和可安全重试的范围后，再恢复脚本执行，不盲目重跑。
+
+暂时无法恢复时，可以在授权范围内继续把有价值的信息和成果写入原有文件，保留待提交决策；不手改脚本生成内容，不替代脚本迁出决策、提交、合并或推进 synced。报告中区分“已写入文件”和“已提交”，说明失败、未完成步骤及状态不明之处，不把部分落盘说成收尾完成。
 
 用一个脚本取得全部范围，输出为 JSON：
 

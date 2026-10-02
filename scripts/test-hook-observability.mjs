@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-10-01
+// 一致性机制 version: 2026-10-02
 // hook 可观测性回归测试:失败留痕(输入解析不出、hook 内部异常、超过上限截断、自检通过后不再报告、scope.mjs --overview 的 hook_failures)
 // 与自检命令(本套件接线全部通过;hook 抛异常、脚本缺失、少接一项、接线文件坏掉时报失败;Codex 的 config.toml 内联接线;没有接线)。
 // 自检按当前平台运行:Windows 上 Codex 一侧经 commandWindows 与 PowerShell 适配器。
@@ -79,9 +79,9 @@ try {
 
   hook("parallel-notice", "{ broken");
   assert.match(logOf(p)[1], /\tparallel-notice\tcodex\tinput is not JSON/);
-  const claude = run(process.execPath, [path.join(p, ".agents/hooks/wrapup-reminder.mjs")], p, { input: "oops", env: { ...env, CLAUDE_PROJECT_DIR: p } });
+  const claude = run(process.execPath, [path.join(p, ".agents/hooks/compact-reminder.mjs")], p, { input: "oops", env: { ...env, CLAUDE_PROJECT_DIR: p } });
   assert.equal(claude.status, 0);
-  assert.match(logOf(p)[2], /\twrapup-reminder\tclaude\tinput is not JSON/);
+  assert.match(logOf(p)[2], /\tcompact-reminder\tclaude\tinput is not JSON/);
 
   // 分支 worktree 里的失败写进公共目录,主目录的 catchup 也看得到
   const wt = `${p}-wt`;
@@ -113,11 +113,11 @@ try {
   assert.equal(report.passed, true, JSON.stringify(failed(report)));
   assert.equal(report.failures_since_last_ok.count, 100, "自检先报出之前的失败");
   const ran = report.results.filter((r) => r.status === "ok");
-  assert.equal(ran.length, 6, JSON.stringify(report.results));
-  for (const host of ["Claude Code", "Codex"]) for (const event of ["Stop", "UserPromptSubmit", "SessionStart"]) {
+  assert.equal(ran.length, 4, JSON.stringify(report.results));
+  for (const host of ["Claude Code", "Codex"]) for (const event of ["UserPromptSubmit", "SessionStart"]) {
     assert.ok(ran.some((r) => r.host === host && r.event === event), `${host} ${event}`);
   }
-  assert.equal(report.results.filter((r) => r.status === "untested").length, 3, "Codex 另一平台的接线注明未测");
+  assert.equal(report.results.filter((r) => r.status === "untested").length, 2, "Codex 另一平台的接线注明未测");
   assert.match(logOf(p).at(-1), /\tselfcheck\t-\tok$/);
   assert.equal(overview(p).hook_failures, undefined, "自检通过后 catchup 不再报告");
   hook("compact-reminder", "after ok");
@@ -173,7 +173,7 @@ try {
   // Codex 用 config.toml 的内联接线(安装器在已有 [hooks] 时写这种)
   fs.rmSync(codexPath);
   const toml = ["model = \"x\"", ""];
-  for (const [event, name, win] of [["Stop", "wrapup-reminder", "wrapup-reminder.ps1')"], ["UserPromptSubmit", "parallel-notice", "run-hook.ps1') parallel-notice"], ["SessionStart", "compact-reminder", "run-hook.ps1') compact-reminder"]]) {
+  for (const [event, name, win] of [["UserPromptSubmit", "parallel-notice", "run-hook.ps1') parallel-notice"], ["SessionStart", "compact-reminder", "run-hook.ps1') compact-reminder"]]) {
     toml.push(`[[hooks.${event}]]`, "", `[[hooks.${event}.hooks]]`, 'type = "command"',
       `command = 'node "$(git rev-parse --show-toplevel)/.agents/hooks/${name}.mjs"'`,
       `command_windows = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path (git rev-parse --show-toplevel) '.agents/hooks/${win}"`,
@@ -181,7 +181,7 @@ try {
   }
   fs.writeFileSync(path.join(p, ".codex/config.toml"), toml.join("\n"));
   report = selfcheck(p, 0);
-  assert.equal(report.results.filter((r) => r.source === ".codex/config.toml" && r.status === "ok").length, 3, JSON.stringify(report.results));
+  assert.equal(report.results.filter((r) => r.source === ".codex/config.toml" && r.status === "ok").length, 2, JSON.stringify(report.results));
 
   // 没有任何接线
   fs.rmSync(path.join(p, ".codex"), { recursive: true });
