@@ -119,6 +119,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
+          # Release 说明取 CHANGELOG 中本版本一节(从「## <tag> — 」标题到下一个「## v」标题之前),取不到就失败
+          notes="$RUNNER_TEMP/release-notes.md"
+          awk -v h="## $RELEASE_TAG — " 'index($0, h) == 1 { p = 1; next } p && /^## v/ { exit } p' CHANGELOG.md > "$notes"
+          grep -q '[^[:space:]]' "$notes" || { echo "CHANGELOG has no section for $RELEASE_TAG" >&2; exit 1; }
           # 带 - 的 tag(如 v2.0.0-preview.1)发为预发布,GitHub 的 latest 不指向它
           prerelease=()
           case "$RELEASE_TAG" in *-*) prerelease=(--prerelease) ;; esac
@@ -126,5 +130,5 @@ jobs:
             "$RUNNER_TEMP/project-consistency-release/project-consistency-kit.tar.gz" \
             "$RUNNER_TEMP/project-consistency-release/project-consistency-kit.tar.gz.sha256" \
             --verify-tag \
-            --generate-notes \
+            --notes-file "$notes" \
             --title "Project Consistency Kit $RELEASE_TAG"

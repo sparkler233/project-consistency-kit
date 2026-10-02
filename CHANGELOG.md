@@ -6,13 +6,13 @@
 
 ## v2.0.0 — 2026-10-02
 
-**正式版(major),待发布。** 2.0 线的第一个正式版,发布后 GitHub 的 latest 指向它,不带 `--release` 即可获取。相对 v1.3.0 的主要变化分在下方三个已发布的预览版里:决策历史进 Git、PROJECT 改为入口式、运行规则独立、wrapup 一次确认与脚本化(preview.1),分支检查点与联动命中(preview.2),实验性的 Core 并行(preview.3)。本节只写相对 preview.3 的变化;开发中的 `2.0.0-preview.4` 从未发布,内容全部归入本版。
+**正式版(major)。** 2.0 线的第一个正式版,GitHub 的 latest 指向它,不带 `--release` 即可获取。相对 v1.3.0 的主要变化分在 [CHANGELOG](https://github.com/sparkler233/project-consistency-kit/blob/main/CHANGELOG.md) 里三个已发布的预览版中:决策历史进 Git、PROJECT 改为入口式、运行规则独立、wrapup 一次确认与脚本化(preview.1),分支检查点与联动命中(preview.2),实验性的 Core 并行(preview.3)。本节只写相对 preview.3 的变化;`2.0.0-preview.4` 从未发布,内容全部归入本版。
 
 **怎么获取与升级**:
 
 - 先更新机器级安装器(重新运行 README「安装」一节的 `npx skills add` 命令)。v1.3.0 与各预览版的安装器按旧版文件集合校验,会拒收 2.0.0 的包。
 - 新项目:告诉 Agent「给这个项目引入一致性机制」。
-- v1.3.0 及更早、2.0 各预览版的项目:安装器不处理,停止并说明;需自行迁移(例如让模型对照新版模板手工完成)。迁移要点:收尾指针从 `refs/tags/synced` 搬到 `refs/pck/synced`(旧标签不再读取),删除机制自己的 Stop hook 接线与脚本(保留用户其他 hook),套件旧版的 `.claude/commands/` 命令换成新的薄适配器;v1.3.0 的项目另需把 PROJECT、AGENTS 与联动目录改成 2.0 的结构。
+- v1.3.0 及更早、2.0 各预览版的项目:安装器不处理,停止并说明;需自行迁移(例如让模型对照新版模板手工完成)。迁移要点:收尾指针从 `refs/tags/synced` 搬到 `refs/pck/synced`(旧标签不再读取;在主线上运行 `git update-ref refs/pck/synced "$(git rev-parse 'refs/tags/synced^{commit}')" && git tag -d synced`,只搬位置、不推进检查边界,各独立 clone 分别处理),删除机制自己的 Stop hook 接线与脚本(保留用户其他 hook),套件旧版的 `.claude/commands/` 命令换成新的薄适配器;v1.3.0 的项目另需把 PROJECT、AGENTS 与联动目录改成 2.0 的结构。
 - 不支持降级;迁移是单独一次提交,需要时 `git revert`。
 
 **兼容承诺**:2.x 内分稳定、实验性、不承诺三档,清单见 README「兼容承诺」一节。稳定的部分改动须兼容读取或提供迁移;实验性的可以调整,须说明迁移与旧任务接续;套件内部脚本的选项与 JSON 字段不对外承诺。
@@ -31,8 +31,9 @@
 - **最低限度启动检查**:`scope.mjs --overview` 增加可选 `--host codex|claude|unknown`,由 `startup-check.mjs` 只读检查必要文件及当前宿主项目级 JSON 接线。正常安静,异常由 Agent 解释;未知宿主、自定义路径与 TOML 内联配置注明未检查。不执行 hook、不修复、不写通过标记,原概览接口保留。
 - **hook 可观测性**:`selfcheck.mjs` 按实际接线在临时仓库运行两项现有 hook,检查退出码和输出;只运行当前平台配置,另一平台注明未测。`hook-trace.mjs` 在 Git 公共目录保留最近 100 条失败记录,自检通过追加标记,概览报告之后的失败。自检不证明宿主信任或真实会话已执行;模块无法加载或适配器尚未找到仓库时可能无法留痕。
 - **并行收工修复**:`task.mjs land --finish` 不再漏报刚开工或只有未提交改动的任务分支;已并进主线但尚未收工的仍不算进行中。
-- **分发与验证**:新增自检、失败留痕、启动检查模块,移除三个 Stop 文件,另加入共享指针模块,移除 v1.3.0 升级细则,当前共 41 个分发文件。获取器只接受 2.0 及以后的包,按当前文件集合校验。CI 覆盖启动检查、失败留痕和自检;本轮本地回归与分发校验通过。早期可观测性实现在 Windows PowerShell 5.1、GBK、Node 24 上测过;后续 Stop 移除后的最终 Windows 组合尚未实测。上下文风险检测、完整手工接手、完整性能底线与真实升级验证仍有待推进。
-- **版本**:VERSION 与安装器 metadata 为 `2.0.0`;GitHub Release 不再标为预发布。
+- **分发与验证**:新增自检、失败留痕、启动检查模块,移除三个 Stop 文件,另加入共享指针模块,移除 v1.3.0 升级细则,当前共 41 个分发文件。获取器只接受 2.0 及以后的包,按当前文件集合校验。CI 覆盖启动检查、失败留痕和自检。
+- **版本**:VERSION 与安装器 metadata 为 `2.0.0`;GitHub Release 不再标为预发布,说明取自本节。
+- **发布前验证**:macOS 上全部回归测试、hook 自检、干净构建与获取脚本校验通过,篡改文件或元数据不一致的包都被拒绝;用分发包在空仓库按安装器步骤首次引入,并跑一轮带冲突与决策撞号的并行。Windows(PowerShell 5.1、GBK、Node 24、`autocrlf=true`)上同样跑了回归测试、经 `run-hook.ps1` 的 hook 自检、构建、适配器测试与同一冒烟,结果一致;只有一项测试里模拟旧版 Git 的一段依赖 `/bin/sh`,在 Windows 上跳过。Codex 0.159.0 真实会话中手动压缩后,用户提示在下一轮出现,重读指令送达模型。未验证:模型在 Windows 上照安装器真实引入、Windows 上 Codex 真实会话的 hook、模型在只有 PowerShell 5.1 的机器上跑 wrapup、压缩后模型在实际工作中是否先重读;旧版本项目的手工迁移尚未在真实项目上做过。
 
 ## v2.0.0-preview.3 — 2026-10-01
 

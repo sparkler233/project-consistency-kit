@@ -37,7 +37,7 @@
 | 干净分发白名单 | `distribution/manifest.txt` | 发布边界独立于源码目录,新增产品文件需显式评审 |
 | GitHub 公开范围 | `distribution/public-paths.txt`、`scripts/publish-public.sh` | 本仓库是内部工作仓库;公开版历史按白名单由脚本生成,内部文档与实验不公开;生成后按只放在本机的私人信息词表检查新增提交的说明与改动 |
 | 分发构建、验证与测试 | `scripts/` | 源码工具:生成 Release 资产、阻断自举状态泄漏与套件决策编号进入分发文件、回归测试 |
-| GitHub Release 工作流 | `.github/workflows/distribution.yml` | 普通变更只验证;`v*` 标签才创建 Release,带 `-` 的为预发布 |
+| GitHub Release 工作流 | `.github/workflows/distribution.yml` | 普通变更只验证;`v*` 标签才创建 Release,带 `-` 的为预发布;Release 说明取自 CHANGELOG 中该版本一节,取不到则不发布 |
 | Claude Code 适配器 | `.claude/commands/catchup.md`、`wrapup.md`、`引入一致性机制.md` | 斜杠入口,只转发到对应 Skill,不复制流程 |
 | 二进制排除与 LFS 规则 | `.gitignore`、`.gitattributes`(仓库根) | git 要它们在根才全局生效 |
 | 项目入口 | `PROJECT.md`(仓库根) | catchup 固定读取 |
@@ -51,7 +51,7 @@
 ## 版本、源码与发布面
 
 - `VERSION` 是正式 SemVer 正本,文件里的日期版本行只是修订标识。
-- GitHub `main` 是套件源码仓库,保留本仓库自己的 PROJECT、AGENTS、联动规则与决策历史;与 VERSION 一致的 `v*` 标签生成的 Release 才是干净分发源。带 `-` 的版本(如 `2.0.0-preview.1`)发为预发布,须 `--release` 明确指定(决策 76);不带 `-` 的正式版成为 latest,默认获取。
+- 本仓库是内部工作仓库,保留 PROJECT、内部文档与完整决策历史,本身不推送;GitHub `main` 是由 `scripts/publish-public.sh` 按 `distribution/public-paths.txt` 生成的公开版,只含产品文件、公开文档与本仓库的 AGENTS、联动规则(决策 78)。与 VERSION 一致的 `v*` 标签生成的 Release 才是干净分发源。带 `-` 的版本(如 `2.0.0-preview.1`)发为预发布,须 `--release` 明确指定(决策 76);不带 `-` 的正式版成为 latest,默认获取。
 - 用户项目的 PROJECT / AGENTS / 联动目录从 `templates/` 生成,不得复制本仓库实况。
 
 ## 改了机制怎么办
