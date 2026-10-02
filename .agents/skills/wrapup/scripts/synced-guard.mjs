@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 // 一致性机制 version: 2026-10-02
-// synced 的操作入口:检查能否推进、按条件创建或推进本地 `refs/pck/synced` 指针(兼容旧 synced 标签)。输出 JSON。
+// synced 的操作入口:检查能否推进、按条件创建或推进本地 `refs/pck/synced` 指针。输出 JSON。
 // 另有一处推进:并行时 `task.mjs land --finish` 在主线快进到合并提交之后推进 synced(它在任务分支的 worktree 里运行,不满足这里「在主线上」的条件)。
 // 用法:node synced-guard.mjs inspect   只检查,不做改动
 //       node synced-guard.mjs advance   条件满足时创建或推进 synced
-//       node synced-guard.mjs migrate   只迁移原位置,不推进检查边界;须在主线上运行
 //       node synced-guard.mjs --help    只打印本段说明,不做任何改动;其他参数报错且不执行
 
 import process from "node:process";
 import { readSynced, writeSynced } from "./synced-ref.mjs";
 import { spawnSync } from "node:child_process";
 
-const guardUsage = "inspect  只检查,不做改动\nadvance  条件满足时创建或推进 synced\nmigrate  只迁移原位置,不推进检查边界\n--help   只打印用法\n";
+const guardUsage = "inspect  只检查,不做改动\nadvance  条件满足时创建或推进 synced\n--help   只打印用法\n";
 const canonicalConfigKey = "projectConsistency.canonicalBranch";
 
 function git(cwd, args) {
@@ -91,7 +90,7 @@ function inspectState(startDir = process.cwd()) {
   const dirty = statusResult.status !== 0 || statusResult.stdout.length > 0;
 
   const refs = readSynced(repoRoot);
-  const syncedRaw = refs.raw || refs.legacyRaw;
+  const syncedRaw = refs.raw;
   const syncedCommit = refs.commit;
   blockers.push(...refs.blockers);
 
@@ -140,7 +139,6 @@ function inspectState(startDir = process.cwd()) {
     "not_canonical",
     "unmerged_paths",
     "synced_not_commit",
-    "synced_refs_disagree",
     "synced_symbolic_ref",
     "synced_not_ancestor",
     "dirty_worktree",
@@ -156,9 +154,6 @@ function inspectState(startDir = process.cwd()) {
     synced: syncedCommit,
     synced_ref: syncedRaw,
     refs,
-    synced_source: refs.source,
-    legacy_synced_present: Boolean(refs.legacyRaw),
-    migration_command: refs.legacyRaw ? "node .agents/skills/wrapup/scripts/synced-guard.mjs migrate" : null,
     dirty,
     has_conflicts: hasConflicts,
     can_advance: !normalizedBlockers.some((blocker) => advanceBlockers.has(blocker)),
@@ -173,9 +168,6 @@ function publicState(state) {
     scope_base,
     head,
     synced,
-    synced_source,
-    legacy_synced_present,
-    migration_command,
     dirty,
     has_conflicts,
     can_advance,
@@ -187,9 +179,6 @@ function publicState(state) {
     scope_base,
     head,
     synced,
-    synced_source,
-    legacy_synced_present,
-    migration_command,
     dirty,
     has_conflicts,
     can_advance,
@@ -197,43 +186,36 @@ function publicState(state) {
   };
 }
 
-function advance(migrateOnly = false) {
+function advance() {
   const before = inspectState();
-  const allowed = (state) => migrateOnly
-    ? Boolean(state.repo_root) && state.blockers.every(b => b === "dirty_worktree")
-    : state.can_advance;
-  if (!allowed(before)) { emit({ status: "blocked", ...publicState(before) }); return 3; }
+  if (!before.can_advance) { emit({ status: "blocked", ...publicState(before) }); return 3; }
   const after = inspectState(before.repo_root);
   if (before.head !== after.head || before.current_branch !== after.current_branch) {
     emit({ status:"blocked", ...publicState(after), blockers:unique([...after.blockers,"head_changed"]) }); return 3;
   }
-  if (before.refs.raw!==after.refs.raw || before.refs.legacyRaw!==after.refs.legacyRaw) {
+  if (before.refs.raw!==after.refs.raw) {
     emit({status:"blocked", ...publicState(after), blockers:["ref_race"]}); return 3;
   }
-  if (!allowed(after)) { emit({status:"blocked", ...publicState(after)}); return 3; }
-  if (migrateOnly && !after.synced) { emit({status:"no_synced", ...publicState(after)}); return 0; }
-  if (!after.refs.legacyRaw && (migrateOnly || after.synced===after.head)) {
-    emit({status:migrateOnly?"already_migrated":"already_synced", ...publicState(after)});return 0;
-  }
-  const update=writeSynced(after.repo_root,after.refs,migrateOnly?after.synced:after.head,`refs/heads/${after.canonical_branch}`,after.head);
+  if (!after.can_advance) { emit({status:"blocked", ...publicState(after)}); return 3; }
+  if (after.synced===after.head) { emit({status:"already_synced", ...publicState(after)}); return 0; }
+  const update=writeSynced(after.repo_root,after.refs,after.head,`refs/heads/${after.canonical_branch}`,after.head);
   if (!update.ok) {
     emit({status:update.reason==="update_failed"?"error":"blocked",...publicState(inspectState(after.repo_root)),blockers:[update.reason],error:update.error});
     return update.reason==="update_failed"?1:3;
   }
-  const status=migrateOnly || (after.synced===after.head && after.refs.legacyRaw)?"migrated":after.synced?"advanced":"created";
-  emit({status,...publicState(inspectState(after.repo_root))});return 0;
+  emit({status:after.synced?"advanced":"created",...publicState(inspectState(after.repo_root))});return 0;
 }
 
 const command = process.argv[2];
 if (process.argv.length === 3 && (command === "--help" || command === "-h")) {
   process.stdout.write(`${guardUsage}`);
   process.exitCode = 0;
-} else if (process.argv.length !== 3 || !["inspect", "advance", "migrate"].includes(command)) {
-  emit({ status: "error", error: "usage: synced-guard.mjs inspect|advance|migrate" });
+} else if (process.argv.length !== 3 || !["inspect", "advance"].includes(command)) {
+  emit({ status: "error", error: "usage: synced-guard.mjs inspect|advance" });
   process.exitCode = 2;
 } else if (command === "inspect") {
   emit(publicState(inspectState()));
   process.exitCode = 0;
 } else {
-  process.exitCode = advance(command === "migrate");
+  process.exitCode = advance();
 }

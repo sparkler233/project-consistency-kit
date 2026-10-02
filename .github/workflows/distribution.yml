@@ -27,8 +27,8 @@ jobs:
         run: node scripts/test-compact-feedback.mjs
       - name: Test synced guard
         run: node scripts/test-synced-guard.mjs
-      - name: Test synced migration
-        run: node scripts/test-synced-migration.mjs
+      - name: Test synced ref
+        run: node scripts/test-synced-ref.mjs
       - name: Test wrapup scope and decision scripts
         run: node scripts/test-wrapup-scripts.mjs
       - name: Test parallel scripts and hooks
@@ -66,8 +66,8 @@ jobs:
         run: node scripts/test-compact-feedback.mjs
       - name: Test synced guard
         run: node scripts/test-synced-guard.mjs
-      - name: Test synced migration
-        run: node scripts/test-synced-migration.mjs
+      - name: Test synced ref
+        run: node scripts/test-synced-ref.mjs
       - name: Test wrapup scope and decision scripts
         run: node scripts/test-wrapup-scripts.mjs
       - name: Test parallel scripts and hooks

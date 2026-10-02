@@ -32,7 +32,6 @@ README.md
 docs/example-session.md
 skills/project-consistency-installer/SKILL.md
 skills/project-consistency-installer/agents/openai.yaml
-skills/project-consistency-installer/references/upgrade-from-v1.3.md
 skills/project-consistency-installer/scripts/fetch-kit.ps1
 skills/project-consistency-installer/scripts/fetch-kit.sh
 templates/AGENTS.md

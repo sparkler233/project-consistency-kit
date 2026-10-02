@@ -44,7 +44,7 @@
 | Agent 指令与接入块 | `AGENTS.md`(仓库根,`一致性机制:接入` begin/end 块引用运行规则) | 宿主按固定文件名自动加载 |
 | Claude 适配入口 | `CLAUDE.md`(仓库根,内容仅 `@AGENTS.md`) | Claude Code 按固定文件名加载 |
 | canonical branch | 本地 Git config `projectConsistency.canonicalBranch` | 当前 clone 的运行状态,由用户确认 |
-| sync horizon | Git 引用 `refs/pck/synced`(兼容读取旧标签) | canonical 项目级 ref;guard 原子创建或推进,feature 只用 merge-base 检查自身变化 |
+| sync horizon | Git 引用 `refs/pck/synced` | canonical 项目级 ref;guard 原子创建或推进,feature 只用 merge-base 检查自身变化 |
 | hook 接线(UserPromptSubmit、SessionStart) | `.claude/settings.json`、`.codex/hooks.json` | 宿主只从这里读 hooks;Codex 首次或变更后需用户信任 |
 | 机器级引导器 | skills.sh 安装的 `project-consistency-installer`(本地开发可链接到本仓库) | 从 GitHub Release 或可信本地 checkout 获取套件,再增量引入或升级项目 |
 

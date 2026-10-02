@@ -63,9 +63,9 @@ metadata:
    - `templates/PROJECT.md`
    - `templates/AGENTS.md`
    - `templates/一致性机制/文件联动目录.md`
-   versioned 分发包或当前源码 checkout 还必须包含 `.codex/hooks.json` 与 `一致性机制/VERSION`;v1.2.0+ 还必须包含 `fetch-kit.ps1`;仅早于 v2.0.0-preview.4 的包要求旧 Stop 文件:旧 Unix 包装、v1.2.0+ 的 `.agents/hooks/wrapup-reminder.mjs`、v1.2.2+ 的 `.agents/hooks/wrapup-reminder.ps1`;v1.3.0+ 还必须包含 `.agents/skills/wrapup/scripts/synced-guard.mjs`;v1.3.0 及更早的包还含 `templates/一致性机制/决策档案.md`;v2.0.0-preview.1+ 还必须包含 `一致性机制/运行规则.md`、`.agents/skills/wrapup/scripts/scope.mjs`、`.agents/skills/wrapup/scripts/decisions.mjs`、`.agents/skills/wrapup/references/document-maintenance.md` 与本 Skill 的 `references/upgrade-from-v1.3.md`;v2.0.0-preview.2+ 还必须包含 `.agents/skills/wrapup/scripts/linkage.mjs`;v2.0.0-preview.3+ 还必须包含 `.agents/skills/wrapup/scripts/task.mjs`、`.agents/skills/wrapup/scripts/checkpoints.mjs`、`.agents/hooks/parallel-notice.mjs`、`.agents/hooks/compact-reminder.mjs` 与 `.agents/hooks/run-hook.ps1`;v2.0.0-preview.4+ 还必须包含 `.agents/skills/wrapup/scripts/hook-trace.mjs` 与 `.agents/hooks/selfcheck.mjs` 与 `.agents/skills/wrapup/scripts/synced-ref.mjs`;v2.0.0-preview.4+ 还必须包含 `.agents/skills/wrapup/scripts/startup-check.mjs`;旧包按各自版本的最低集合验证,不得用新版本文件要求反向否决旧 Release。
+   以及 `.codex/hooks.json` 与 `一致性机制/VERSION`。只接受 2.0 及以后的版本;完整文件集合由获取脚本按当前版本校验,早于 2.0 的包会被拒绝。
 6. 记录版本与来源并在计划和最终报告回显:
-   - 干净分发目录必须有 `DISTRIBUTION-METADATA.txt` 与 `DISTRIBUTION-MANIFEST.sha256`;记录其中的 `kit_version`、`mechanism_revision`、规范仓库、release ref 与 source commit;缺少版本字段的 schema 1 旧包标为 `legacy`,版本可从 `vX.Y.Z` release ref 派生展示,但必须标明不是包内 VERSION;
+   - 干净分发目录必须有 `DISTRIBUTION-METADATA.txt` 与 `DISTRIBUTION-MANIFEST.sha256`;记录其中的 `kit_version`、`mechanism_revision`、规范仓库、release ref 与 source commit;
    - 本地源码 checkout 必须是 Git 仓库;读取 `一致性机制/VERSION` 为 `SOURCE_VERSION`,读取源内安装器 `metadata.version`,两者必须一致;另记录统一修订日期、`git rev-parse HEAD` 与当前 ref,有未提交改动时明确标出;
    - 当前加载的 `BOOTSTRAP_VERSION` 与取得的 `SOURCE_VERSION` 不同时同时报告;
    - 两种来源都不满足时停止。不得拿无来源、校验失败或半成品目录继续安装。
@@ -80,7 +80,6 @@ git --version
 git rev-parse --is-inside-work-tree 2>/dev/null
 git rev-parse -q --verify HEAD
 git rev-parse -q --verify refs/pck/synced
-git rev-parse -q --verify refs/tags/synced
 git status --short 2>/dev/null
 cat 一致性机制/VERSION 2>/dev/null
 grep -hE '^(<!-- |# |// )一致性机制 version:' \
@@ -101,11 +100,11 @@ test -L AGENTS.md && readlink AGENTS.md
 test -L CLAUDE.md && readlink CLAUDE.md
 ```
 
-另检查旧版 `.claude/commands/同步.md` 和仍含完整流程的 `catchup.md` / `wrapup.md`。Git 低于 2.38 时在计划与最终报告中注明:并行(`task.mjs` 与每轮提示的试合并)用不了,其余照常。
+Git 低于 2.38 时在计划与最终报告中注明:并行(`task.mjs` 与每轮提示的试合并)用不了,其余照常。
 
-把目标 `一致性机制/VERSION` 记为 `TARGET_VERSION`:不存在时标为“旧版或未标记”,不得从日期行反推 SemVer。`SOURCE_VERSION > TARGET_VERSION` 是升级,相等时仍检查实际 diff,`SOURCE_VERSION < TARGET_VERSION` 是降级请求,必须单独提示并再次确认;目标缺少版本时使用统一修订日期和实际内容规划迁移。
+把目标 `一致性机制/VERSION` 记为 `TARGET_VERSION`:不存在时标为“未标记”,不得从日期行反推 SemVer。`SOURCE_VERSION > TARGET_VERSION` 是升级,相等时仍检查实际 diff,`SOURCE_VERSION < TARGET_VERSION` 是降级请求,必须单独提示并再次确认。
 
-升级只支持从 v1.3.0 或 2.0 预览版开始:`TARGET_VERSION` 为 1.3.0 时,完整读取本 Skill 的 [v1.3.0 升级细则](references/upgrade-from-v1.3.md),后续步骤中凡细则另有规定的按细则执行;`TARGET_VERSION` 为 2.0 较早的预览版(如 2.0.0-preview.1、preview.2)时,PROJECT、AGENTS 正文与联动目录的结构已是 2.0 的,不读升级细则、不改造它们:替换机制文件、按模板更新接入块,联动目录只更新版本行;来源为 preview.3 起的版本而目标更早时,另按步骤 5 补上每轮提示与压缩后提醒两个 hook 的接线,按步骤 6 处理 `.claude/worktrees/`;模板的「项目联动关系」规则写法有变化时,在计划中列出项目自己的哪些规则可以改成新写法,由用户决定改不改,改也只改写法、不改含义;目标早于 1.3.0,或未标记版本但已有机制痕迹时,停止并建议先用 `--release v1.3.0` 升到 1.3.0 再升级。首次引入不读升级细则。
+升级只支持从 2.0.0 及以后的版本开始:PROJECT、AGENTS 正文与联动目录的结构不变,替换机制文件、按模板更新接入块,联动目录只更新版本行;模板的「项目联动关系」规则写法有变化时,在计划中列出项目自己的哪些规则可以改成新写法,由用户决定改不改,改也只改写法、不改含义。`TARGET_VERSION` 早于 2.0.0(含 v1.x 与 2.0 各预览版),或未标记版本但已有机制痕迹时,停止:说明安装器不处理旧版本升级,这类项目由用户自行迁移,不做部分升级。
 
 完整读取现有 PROJECT、实体 AGENTS、实体 CLAUDE 与 README 的相关结构,建立内容归属表:
 
@@ -144,17 +143,13 @@ test -L CLAUDE.md && readlink CLAUDE.md
 ┌──────────────────────────────────┬────────────────────────────────────────┬────────┐
 │ 目标                             │ 动作                                   │ 状态   │
 ├──────────────────────────────────┼────────────────────────────────────────┼────────┤
-│ PROJECT.md                       │ 新建;首次引入补入口结构;升级完整改造 │ …      │
+│ PROJECT.md                       │ 新建;首次引入补入口结构              │ …      │
 │ AGENTS.md                        │ 新建或合并工作规则 + 接入块             │ …      │
 │ CLAUDE.md                        │ 核对后替换为一行 @AGENTS.md             │ …      │
 │ README.md                        │ 默认不动;仅判断是否登记为关键资料       │ 跳过   │
 │ .agents/skills/(catchup/wrapup)  │ 新建或按版本更新行为正本                │ …      │
 │ .claude/commands/(catchup/wrapup)│ 新建或迁移为 Claude Code 薄适配器       │ …      │
-│ 旧版中文出向命令                 │ 对账定制后迁移并移除旧入口              │ …      │
 │ 一致性机制/(运行规则、hooks)     │ 从套件新建或按版本更新                  │ …      │
-│ 旧机制文档(仅升级)              │ 设计说明与机制 README 确认后删除        │ …      │
-│ 决策档案(仅升级)                │ 全文写入升级提交正文后删除,或保留只读  │ …      │
-│ 升级提交(仅升级)                │ 展示提交说明全文,确认后提交            │ …      │
 │ 一致性机制/VERSION               │ 全部机制件验证成功后最后写入             │ …      │
 │ 文件联动目录.md                  │ 从分发模板新建或补齐结构,保留项目规则  │ …      │
 │ .claude/settings.json            │ 增量接线每轮提示、压缩后提醒 │ …      │
@@ -170,8 +165,7 @@ test -L CLAUDE.md && readlink CLAUDE.md
 - 无法分类的旧内容放哪里;
 - README 是否承载需同步维护的公开契约;
 - 项目是否含图片、设计稿、字体或媒体;
-- 不是 Git 仓库时是否允许 `git init`;
-- 升级时:决策档案删除还是保留;PROJECT、AGENTS、联动目录改造中的每一项删除(写明删什么、原文去哪)。
+- 不是 Git 仓库时是否允许 `git init`。
 
 新增或变化了 hook 接线时,计划末尾单独列出「装完后需要你做的一步」,不要只留到最后的报告:Codex 的项目 hook 要用户审查批准后才运行,没批准时每轮提示、压缩后提醒都不会运行,也不报错。Codex 桌面端可能不弹出审查窗口,这时在项目目录的终端里打开 Codex(CLI),用 `/hooks` 审查并批准,只需一次。Claude Code 按它自己的提示确认 hook。
 
@@ -182,13 +176,12 @@ test -L CLAUDE.md && readlink CLAUDE.md
 - 不存在但旧 CLAUDE / README 有事实 → 按套件 `templates/PROJECT.md` 的结构新建,基于现有内容填写并标明来源,README 原文不动;
 - 无可迁移事实 → 从 `templates/PROJECT.md` 新建,按实际仓库预填可确认内容;
 - 已存在(首次引入)→ 保留已有内容,按模板补齐入口结构,至少补出「关键决策」下的「待提交」「最近决策」两个小节(wrapup 的决策脚本按这两个小节读取);超出补齐的结构调整,按套件 `.agents/skills/wrapup/references/document-maintenance.md` 提出,经用户确认;
-- 升级自 v1.3.0 → 按升级细则完整改为入口式;
 - 决策落点:「关键决策」下的「待提交」(拍板时写全文)与「最近决策」(每条一行索引)。
 
 **AGENTS.md**
 
 - 不存在 → 从 `templates/AGENTS.md` 新建,再合并旧规则;
-- 已存在实体 → 原结构不动;按模板 begin/end marker(`一致性机制:接入`)补上或整块替换接入块(块内只引用运行规则并给出压缩后指令);v1.3.0 的旧块 marker 为 `一致性机制:同步纪律`,整块换成新 marker 的接入块,不留旧块;块内有项目自加内容时先展示,移到块外保留;升级时,v1.3.0 模板在块外带来的旧机制条款按升级细则处理;
+- 已存在实体 → 原结构不动;按模板 begin/end marker(`一致性机制:接入`)补上或整块替换接入块(块内只引用运行规则并给出压缩后指令);块内有项目自加内容时先展示,移到块外保留;
 - 已是链接 → 先解析实际内容,不得叠加链接;
 - catchup 必须明确不重复读取 harness 已注入的 AGENTS / CLAUDE。
 
@@ -221,30 +214,9 @@ test -L CLAUDE.md && readlink CLAUDE.md
 
 `一致性机制/VERSION` 不参与内容合并,但只能在本轮用户批准的机制件全部写入并通过步骤 8 验证后,最后原样写入 `SOURCE_VERSION`。用户跳过任一必需升级、出现未解决冲突或验证失败时不得推进 VERSION;报告目标处于 mixed / pending 状态,避免把部分安装伪装成完整版本。
 
-旧版完整命令迁移规则:
+`一致性机制/文件联动目录.md` 必须来自套件的 `templates/一致性机制/文件联动目录.md`,不是套件自身真实规则。首次引入且目标已存在时只逐条补缺,保留项目自定内容;升级时只更新版本行。
 
-- 旧命令只是套件历史版本 → 安装 Skill 后替换为薄适配器;
-- 旧命令含项目定制 → 展示差异,逐项迁入对应 Skill,确认无遗漏前不替换;
-- 已有同名 Skill → 比较版本与定制,不整目录静默覆盖;
-- 旧中文出向命令与 wrapup 等价 → 确认后移除旧入口;
-- 无法判断来源 → 标人工合并。
-
-完成后验证完整流程只存在于 `.agents/skills/`,Claude 命令不复制步骤正文。
-
-`一致性机制/文件联动目录.md` 必须来自套件的 `templates/一致性机制/文件联动目录.md`,不是套件自身真实规则。首次引入且目标已存在时只逐条补缺,保留项目自定内容;升级时按升级细则改造。
-
-新版不再创建 `一致性机制/决策档案.md`:决策全文在 git 提交正文,「最近决策」由 wrapup 的决策脚本按 git 历史生成;git 中没有全文的旧行被挤出时逐字写入提交正文。升级时已有的档案按升级细则处理。
-
-### 升级时退役旧 Stop hook
-
-v2.0.0-preview.4 起不再提供 Stop hook。获取此版本前先更新机器级安装器及获取脚本;旧获取器会因缺少已退役文件而拒绝新版包。新版获取器仍按旧版本要求校验历史包。
-
-将以下退役动作列入安装计划,按已有授权执行,先断开接线再删除脚本:
-
-- 检查项目 `.claude/settings.json`、存在时的 `.claude/settings.local.json`、`.codex/hooks.json` 和 `.codex/config.toml`。只移除明确调用旧机制脚本的 Stop handler: `.agents/hooks/wrapup-reminder.mjs`、`.agents/hooks/wrapup-reminder.ps1`、`一致性机制/hooks/收尾提醒.sh`,或 `run-hook.ps1 wrapup-reminder`。不得整段删除用户的 Stop 配置。
-- JSON 只删对应 handler,仅在组为空时删组、事件为空时删事件键;保留其他 handler、matcher、顺序与设置。TOML 同样只删对应 handler 表,其余内容保留;混合了自定义动作或无法判明归属的命令先展示差异,未解决则记 pending。
-- 仅删除上述三个旧脚本中确认属于套件标准内容的文件;有项目定制时先处理归属,不静默丢弃。不要清空整个 hooks 目录,也不修改项目外的宿主配置。
-- 验收确认旧机制 Stop 接线已无残留,用户其他 Stop hook 保留,两项现有提示通过检查。未解决的退役项目仍属于升级未完成,不得推进 VERSION。
+决策全文在 git 提交正文,「最近决策」由 wrapup 的决策脚本按 git 历史生成,不另建决策档案;已有项目索引里 git 中没有全文的旧行,被挤出时逐字写入提交正文。
 
 宿主接线共两项,各指向一份跨平台 Node 脚本:`UserPromptSubmit` → 每轮提示 `parallel-notice.mjs`;`SessionStart` → 压缩后提醒 `compact-reminder.mjs`(它只在压缩后输出,新会话、恢复时静默)。`.claude/settings.json` 已存在时只向这两个事件分别追加对应 entry;已有同类 entry(命令含同名脚本)就跳过,不覆盖其他 hooks。
 
@@ -286,8 +258,7 @@ Codex 本地客户端使用同样两份 Node 脚本,但接线必须先识别目�
 - 所有自动创建或推进 `synced` 的入口统一委托目标项目 `.agents/skills/wrapup/scripts/synced-guard.mjs`,安装器不得另写 `git tag` 逻辑;
 - 有 commit 且无 `synced` → 用户确认初始 horizon 后调用 guard `advance`,把当前 canonical HEAD 建为 baseline。首次创建允许工作区已有 staged / unstaged / untracked 变化,它们仍完整留在 baseline 之后等待 wrapup;
 - 无 commit → 先展示提交范围和 message,用户确认后才首 commit,再调用 guard 建立 `synced`;
-- 已有 `synced` → 不推进检查边界;调用 guard `inspect` 报告 current / canonical branch、正确 `scope_base` 与安全状态。preview.4 起位置为 `refs/pck/synced`,兼容读取旧 `refs/tags/synced`;旧标签存在时将 guard `migrate` 列入升级计划,按已有授权在主线上执行,它仅搬移原位置,允许保留工作区未提交改动。新旧值不同则停止处理,不得自行选择较新值、覆盖或删掉一个;无指针时 `migrate` 不创建初始基线。
-- 同一 clone 的 worktree 共享新旧引用,升级须覆盖仍在使用的机制脚本,未升级的旧 worktree 不能继续推进旧标签;各独立 clone 另行升级。只处理本地引用,不擅自删除远端旧标签。普通 `push --tags` 不带新引用,显式 refspec 或镜像推送仍可带走它;
+- 已有 `synced`(`refs/pck/synced`)→ 不推进检查边界;调用 guard `inspect` 报告 current / canonical branch、正确 `scope_base` 与安全状态。同一 clone 的 worktree 共享这个引用;普通 `push --tags` 不带它,显式 refspec 或镜像推送仍可带走;
 - 当前不在已确认的 canonical branch、detached、冲突或历史无可靠共同祖先 → 不切 branch、不创建指针,报告 canonical setup / horizon pending,交给用户整理。
 
 ## 步骤 8 · 报告与验证
@@ -295,8 +266,7 @@ Codex 本地客户端使用同样两份 Node 脚本,但接线必须先识别目�
 报告 `BOOTSTRAP_VERSION`、`SOURCE_VERSION`、安装前 `TARGET_VERSION`、安装后版本状态、统一修订日期、套件源 URL、release/ref、source commit、来源类型,以及新建、合并、迁移、跳过、失败和待填项。至少验证:
 
 - PROJECT 为入口式:目标与边界、总体状态、阅读入口(写出各位置的具体主题)、关键决策(「待提交」「最近决策」);`node .agents/skills/wrapup/scripts/decisions.mjs plan` 不报 `section_not_found`;
-- `一致性机制/运行规则.md` 存在,AGENTS 接入块引用它,且不再有 `一致性机制:同步纪律` 旧块;`node .agents/skills/wrapup/scripts/scope.mjs --overview` 可运行;
-- 升级时:决策档案已按用户选择处理;v1.3.0 模板带来的旧机制条款已不在 AGENTS;升级提交已按确认完成或明确报告未提交;
+- `一致性机制/运行规则.md` 存在,AGENTS 接入块引用它;`node .agents/skills/wrapup/scripts/scope.mjs --overview` 可运行;
 - AGENTS 是实体正本,CLAUDE 是只含 `@AGENTS.md` 的普通文件适配器;
 - catchup / wrapup 两个仓库级 Skill 存在且通过 Skill 校验;
 - synced guard 存在,`node .agents/skills/wrapup/scripts/synced-guard.mjs inspect` 可运行并给出 branch 与 `scope_base`;catchup 与 wrapup 都消费它给出的 branch / `scope_base`,安装器不另写 tag 操作(并行时 `task.mjs land --finish` 在主线前进后推进 synced,属于机制脚本自身);
@@ -316,11 +286,11 @@ Codex 本地客户端使用同样两份 Node 脚本,但接线必须先识别目�
 - 发布包外层 SHA-256、内部逐文件清单、来源元数据或缓存完整性任一失败时停止,不得静默回退到源码仓库。
 - 用户明确提供的本地源码 checkout 可以作为开发来源;非规范远端不得由下载脚本静默获取。
 - 不从不受信任的 fork 静默获取;非规范来源必须由用户以本地路径明确提供。
-- 不丢旧内容。首次引入不因模板更标准而重排用户文档;升级时的改造按升级细则进行,删除须经用户确认。
+- 不丢旧内容。首次引入不因模板更标准而重排用户文档;删除须经用户确认。
 - README 默认不写、不创建、不作为项目地图。
 - AGENTS 是项目自己的指令正本,机制规则只在 `一致性机制/运行规则.md`;CLAUDE 只用 `@AGENTS.md` 做导入适配。
 - PROJECT 是项目入口;决策全文先在「待提交」,wrapup 后在 git 提交正文。
 - catchup / wrapup 以目标仓库 `.agents/skills/` 为行为正本。
 - 每轮提示、压缩后提醒各以 `.agents/hooks/` 下的同名 `.mjs` 为跨平台逻辑正本;`run-hook.ps1` 只做 Windows Codex 路径定位与 stdin 转发,宿主配置只做接线;`selfcheck.mjs` 只做自检,失败留痕只在 `hook-trace.mjs`。
 - `一致性机制/VERSION` 是正式套件版本正本;日期版本行只用于修订与混合版本检测。
-- 不擅自 `git init`、commit 或 push;升级提交只在用户看过提交说明全文并确认后进行。
+- 不擅自 `git init`、commit 或 push;提交只在用户看过提交说明全文并确认后进行。

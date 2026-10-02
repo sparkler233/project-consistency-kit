@@ -44,7 +44,7 @@ function createRepo({ configure = true, tag = true } = {}) {
   git(repo, "add", "tracked.txt");
   git(repo, "commit", "-qm", "base");
   if (configure) git(repo, "config", "--local", "projectConsistency.canonicalBranch", "main");
-  if (tag) git(repo, "tag", "synced");
+  if (tag) git(repo, "update-ref", "refs/pck/synced", "HEAD");
   return repo;
 }
 
@@ -129,7 +129,7 @@ try {
   assert.equal(invoke(detached, "advance", 3).status, "blocked");
 
   const diverged = createRepo();
-  const oldSynced = git(diverged, "rev-parse", "synced");
+  const oldSynced = git(diverged, "rev-parse", "refs/pck/synced");
   git(diverged, "checkout", "-q", "--orphan", "replacement");
   git(diverged, "rm", "-q", "-f", "tracked.txt");
   fs.writeFileSync(path.join(diverged, "replacement.txt"), "replacement\n");
@@ -140,7 +140,7 @@ try {
   const divergence = invoke(diverged, "inspect");
   assert.ok(divergence.blockers.includes("synced_not_ancestor"));
   assert.equal(invoke(diverged, "advance", 3).status, "blocked");
-  assert.equal(git(diverged, "rev-parse", "synced"), oldSynced);
+  assert.equal(git(diverged, "rev-parse", "refs/pck/synced"), oldSynced);
 
   const conflict = createRepo();
   git(conflict, "switch", "-q", "-c", "other");

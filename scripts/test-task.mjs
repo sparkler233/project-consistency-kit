@@ -62,7 +62,7 @@ try {
   write(repo, "一致性机制/文件联动目录.md", linkage);
   git(repo, "add", "-A");
   git(repo, "commit", "-qm", "初始");
-  git(repo, "tag", "synced");
+  git(repo, "update-ref", "refs/pck/synced", "HEAD");
 
   // 用法与拦截
   assert.equal(task(repo, ["start", "--here"], 2).error.startsWith("--here"), true, "--here 只写检查点,需要目标");
@@ -128,15 +128,9 @@ try {
   const cA = rev(a, "HEAD");
   assert.match(git(a, "log", "-1", "--format=%B"), /Decision: 2\nTask: 改写第三章\nLand-Checked: [0-9a-f]{40}/);
   const oldMain = rev(repo, "main");
-  git(repo, "update-ref", "refs/pck/synced", cA);
-  assert.ok(task(a, ["land", "--finish"], 3).blockers.includes("synced_refs_disagree"));
-  assert.equal(rev(repo, "main"), oldMain, "新旧指针不一致时不得推进主线");
-  assert.equal(rev(a, "HEAD"), cA);
-  git(repo, "update-ref", "-d", "refs/pck/synced", cA);
   const fa = task(a, ["land", "--finish"]);
   assert.equal(fa.status, "landed");
   assert.equal(fa.synced, "advanced");
-  assert.equal(git(repo, "tag", "--list", "synced"), "", "并行合并同时退役旧标签");
   assert.equal(fa.recheck_skipped, false);
   const M = rev(repo, "main");
   assert.deepEqual(git(repo, "log", "-1", "--format=%P", M).split(" "), [oldMain, cA], "合并提交:第一父提交是原主线,第二父提交是分支");

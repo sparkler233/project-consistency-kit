@@ -42,7 +42,7 @@ function createRepo(recent) {
   fs.writeFileSync(path.join(repo, "PROJECT.md"), project([], recent));
   git(repo, "add", "-A");
   git(repo, "commit", "-qm", "初始");
-  git(repo, "tag", "synced");
+  git(repo, "update-ref", "refs/pck/synced", "HEAD");
   return repo;
 }
 function setPending(repo, pending) {
@@ -138,7 +138,7 @@ try {
   fs.mkdirSync(path.join(scoped, "素材"));
   for (let i = 0; i < 3; i += 1) fs.writeFileSync(path.join(scoped, "素材", `图${i}.txt`), "x");
   const out = json(scoped, scope);
-  assert.equal(out.base, git(scoped, "rev-parse", "synced"));
+  assert.equal(out.base, git(scoped, "rev-parse", "refs/pck/synced"));
   assert.equal(out.commits_since_base.length, 0);
   const file = out.worktree.untracked.find((u) => u.path === "说明.md");
   assert.deepEqual(file.head, ["第一行", "第二行", "第三行"]);
@@ -246,7 +246,7 @@ try {
   const guard = path.join(scripts, "synced-guard.mjs");
   const hp = createRepo(recent10);
   setPending(hp, [entry(11, "只为测试 --help")]);
-  const snap = () => [fs.readFileSync(path.join(hp, "PROJECT.md"), "utf8"), git(hp, "rev-parse", "HEAD"), git(hp, "rev-parse", "synced"),
+  const snap = () => [fs.readFileSync(path.join(hp, "PROJECT.md"), "utf8"), git(hp, "rev-parse", "HEAD"), git(hp, "rev-parse", "refs/pck/synced"),
     fs.existsSync(path.join(hp, ".git", "pck-commit-message.txt"))];
   const before8 = snap();
   for (const [script, args] of [[decisions, ["--help"]], [decisions, ["apply", "--help"]], [decisions, ["apply", "-h", "--title", "x"]],

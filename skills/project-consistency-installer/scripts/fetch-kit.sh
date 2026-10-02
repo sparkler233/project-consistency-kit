@@ -25,8 +25,6 @@ Usage: fetch-kit.sh [--release TAG|latest] [--cache-dir ABSOLUTE_PATH] [--offlin
 Downloads and verifies the clean Project Consistency Kit GitHub Release into a
 machine cache. Prints the verified distribution path to stdout. Progress and
 source provenance go to stderr.
-
---ref is retained as a deprecated alias for --release.
 EOF
 }
 
@@ -77,79 +75,12 @@ metadata_value() {
   printf '%s\n' "$value"
 }
 
-metadata_optional_value() {
-  local key="$1"
-  local file="$2"
-  local count
-  local value
-  count=$(awk -F= -v key="$key" '$1 == key { count++ } END { print count + 0 }' "$file")
-  if [ "$count" -gt 1 ]; then
-    printf 'metadata key appears more than once: %s\n' "$key" >&2
-    return 2
-  fi
-  [ "$count" -eq 1 ] || return 1
-  value=$(awk -F= -v key="$key" '$1 == key { print substr($0, length(key) + 2) }' "$file")
-  if [ -z "$value" ]; then
-    printf 'metadata value is empty: %s\n' "$key" >&2
-    return 2
-  fi
-  printf '%s\n' "$value"
-}
-
-version_at_least_1_2() {
-  local version_core="${1%%-*}"
-  local major minor patch
-  IFS=. read -r major minor patch <<EOF
-$version_core
-EOF
-  [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ && "$patch" =~ ^[0-9]+$ ]] || return 1
-  [ "$major" -gt 1 ] || { [ "$major" -eq 1 ] && [ "$minor" -ge 2 ]; }
-}
-
-version_at_least_1_2_2() {
-  local version_core="${1%%-*}"
-  local major minor patch
-  IFS=. read -r major minor patch <<EOF
-$version_core
-EOF
-  [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ && "$patch" =~ ^[0-9]+$ ]] || return 1
-  [ "$major" -gt 1 ] || {
-    [ "$major" -eq 1 ] \
-      && { [ "$minor" -gt 2 ] || { [ "$minor" -eq 2 ] && [ "$patch" -ge 2 ]; }; }
-  }
-}
-
 version_at_least_2_0() {
   local version_core="${1%%-*}"
   local major
   major="${version_core%%.*}"
   [[ "$major" =~ ^[0-9]+$ ]] || return 1
   [ "$major" -ge 2 ]
-}
-
-# 2.0.0-preview.1 是唯一早于 preview.2 的 2.0 版本
-version_at_least_2_0_preview_2() {
-  version_at_least_2_0 "$1" && [ "$1" != "2.0.0-preview.1" ]
-}
-
-# preview.3 起含并行脚本与每轮提示、压缩后提醒两个 hook
-version_at_least_2_0_preview_3() {
-  version_at_least_2_0_preview_2 "$1" && [ "$1" != "2.0.0-preview.2" ]
-}
-
-# preview.4 统一包含自检、失败留痕与启动检查,并退役 Stop 文件
-version_at_least_2_0_preview_4() {
-  version_at_least_2_0_preview_3 "$1" && [ "$1" != "2.0.0-preview.3" ]
-}
-
-version_at_least_1_3() {
-  local version_core="${1%%-*}"
-  local major minor patch
-  IFS=. read -r major minor patch <<EOF
-$version_core
-EOF
-  [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ && "$patch" =~ ^[0-9]+$ ]] || return 1
-  [ "$major" -gt 1 ] || { [ "$major" -eq 1 ] && [ "$minor" -ge 3 ]; }
 }
 
 validate_distribution() {
@@ -160,12 +91,6 @@ validate_distribution() {
   local listed_files
   local relative_path
   local required_paths
-  local versioned_paths
-  local optional_version
-  local optional_revision
-  local optional_status
-  local version_field=0
-  local revision_field=0
 
   [ -d "$distribution_dir" ] || fail "distribution directory is missing: $distribution_dir"
   [ ! -L "$distribution_dir" ] || fail "refusing symlinked distribution: $distribution_dir"
@@ -212,67 +137,44 @@ validate_distribution() {
   [[ "$validated_commit" =~ ^[0-9a-f]{40}$ ]] || fail "invalid source commit in metadata"
   [[ "$validated_ref" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "invalid source ref in metadata"
 
-  if [ "$validated_schema" = "2" ]; then
-    validated_version=$(metadata_value kit_version "$metadata")
-    validated_revision=$(metadata_value mechanism_revision "$metadata")
-    validated_profile="versioned"
-  else
-    if optional_version=$(metadata_optional_value kit_version "$metadata"); then
-      version_field=1
-    else
-      optional_status=$?
-      [ "$optional_status" -eq 1 ] || fail "invalid optional metadata key: kit_version"
-    fi
-    if optional_revision=$(metadata_optional_value mechanism_revision "$metadata"); then
-      revision_field=1
-    else
-      optional_status=$?
-      [ "$optional_status" -eq 1 ] || fail "invalid optional metadata key: mechanism_revision"
-    fi
-    [ "$version_field" -eq "$revision_field" ] \
-      || fail "schema 1 version metadata must include both kit_version and mechanism_revision"
-    if [ "$version_field" -eq 1 ]; then
-      validated_version="$optional_version"
-      validated_revision="$optional_revision"
-      validated_profile="versioned"
-    else
-      if [[ "$validated_ref" =~ ^v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$ ]]; then
-        validated_version="${BASH_REMATCH[1]}"
-      else
-        validated_version="legacy"
-      fi
-      validated_revision=$(sed -n 's/^<!-- 一致性机制 version: \([0-9][0-9-]*\) -->$/\1/p' \
-        "$distribution_dir/skills/project-consistency-installer/SKILL.md")
-      [[ "$validated_revision" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
-        || validated_revision="unknown"
-      validated_profile="legacy"
-    fi
-  fi
-
-  if [ "$validated_profile" = "versioned" ]; then
-    [[ "$validated_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
-      || fail "invalid kit version in metadata"
-    [[ "$validated_revision" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
-      || fail "invalid mechanism revision in metadata"
-  fi
-
-  if [ "$validated_profile" != "versioned" ] || ! version_at_least_2_0_preview_4 "$validated_version"; then
-    [ -f "$distribution_dir/一致性机制/hooks/收尾提醒.sh" ] || fail "legacy distribution missing Stop shell wrapper"
-    if [ "$validated_profile" = "versioned" ] && version_at_least_1_2 "$validated_version"; then
-      [ -f "$distribution_dir/.agents/hooks/wrapup-reminder.mjs" ] || fail "legacy distribution missing Stop hook"
-    fi
-  fi
+  validated_version=$(metadata_value kit_version "$metadata")
+  validated_revision=$(metadata_value mechanism_revision "$metadata")
+  validated_profile="versioned"
+  [[ "$validated_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
+    || fail "invalid kit version in metadata"
+  [[ "$validated_revision" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] \
+    || fail "invalid mechanism revision in metadata"
+  version_at_least_2_0 "$validated_version" \
+    || fail "kit $validated_version is not supported; this fetcher only accepts 2.0 and later"
 
   required_paths='skills/project-consistency-installer/SKILL.md
 skills/project-consistency-installer/scripts/fetch-kit.sh
+skills/project-consistency-installer/scripts/fetch-kit.ps1
 .agents/skills/catchup/SKILL.md
 .agents/skills/wrapup/SKILL.md
+.agents/skills/wrapup/references/document-maintenance.md
+.agents/skills/wrapup/scripts/scope.mjs
+.agents/skills/wrapup/scripts/decisions.mjs
+.agents/skills/wrapup/scripts/linkage.mjs
+.agents/skills/wrapup/scripts/synced-guard.mjs
+.agents/skills/wrapup/scripts/synced-ref.mjs
+.agents/skills/wrapup/scripts/task.mjs
+.agents/skills/wrapup/scripts/checkpoints.mjs
+.agents/skills/wrapup/scripts/hook-trace.mjs
+.agents/skills/wrapup/scripts/startup-check.mjs
+.agents/hooks/parallel-notice.mjs
+.agents/hooks/compact-reminder.mjs
+.agents/hooks/run-hook.ps1
+.agents/hooks/selfcheck.mjs
 .claude/commands/catchup.md
 .claude/commands/wrapup.md
 .claude/settings.json
+.codex/hooks.json
 templates/PROJECT.md
 templates/AGENTS.md
 templates/一致性机制/文件联动目录.md
+一致性机制/VERSION
+一致性机制/运行规则.md
 LICENSE'
   while IFS= read -r relative_path; do
     [ -f "$distribution_dir/$relative_path" ] \
@@ -281,119 +183,36 @@ LICENSE'
 $required_paths
 EOF
 
-  if [ "$validated_profile" = "versioned" ]; then
-    versioned_paths='.codex/hooks.json
-一致性机制/VERSION'
-    while IFS= read -r relative_path; do
-      [ -f "$distribution_dir/$relative_path" ] \
-        || fail "versioned distribution is incomplete: missing $relative_path"
-    done <<EOF
-$versioned_paths
-EOF
-
-    packaged_version=$(tr -d '\r\n' < "$distribution_dir/一致性机制/VERSION")
-    [ "$packaged_version" = "$validated_version" ] \
-      || fail "packaged VERSION differs from metadata kit version"
-    installer_version=$(sed -n 's/^  version: "\([^"]*\)"$/\1/p' \
-      "$distribution_dir/skills/project-consistency-installer/SKILL.md")
-    [ "$installer_version" = "$validated_version" ] \
-      || fail "installer version differs from metadata kit version"
-    revision_doc="$distribution_dir/一致性机制/机制设计说明.md"
-    if version_at_least_2_0 "$validated_version"; then revision_doc="$distribution_dir/一致性机制/运行规则.md"; fi
-    packaged_revision=$(sed -n 's/^<!-- 一致性机制 version: \([0-9][0-9-]*\) -->$/\1/p' "$revision_doc")
-    [ "$packaged_revision" = "$validated_revision" ] \
-      || fail "packaged revision differs from metadata mechanism revision"
-    if [[ "$validated_ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-      [ "$validated_ref" = "v$validated_version" ] \
-        || fail "release ref differs from metadata kit version"
-    fi
-
-    if version_at_least_1_2 "$validated_version"; then
-      for relative_path in \
-        skills/project-consistency-installer/scripts/fetch-kit.ps1; do
-        [ -f "$distribution_dir/$relative_path" ] \
-          || fail "v1.2+ distribution is incomplete: missing $relative_path"
-      done
-    fi
-    if ! version_at_least_2_0_preview_4 "$validated_version" && version_at_least_1_2_2 "$validated_version"; then
-      [ -f "$distribution_dir/.agents/hooks/wrapup-reminder.ps1" ] \
-        || fail "v1.2.2+ distribution is incomplete: missing .agents/hooks/wrapup-reminder.ps1"
-    fi
-    if version_at_least_1_3 "$validated_version"; then
-      [ -f "$distribution_dir/.agents/skills/wrapup/scripts/synced-guard.mjs" ] \
-        || fail "v1.3+ distribution is incomplete: missing synced guard"
-    fi
-    if version_at_least_2_0 "$validated_version"; then
-      for relative_path in \
-        一致性机制/运行规则.md \
-        .agents/skills/wrapup/scripts/scope.mjs \
-        .agents/skills/wrapup/scripts/decisions.mjs \
-        .agents/skills/wrapup/references/document-maintenance.md \
-        skills/project-consistency-installer/references/upgrade-from-v1.3.md; do
-        [ -f "$distribution_dir/$relative_path" ] \
-          || fail "v2.0+ distribution is incomplete: missing $relative_path"
-      done
-    fi
-    if version_at_least_2_0_preview_2 "$validated_version"; then
-      [ -f "$distribution_dir/.agents/skills/wrapup/scripts/linkage.mjs" ] \
-        || fail "v2.0.0-preview.2+ distribution is incomplete: missing .agents/skills/wrapup/scripts/linkage.mjs"
-    fi
-    if version_at_least_2_0_preview_3 "$validated_version"; then
-      for relative_path in \
-        .agents/skills/wrapup/scripts/task.mjs \
-        .agents/skills/wrapup/scripts/checkpoints.mjs \
-        .agents/hooks/parallel-notice.mjs \
-        .agents/hooks/compact-reminder.mjs \
-        .agents/hooks/run-hook.ps1; do
-        [ -f "$distribution_dir/$relative_path" ] \
-          || fail "v2.0.0-preview.3+ distribution is incomplete: missing $relative_path"
-      done
-    fi
-    if version_at_least_2_0_preview_4 "$validated_version"; then
-      for relative_path in \
-        .agents/skills/wrapup/scripts/hook-trace.mjs \
-        .agents/hooks/selfcheck.mjs \
-        .agents/skills/wrapup/scripts/synced-ref.mjs; do
-        [ -f "$distribution_dir/$relative_path" ] \
-          || fail "v2.0.0-preview.4+ distribution is incomplete: missing $relative_path"
-      done
-    fi
-  fi
-  if [ "$validated_profile" = "versioned" ] && version_at_least_2_0_preview_4 "$validated_version"; then
-    [ -f "$distribution_dir/.agents/skills/wrapup/scripts/startup-check.mjs" ] \
-      || fail "v2.0.0-preview.4+ distribution is incomplete: missing startup-check.mjs"
-  fi
-  if [ "$validated_profile" != "versioned" ] || ! version_at_least_2_0 "$validated_version"; then
-    for relative_path in \
-      templates/一致性机制/决策档案.md \
-      一致性机制/README.md \
-      一致性机制/机制设计说明.md; do
-      [ -f "$distribution_dir/$relative_path" ] \
-        || fail "distribution is incomplete: missing $relative_path"
-    done
+  packaged_version=$(tr -d '\r\n' < "$distribution_dir/一致性机制/VERSION")
+  [ "$packaged_version" = "$validated_version" ] \
+    || fail "packaged VERSION differs from metadata kit version"
+  installer_version=$(sed -n 's/^  version: "\([^"]*\)"$/\1/p' \
+    "$distribution_dir/skills/project-consistency-installer/SKILL.md")
+  [ "$installer_version" = "$validated_version" ] \
+    || fail "installer version differs from metadata kit version"
+  packaged_revision=$(sed -n 's/^<!-- 一致性机制 version: \([0-9][0-9-]*\) -->$/\1/p' "$distribution_dir/一致性机制/运行规则.md")
+  [ "$packaged_revision" = "$validated_revision" ] \
+    || fail "packaged revision differs from metadata mechanism revision"
+  if [[ "$validated_ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+    [ "$validated_ref" = "v$validated_version" ] \
+      || fail "release ref differs from metadata kit version"
   fi
 
   for relative_path in \
     PROJECT.md \
     AGENTS.md \
     CLAUDE.md \
-    一致性机制/文件联动目录.md \
-    一致性机制/决策档案.md; do
+    一致性机制/文件联动目录.md; do
     [ ! -e "$distribution_dir/$relative_path" ] \
       || fail "source-only file leaked into distribution: $relative_path"
   done
-  if [ -f "$distribution_dir/templates/一致性机制/决策档案.md" ] \
-    && grep -Eq '^- 20[0-9]{2}-' "$distribution_dir/templates/一致性机制/决策档案.md"; then
-    fail "decision archive template contains project history"
-  fi
-
   rm -rf "$validation_tmp"
   validation_tmp=""
 }
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --release|--ref)
+    --release)
       [ "$#" -ge 2 ] || fail "$1 requires a value"
       release="$2"
       shift 2
