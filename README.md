@@ -1,166 +1,97 @@
-# Project Consistency Kit
+English | [简体中文](README.zh-CN.md)
 
-> 让 Agent 在新会话里接得上进度，并在收尾时把项目状态、决策和相关文档一起更新。
+# Recensio
 
-[![Latest release](https://img.shields.io/github/v/release/sparkler233/project-consistency-kit)](https://github.com/sparkler233/project-consistency-kit/releases/latest)
-[![Distribution](https://github.com/sparkler233/project-consistency-kit/actions/workflows/distribution.yml/badge.svg?branch=main)](https://github.com/sparkler233/project-consistency-kit/actions/workflows/distribution.yml)
+*ri-SEN-see-oh* · Latin for the first step in editing an old text: gather every surviving copy and, from their history, establish the text as it stands.
+
+Project memory in Git: every new AI session starts from the same, up-to-date picture of the project.
+
+[![Latest release](https://img.shields.io/github/v/release/sparkler233/recensio)](https://github.com/sparkler233/recensio/releases/latest)
+[![Distribution](https://github.com/sparkler233/recensio/actions/workflows/distribution.yml/badge.svg?branch=main)](https://github.com/sparkler233/recensio/actions/workflows/distribution.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f6f4e.svg)](LICENSE)
 
-> **2.0.0**:决策历史进 Git、PROJECT 改为入口式、运行规则独立、wrapup 一次确认,并加入实验性的多会话并行。从 v1.3.0 或 2.0 预览版过来,先更新机器级安装器;旧版本项目不支持直接升级,见下文「发布与升级」。
+Recensio keeps a project's memory in the repository itself. A short `PROJECT.md` says what is true now and where things are; the reasoning behind each decision, and how the project got here, go into Git commit messages. A new session runs **catchup** to read them. When a piece of work is done, **wrapup** updates the records, checks the documents that depend on what changed, and commits. Small scripts handle the mechanical parts.
 
-## 它解决什么
+- **Just Git.** No server, database, account or API key; Git and Node.js are enough. The project's content is plain Markdown and Git history. It is not limited to software: long-running projects in writing, design or office work fit just as well.
+- **One memory across sessions and agents.** Claude Code, Codex and other tools that read `AGENTS.md` share the same files. After switching sessions or tools, run catchup once and the agent understands the project and carries on.
+- **A history you can look up.** Decisions made during the work are saved together with their reasons and the options that were dropped. Any later session can find them, so the project keeps its own history and memory.
+- **Consistency inside the project.** At the end of a piece of work, linkage rules ("if A changes, check B") find what the change affects, so status, decisions and related documents are updated together and the project is less likely to drift.
+- **Steady after context compaction.** What has been done is already recorded locally, not only in the conversation, so the agent can pick up its earlier line of thought. After compaction, a hook has the agent reread the project and the rules before continuing.
+- **Light on the model.** A new session reads a few short files and understands the project without going through the whole repository. Mechanical steps are handled by scripts, so the agent does not have to think about the mechanism itself and keeps its context and effort for the real work.
+- **Parallel sessions (experimental).** Several sessions can move one project forward at once, each on its own branch, with conflicts and related changes checked before merging. Useful when work splits cleanly between a few agents.
 
-本项目旨在解决人与 Agent 在长程工作协作下切换 Session 和 Harness 并压缩上下文的过程中带来的项目内部文档与信息的漂移问题。我们借助 Git 来实现了项目的状态保存与内部文件联动。
+> The files Recensio adds to a project (rules, templates, folder names) are currently in Chinese. English versions are planned.
 
-情景：当你和 Agent 推进一个项目几天后，仓库里通常会同时出现两种状态：代码或内容已经变了，项目进度、决策记录和素材清单仍停在旧版本。如果切换 Harness 和 Session，Agent 需要重新判断项目进度、哪些决定已经确认、哪些文档需要补写。
-
-Project Consistency Kit 把这些信息留在仓库里。Git 记录当前项目发生过什么,决策全文和过程历史写在提交说明里;`PROJECT.md` 是项目入口,只写现在成立的事和各类资料在哪里;`一致性机制/运行规则.md` 说明机制怎么运行,`AGENTS.md` 保存项目自己的规则。新会话用 catchup Skill 恢复现场,工作结束时用 wrapup Skill 检查还有哪些状态或文档需要一起更新。
-
-## 怎么工作
+## How it works
 
 ```text
-catchup  ->  正常工作  ->  wrapup
-恢复现场                    检查联动并提交
+catchup  ->  work  ->  wrapup
 ```
 
-1. 新 Session 开始时运行 catchup。它读取项目入口、运行规则和 Git 概况，理解项目的目的、当前阶段与工作现场，用简明反馈让你判断它是否已经接上项目。未保存工作、分支交接信息和影响接手的异常会得到关注，不逐项展开设计或罗列完整状态清单。具体任务的资料调查在后续工作中进行。启动还会只读检查必要文件、当前宿主的项目级 JSON hook 接线及已有失败记录，有问题时由 Agent 说明影响；不执行 hook 或自动修复。自定义命令与 TOML 内联接线等未检查范围如实保留，未发现问题不等于宿主已实际运行 hook。恢复过程只读，不修改文件；上下文被压缩后不用重跑，Agent 按 AGENTS 中的指令重读 PROJECT 与运行规则即可。
-2. 中间照常和 Agent 协作。拍板的决策会立即写进 `PROJECT.md` 的「待提交」区,不等收尾。
-3. 一段工作结束时运行 wrapup。canonical branch 比较自上次 `synced` 以来的全部改动;并行 feature branch 改用它与 canonical 的 merge-base。在 canonical branch 上,它把维护计划、拟提交文件、完整提交说明和 `synced` 条件一次展示给你,一次确认后才写入文件、把决策全文迁入提交说明并创建本地提交;只有 canonical branch 能通过确定性 guard 推进 `synced`。在 feature branch 上收尾时,这次提交就是任务检查点,不等确认、提交后报告;任务还没做完或之后可能换 Session 接手时,提交说明里写上目标、进度、还剩三行,供接手时读取。数行数、生成提交说明这类机械步骤由随附脚本完成。保存节奏由你掌握，不以每项工作完成为必需的提醒节点；Agent 可以结合对话积累与任务进度自然建议保存。任务分支停下时仍保存检查点，无需额外确认、事后报告。
+- **catchup**, at the start of a session: the agent reads `PROJECT.md`, the runtime rules and a summary of recent Git activity, then tells you briefly where things stand. It changes nothing.
+- **While you work**: when you settle a decision, the agent writes it into `PROJECT.md` straight away instead of waiting for the end.
+- **wrapup**, when you want to save: the agent checks which related documents need updating, shows you the plan and the full commit message, and commits once you confirm. Decisions move from `PROJECT.md` into the commit message. Nothing is pushed.
 
-| 运行环境 | 会话初始化引入 | 会话收尾 |
+| | Start a session | Save |
 | --- | --- | --- |
-| Codex | `$catchup` | `$wrapup` |
 | Claude Code | `/catchup` | `/wrapup` |
-| 其他 Harness | 调用 catchup Skill | 调用 wrapup Skill |
+| Codex | `$catchup` | `$wrapup` |
+| Other tools | run the catchup skill | run the wrapup skill |
 
-同样也可以直接告诉 Agent“帮我恢复项目状态”或“检查联动并收尾”。显式命令只是入口，实际流程由仓库里的 Skill 定义。
+Plain requests work too, such as "catch up on this project" or "wrap up".
 
-需要多个会话同时推进时，可以直接说“我想用并行模式分别做这两件事”。Agent 会结合任务说明收益与边界；获准启用后，由 Agent 准备独立工作区，再告诉你如何在宿主中打开对应的新会话。普通启动不要求选择模式，也不承诺自动创建或切换所有宿主的会话。
+## Quick start
 
-## 安装
+You need Git and Node.js (on Windows, Git for Windows).
 
-需要 Git 和 Node.js；实验性的多会话并行需要 Git 2.38 及以上。macOS、Linux 用户还需要 `curl`、`tar` 以及 `sha256sum` 或 `shasum`；Windows 用户需要 Git for Windows。
+1. Install the installer skill, once per machine:
 
-先把安装器装到用户级 Skill 目录：
+   ```bash
+   npx skills add sparkler233/recensio --skill project-consistency-installer --global
+   ```
 
-```bash
-npx skills add sparkler233/project-consistency-kit \
-  --skill project-consistency-installer \
-  --global
-```
+2. In your project, ask the agent: "Use project-consistency-installer to set up this project."
 
-CLI 会检测本机可用的 Agent 环境。需要时可以加 `--agent codex` 或 `--agent claude-code`。安装完成后，进入目标项目并告诉 Agent：
+The installer downloads the latest release and checks its checksums and source before using it. It then shows you a plan and changes nothing until you agree. Your README is left alone, and existing `PROJECT.md` and `AGENTS.md` content is merged rather than overwritten. Step-by-step setup is in [初始化新项目.md](初始化新项目.md) (Chinese).
 
-> 给这个项目引入一致性机制。
+**Coming from v1.3.0 or a 2.0 preview?** Rerun the install command first: older installers reject 2.0.0. The installer does not upgrade projects from those versions; the [changelog](CHANGELOG.md) (Chinese) lists what to change by hand.
 
-安装器会扫描项目现有的 `README.md`、`PROJECT.md`、`AGENTS.md` 和 `CLAUDE.md`，再展示迁移计划。它不会在确认前覆盖原有内容，也不会因为模板更标准就重排用户文档。
+## What it adds to your project
 
-本机没有套件源码时，安装器会下载最新的 GitHub Release，并校验压缩包、内部文件清单、版本、来源仓库和精确提交。校验全部通过后，它才会继续安装。Windows 的 PowerShell 入口会自动找到 Git for Windows 自带的 Bash，不要求手工修改 PATH。
-
-全新项目也可以从干净 Release 开始，完整步骤见[《在新项目里启用 Project Consistency Kit》](初始化新项目.md)。
-
-## 主要会给项目加什么
-
-| 内容 | 用途 |
+| File | Purpose |
 | --- | --- |
-| `PROJECT.md` | 项目入口:目标与边界、总体状态、阅读入口,以及「待提交」「最近决策」 |
-| `AGENTS.md` | 项目自己的 Agent 规则;机制只在其中放一个接入块,引用运行规则 |
-| `一致性机制/运行规则.md` | 机制怎么运行(由安装器管理,升级时整体更新) |
-| `CLAUDE.md` | 用 `@AGENTS.md` 让 Claude Code 读取同一份规则 |
-| `.agents/skills/catchup/` | 定义如何恢复项目状态 |
-| `.agents/skills/wrapup/` | 定义如何检查联动、迁出决策、确认提交并推进 `synced`;随附范围(含联动规则的路径匹配)、决策与 guard 脚本和文档整理细则 |
-| `一致性机制/文件联动目录.md` | 记录哪些文件变化时需要一起检查其他内容;规则的触发写出文件或目录路径时,wrapup 会列出本次改动命中的规则 |
-| `.agents/hooks/` 和宿主配置 | 两项提示:并行时主线的变化与本分支相关就提示;上下文被压缩后提醒 Agent 重读规则，Codex 同时显示简短恢复提示，Agent 完成重读后说明恢复情况，不承诺对话信息完整保留。Windows Codex 通过薄 PowerShell 适配器转到同一 Node 逻辑。hook 出错时不挡宿主,只在 Git 目录留一行记录,catchup 会提到;`node .agents/hooks/selfcheck.mjs` 按项目实际接线把每个 hook 跑一遍,报告哪些能出声 |
-| `一致性机制/VERSION` | 记录项目当前安装的套件版本 |
+| `PROJECT.md` | Entry point: goals, current status, where things are, pending and recent decisions |
+| `AGENTS.md` | Your project's own rules for agents, plus a short block that points to the runtime rules |
+| `CLAUDE.md` | A single line, `@AGENTS.md`, so Claude Code reads the same rules |
+| `一致性机制/运行规则.md` | Runtime rules, managed by the installer |
+| `一致性机制/文件联动目录.md` | Linkage rules ("if A changes, check B"); wrapup lists the rules your changes touch |
+| `.agents/skills/` | The catchup and wrapup skills and their scripts |
+| `.agents/hooks/` and host settings | Two hooks: a note at the start of a turn when the main branch changed in a way that affects your branch, and a reminder to reread the rules after the context is compacted |
 
-`synced` 是一个存放在 `refs/pck/synced` 的本地 Git 指针，表示 canonical branch 上一次已经完成项目级联动检查的位置。它和 `HEAD` 分开，因此中途手工提交过的改动不会被 wrapup 跳过。canonical branch 由用户确认后保存在当前 clone 的 Git config;guard 会检查 branch、祖先关系、冲突和工作区状态,再用原子 ref 更新推进指针。非 canonical branch 可以保存 branch checkpoint,但不会移动项目级 horizon。
+The point of the last wrapup is kept in a local Git ref, so commits made by hand in between are still checked next time.
 
-## 支持范围
+## Parallel sessions (experimental)
 
-- Codex 可以直接发现仓库级 catchup 和 wrapup Skill；项目 hook(并行时的每轮提示、上下文压缩后的提醒)通过 `.codex/hooks.json` 接入，首次使用或配置变化后需要用户审查并信任；没批准时 hook 不运行，也不报错。Codex 桌面端可能不弹出审查窗口，这时在项目目录的终端里打开 Codex，用 `/hooks` 批准一次即可。
-- Claude Code 通过 `/catchup`、`/wrapup` 和 `CLAUDE.md` 适配同一套规则，hook 配置位于 `.claude/settings.json`。
-- 其他能读取 `AGENTS.md` 或 Agent Skills 的运行环境可以复用项目规则和工作流；如果没有等价的生命周期 hook，就不会获得对应的生命周期提示。
-- 核心脚本支持 macOS、Linux 和原生 Windows。Windows Codex 使用仓库内 `.ps1` 薄适配器，避免会话 PowerShell 预先展开内联命令中的变量；Hook 还需用户完成项目与命令信任。
+Several sessions can work on one project at once, each on its own branch and worktree. When you tell a session to merge into the main line (in Chinese, 并进主线), it syncs, checks and merges its own work. If the main branch changes in a way that touches a branch, that session gets a note at the start of its next turn. This needs Git 2.38 or later, and its commands and formats may still change within 2.x.
 
-## 它不会做什么
+## Limits
 
-- wrapup 不会自动推送远端；在 canonical branch 上不会在用户确认前修改文件或创建提交(并行的任务分支上，收尾提交是任务检查点，不等确认、提交后报告)。
-- catchup 只能从仓库恢复已经落盘的信息，无法找回早已丢失的旧会话内容。
-- 文件联动规则需要结合项目实际情况维护，安装器无法替项目决定所有领域关系。
-- `synced` 是本地维护指针,同一仓库的 worktree 共享,独立 clone 不自动获得。多机使用需明确各自检查边界;普通推送标签不会带走它,显式推送该引用或镜像推送仍会。
+- wrapup commits locally and never pushes. On the main branch it asks before changing files or committing; on a task branch it saves a checkpoint without asking.
+- catchup can only recover what was saved in the repository.
+- Whether a decision gets written down still depends on the model noticing it. Check the record for the decisions that matter.
+- Two sessions working in the same worktree at the same time is not supported.
+- Hooks only run after you approve them in Claude Code or Codex. If the Codex desktop app does not show the prompt, open Codex in a terminal in the project and approve them once with `/hooks`.
 
-## 兼容承诺
+## Compatibility
 
-2.x 内分三档。**稳定**的部分保持兼容,改动须能读取旧格式或提供迁移;**实验性**的部分可以调整,见下一节;**不承诺**的是套件内部接口,随同一版本一起改。“稳定”是发布政策,不表示模型行为已有可靠性保证。
+Within 2.x, the files, commands and formats you rely on stay compatible or come with a migration. Parallel work is experimental and may change. Script options and internal formats are not promised. Details: [COMPATIBILITY.md](COMPATIBILITY.md).
 
-| 稳定对象 | 内容 |
-| --- | --- |
-| 文件与职责 | `PROJECT.md`、`AGENTS.md`、只含 `@AGENTS.md` 的 `CLAUDE.md`、`一致性机制/运行规则.md`、项目所有的 `一致性机制/文件联动目录.md`、`一致性机制/VERSION` |
-| PROJECT 中脚本读取的部分 | `### 待提交`、`### 最近决策` 两个小节;待提交条目首行 `- 日期 · 决策 N:标题` 加缩进子项;最近决策每行一条、由脚本生成。其余章节、标题与排版不冻结 |
-| 决策历史 | 提交正文的 `决策 N · 日期 · 标题` 行与 `Decision:`、`Decision-Archive:`、`Supersedes:`、`Adjusts: 旧 by 新`;已写入的历史继续可检索 |
-| 联动目录 | 规则为小标题加「触发」「动作」;触发里反引号路径(含目录与 `*`)由脚本判断,其余交模型 |
-| 用户入口 | catchup / wrapup(Claude Code `/catchup` `/wrapup`,Codex `$catchup` `$wrapup`),说「收尾」即 wrapup;安装入口 `/引入一致性机制` 与安装器 Skill |
-| 关键行为 | catchup 只读;wrapup 在主线上确认后本地提交、不推送;`synced` 只在主线上、检查通过后推进;没有可靠基线时不猜 |
-| Git 本地状态 | 收尾指针 `refs/pck/synced`;主线配置 `projectConsistency.canonicalBranch` |
-| hook 接线 | 每轮提示(UserPromptSubmit)与压缩后提醒(SessionStart)两项;Claude Code 接 `.claude/settings.json`,Codex 接 `.codex/hooks.json`,Windows 经 `run-hook.ps1`;升级保留用户其他 hook |
-| 面向用户的命令 | 获取脚本 `fetch-kit.sh` / `.ps1` 的 `--release TAG\|latest`、`--cache-dir`、`--offline`、`--verify-dir`;hook 自检 `node .agents/hooks/selfcheck.mjs` |
-| 版本身份 | `VERSION` 写 SemVer,修订日期标记与之分开;获取脚本依赖的 Release 资产名与校验方式不静默改变 |
+## More
 
-**不承诺**:`scope`、`decisions`、`synced-guard`、`startup-check`、`linkage` 等脚本的命令行选项与 JSON 字段可以直接调用,但不对外承诺稳定;`base`、`can_advance` 等字段的事实与安全含义不会被偷换。运行规则与 Skill 的措辞、步骤和报告格式,hook 文案,分发包内部布局与其他 metadata 字段也不冻结。不支持混装不同版本的机制文件。
+- [Example session](docs/example-session.md) (Chinese)
+- [Changelog](CHANGELOG.md) (Chinese)
+- [Releases](https://github.com/sparkler233/recensio/releases)
 
-## 实验性范围
-
-实验性能力的流程与接口在 2.x 内可能不兼容地调整。调整时须说明迁移与旧任务接续方式,仍保护已有成果、历史和其他工作区,不越过用户授权。
-
-| 范围 | 当前状态 |
-| --- | --- |
-| 并行协作的开工、同步、合并、退出,任务检查点与相关变化提示 | 已提供实验性实现;对其他任务分支进行中改动的普遍感知仍是后续探索 |
-| 按上下文用量提醒保存 | 仅内部试用,不随套件分发 |
-| 跨 Session 通信与自动协调 | 研究方向,有实验材料,尚非产品能力 |
-| 脚本无法恢复时由 Agent 手工完成保存流程 | 尚未实现,列为后续实验方向;当前不开放手工接管 Git 操作 |
-
-并行一项具体包括:`task.mjs` 的 `start / sync / land / close` 及其选项、并进主线流程、任务检查点的写法与查找约定(`Task:`、`Land-Checked:`,目标 / 进度 / 还剩三行)、概览里的分支信息、每轮提示的策略,以及单线程与并行之间的切换方式(仍是后续方向,尚未实现)。它们分布在多个文件里,不按整个文件划界;同一脚本里的稳定能力仍按上一节承诺。旧检查点会通过兼容读取或明确迁移保持可恢复。不保证同一 worktree 多会话协作,不承诺跨会话自动编排或压缩后无损恢复。
-
-启动检查、压缩后反馈和文件联动不整体列为实验性;验证覆盖与已知限制另行说明。列入实验方向不表示能力已经提供,也不开放当前规则禁止的操作。
-
-## 仍未解决的问题
-
-### 多个 Session 并行工作的边界
-
-2.0 起提供实验性的并行:你同时驾驶几个会话,每个会话在自己的 branch + worktree 上工作,主线上不放会话;对哪个会话说「并进主线」,就由它自己同步主线、检查、合并并推进 `synced`。机制只守三条:主线只通过检查过的合并前进;停下时把目标、进度、还剩写进分支上的检查点;不动别的分支和别人未提交的改动。开工、同步、合并、收工由 `task.mjs` 完成;主线变化与某个分支相关时,那个会话在下一轮开始时收到提示(你也看得到);要不要同步由你决定。
-
-这部分还是实验性的:只在 macOS 上经过少量真实会话验证,每种设置只跑过一次;两个会话先后合并时,`PROJECT.md` 总体状态一段常要解冲突;上下文压缩后的提醒已在 Codex 上见到送达,但压缩后模型是否仍照规则做还没验证;需要 Git 2.38 及以上;Codex 沙箱下并进主线需要把主线目录设为可写;Claude Code 桌面版把 worktree 建在仓库内的 `.claude/worktrees/`,需要加进 `.gitignore`。
-
-两个 Session 直接操作同一个 worktree 仍不受支持:它们会共享未提交文件和索引,机制无法可靠判断改动归属。
-
-### 决策落盘仍然依赖模型
-
-Git 和脚本能够检查文件是否发生变化，却无法仅凭确定性程序判断一段对话里是否产生了应该保存的决策。当前机制依靠 Agent 识别决策并写入 `PROJECT.md` 或对应文档，wrapup 只能在当前会话中再检查一次是否有遗漏。
-
-模型可能漏掉决策、错误理解某项决策，也可能以为某项决定已经保存，而实际并未落盘。这是一种无法由现有机制彻底排除的决策保存幻觉。Hook、固定流程和用户确认可以降低风险，但无法把自然语言中的决策识别完全交给确定性程序。在找到更可靠的记录和验证方式之前，重要决策仍需要用户检查最终落盘的内容。
-
-## 发布与升级
-
-源码仓库的 `main` 是套件源码，含开发用的构建、测试脚本和本仓库自己的规则，不适合作为模板整包复制。正式 Release 只包含分发白名单批准的通用文件，并附带外层 SHA-256、内部逐文件校验和来源元数据。
-
-安装器默认使用[最新稳定版本](https://github.com/sparkler233/project-consistency-kit/releases/latest)，也可以固定到指定的 `v*` 标签。校验失败时不会静默回退到源码 `main`。
-
-**从旧版本的安装器过来**:先更新机器上的安装器(重新运行上面的 `npx skills add` 命令)。v1.3.0 与 2.0 各预览版的安装器按旧版的文件集合校验,会拒收 2.0.0 的包。
-
-**旧版本项目**:安装器只负责全新引入和 2.0 以后的版本升级。v1.3.0 及更早版本、2.0 各预览版的项目不支持直接升级,需要自行迁移(例如让模型对照新版模板手工完成),迁移要点见 [CHANGELOG](CHANGELOG.md) 的 2.0.0 一节;旧版 `refs/tags/synced` 标签不再读取。2.0 不提供降级;升级是单独的一次提交,需要时用 `git revert` 撤销它。
-
-脚本异常时先恢复运行或处理发现的问题;执行中断先核对已发生的变化。暂时无法恢复时,仍可在授权范围内把有价值的信息写入文件,但须说明保存流程尚未完成。提交、合并和基线推进继续由机制脚本完成。
-
-## 进一步阅读
-
-- [完整使用示例](docs/example-session.md)
-- [全新项目初始化](初始化新项目.md)
-- [机制运行规则](一致性机制/运行规则.md)
-- [机制文件索引](一致性机制/README.md)(套件仓库内部文档)
-- [机制设计与决策理由](一致性机制/机制设计说明.md)(套件仓库内部文档)
-- [版本变化](CHANGELOG.md)
-- [GitHub Releases](https://github.com/sparkler233/project-consistency-kit/releases)
-
-## 许可证
+## License
 
 [MIT](LICENSE)

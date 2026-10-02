@@ -14,6 +14,9 @@ templates
 .gitattributes
 LICENSE
 README.md
+README.zh-CN.md
+COMPATIBILITY.md
+COMPATIBILITY.zh-CN.md
 CHANGELOG.md
 初始化新项目.md
 docs/example-session.md

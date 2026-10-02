@@ -4,6 +4,11 @@
 > 任何机制文件发生真实变化:判断 SemVer 影响、全部修订日期一起 bump 到当天,并在此记入对应版本。
 > 本文件**套件专属,不随模板进项目**(绿地 rsync 已排除;安装器也不拷它)。
 
+## 未发布
+
+- **改名 Recensio**:对外名称由 Project Consistency Kit 改为 Recensio,GitHub 仓库改名为 `recensio`(旧地址自动跳转)。装进项目的目录、标记、收尾指针与安装器 Skill 名不变。
+- **公开文档**:`README.md` 改为英文,中文版为 `README.zh-CN.md`,按「只要 Git、项目现状加历史」重写开头,精简内部机制细节;兼容承诺与实验性范围从 README 挪到 `COMPATIBILITY.md` 与 `COMPATIBILITY.zh-CN.md`,内容不变。只改文档,不影响已发布的 2.0.0。
+
 ## v2.0.0 — 2026-10-02
 
 **正式版(major)。** 2.0 线的第一个正式版,GitHub 的 latest 指向它,不带 `--release` 即可获取。相对 v1.3.0 的主要变化分在 [CHANGELOG](https://github.com/sparkler233/project-consistency-kit/blob/main/CHANGELOG.md) 里三个已发布的预览版中:决策历史进 Git、PROJECT 改为入口式、运行规则独立、wrapup 一次确认与脚本化(preview.1),分支检查点与联动命中(preview.2),实验性的 Core 并行(preview.3)。本节只写相对 preview.3 的变化;`2.0.0-preview.4` 从未发布,内容全部归入本版。
@@ -15,7 +20,7 @@
 - v1.3.0 及更早、2.0 各预览版的项目:安装器不处理,停止并说明;需自行迁移(例如让模型对照新版模板手工完成)。迁移要点:收尾指针从 `refs/tags/synced` 搬到 `refs/pck/synced`(旧标签不再读取;在主线上运行 `git update-ref refs/pck/synced "$(git rev-parse 'refs/tags/synced^{commit}')" && git tag -d synced`,只搬位置、不推进检查边界,各独立 clone 分别处理),删除机制自己的 Stop hook 接线与脚本(保留用户其他 hook),套件旧版的 `.claude/commands/` 命令换成新的薄适配器;v1.3.0 的项目另需把 PROJECT、AGENTS 与联动目录改成 2.0 的结构。
 - 不支持降级;迁移是单独一次提交,需要时 `git revert`。
 
-**兼容承诺**:2.x 内分稳定、实验性、不承诺三档,清单见 README「兼容承诺」一节。稳定的部分改动须兼容读取或提供迁移;实验性的可以调整,须说明迁移与旧任务接续;套件内部脚本的选项与 JSON 字段不对外承诺。
+**兼容承诺**:2.x 内分稳定、实验性、不承诺三档,清单见 [COMPATIBILITY.zh-CN.md](COMPATIBILITY.zh-CN.md)(英文版 [COMPATIBILITY.md](COMPATIBILITY.md))。稳定的部分改动须兼容读取或提供迁移;实验性的可以调整,须说明迁移与旧任务接续;套件内部脚本的选项与 JSON 字段不对外承诺。
 
 以下为 preview.3 发布后的全部改动:
 
