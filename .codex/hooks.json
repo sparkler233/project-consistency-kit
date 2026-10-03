@@ -1,5 +1,5 @@
 {
-  "description": "Project Consistency Kit lifecycle hooks.",
+  "description": "Recensio lifecycle hooks.",
   "hooks": {
     "UserPromptSubmit": [
       {

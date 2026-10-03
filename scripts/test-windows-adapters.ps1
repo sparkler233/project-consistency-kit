@@ -1,4 +1,4 @@
-# 一致性机制 version: 2026-10-02
+# 一致性机制 version: 2026-10-03
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]

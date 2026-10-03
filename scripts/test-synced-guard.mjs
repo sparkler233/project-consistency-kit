@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-10-02
+// 一致性机制 version: 2026-10-03
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -89,7 +89,7 @@ try {
   const advanced = invoke(canonical, "advance");
   assert.equal(advanced.status, "advanced");
   assert.equal(git(canonical, "rev-parse", "refs/pck/synced"), nextHead);
-  assert.match(git(canonical, "reflog", "show", "refs/pck/synced"), /Project Consistency Kit wrapup/);
+  assert.match(git(canonical, "reflog", "show", "refs/pck/synced"), /Recensio wrapup/);
   assert.equal(invoke(canonical, "advance").status, "already_synced");
 
   const featureDir = fs.mkdtempSync(path.join(os.tmpdir(), "project-consistency-feature-worktree-"));

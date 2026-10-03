@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-10-02
+# 一致性机制 version: 2026-10-03
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -150,7 +150,7 @@ printf '%s\n' \
   'schema=1' \
   "kit_version=$kit_version" \
   "mechanism_revision=$mechanism_revision" \
-  'source_repository=https://github.com/sparkler233/project-consistency-kit.git' \
+  'source_repository=https://github.com/sparkler233/recensio.git' \
   "source_commit=$source_commit" \
   "source_ref=$source_ref" \
   "dirty=$dirty" \

@@ -1,4 +1,4 @@
-# 一致性机制 version: 2026-10-02
+# 一致性机制 version: 2026-10-03
 # GitHub 公开版白名单:scripts/publish-public.sh 只把这些路径(文件或目录)带进公开历史,其余一律不公开。
 # 分发包的文件边界另见 manifest.txt;本文件管的是公开仓库里能看到什么。
 .agents
@@ -14,7 +14,7 @@ templates
 .gitattributes
 LICENSE
 README.md
-README.zh-CN.md
+README.en.md
 COMPATIBILITY.md
 COMPATIBILITY.zh-CN.md
 CHANGELOG.md

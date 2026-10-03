@@ -1,4 +1,4 @@
-# 一致性机制 version: 2026-10-02
+# 一致性机制 version: 2026-10-03
 interface:
   display_name: "Project Consistency Installer"
   short_description: "Fetch and install the consistency kit safely"

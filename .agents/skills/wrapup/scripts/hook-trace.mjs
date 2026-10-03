@@ -1,4 +1,4 @@
-// 一致性机制 version: 2026-10-02
+// 一致性机制 version: 2026-10-03
 // hook 失败留痕,供三个 hook、自检命令与 scope.mjs 使用,只此一份。
 // hook 照旧失败时静默放行,只在 Git 公共目录(各 worktree 共用)的 pck-hook-failures.log 追加一行:
 // 时间、hook、宿主、简短原因,以制表符分隔。正常的静默(没什么可提醒)不算失败。

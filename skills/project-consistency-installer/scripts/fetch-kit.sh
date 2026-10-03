@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-10-02
+# 一致性机制 version: 2026-10-03
 set -euo pipefail
 
-canonical_repository="https://github.com/sparkler233/project-consistency-kit.git"
-release_base="https://github.com/sparkler233/project-consistency-kit/releases"
+canonical_repository="https://github.com/sparkler233/recensio.git"
+# Releases built before the rename (2.0.0) carry the old address; GitHub redirects it.
+legacy_repository="https://github.com/sparkler233/project-consistency-kit.git"
+release_base="https://github.com/sparkler233/recensio/releases"
 release="${PROJECT_CONSISTENCY_KIT_RELEASE:-latest}"
 cache_root="${XDG_CACHE_HOME:-${HOME:?HOME is required}/.cache}/project-consistency-kit"
 offline=0
@@ -11,6 +13,7 @@ verify_dir=""
 tmp_dir=""
 validation_tmp=""
 validated_commit=""
+validated_repository=""
 validated_ref=""
 validated_schema=""
 validated_version=""
@@ -22,7 +25,7 @@ usage() {
 Usage: fetch-kit.sh [--release TAG|latest] [--cache-dir ABSOLUTE_PATH] [--offline]
        fetch-kit.sh --verify-dir ABSOLUTE_PATH
 
-Downloads and verifies the clean Project Consistency Kit GitHub Release into a
+Downloads and verifies the clean Recensio GitHub Release into a
 machine cache. Prints the verified distribution path to stdout. Progress and
 source provenance go to stderr.
 EOF
@@ -129,7 +132,8 @@ validate_distribution() {
     1|2) ;;
     *) fail "unsupported metadata schema: $validated_schema" ;;
   esac
-  [ "$(metadata_value source_repository "$metadata")" = "$canonical_repository" ] \
+  validated_repository=$(metadata_value source_repository "$metadata")
+  [ "$validated_repository" = "$canonical_repository" ] || [ "$validated_repository" = "$legacy_repository" ] \
     || fail "distribution source repository mismatch"
   validated_commit=$(metadata_value source_commit "$metadata")
   validated_ref=$(metadata_value source_ref "$metadata")
@@ -219,7 +223,7 @@ while [ "$#" -gt 0 ]; do
       ;;
     --repo)
       [ "$#" -ge 2 ] || fail "--repo requires a value"
-      [ "$2" = "$canonical_repository" ] \
+      [ "$2" = "$canonical_repository" ] || [ "$2" = "$legacy_repository" ] \
         || fail "custom remote repositories are not fetched; provide a trusted local kit path instead"
       shift 2
       ;;
@@ -253,7 +257,7 @@ if [ -n "$verify_dir" ]; then
   validate_distribution "$verify_dir"
   printf 'fetch-kit: kit_version=%s revision=%s schema=%s profile=%s source=%s release=%s commit=%s mode=local-verify\n' \
     "$validated_version" "$validated_revision" "$validated_schema" "$validated_profile" \
-    "$canonical_repository" "$validated_ref" "$validated_commit" >&2
+    "$validated_repository" "$validated_ref" "$validated_commit" >&2
   printf '%s\n' "$(cd "$verify_dir" && pwd)"
   exit 0
 fi
@@ -280,7 +284,7 @@ if [ "$offline" -eq 1 ]; then
   fi
   printf 'fetch-kit: kit_version=%s revision=%s schema=%s profile=%s source=%s release=%s commit=%s mode=offline\n' \
     "$validated_version" "$validated_revision" "$validated_schema" "$validated_profile" \
-    "$canonical_repository" "$validated_ref" "$validated_commit" >&2
+    "$validated_repository" "$validated_ref" "$validated_commit" >&2
   printf '%s\n' "$distribution_dir"
   exit 0
 fi
@@ -351,5 +355,5 @@ if [ "$release" != "latest" ] && [ "$validated_ref" != "$release" ]; then
 fi
 printf 'fetch-kit: kit_version=%s revision=%s schema=%s profile=%s source=%s release=%s commit=%s mode=release\n' \
   "$validated_version" "$validated_revision" "$validated_schema" "$validated_profile" \
-  "$canonical_repository" "$validated_ref" "$validated_commit" >&2
+  "$validated_repository" "$validated_ref" "$validated_commit" >&2
 printf '%s\n' "$distribution_dir"

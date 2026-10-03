@@ -1,4 +1,4 @@
-# 一致性机制 version: 2026-10-02
+# 一致性机制 version: 2026-10-03
 name: Validate and publish clean distribution
 
 on:
@@ -131,4 +131,4 @@ jobs:
             "$RUNNER_TEMP/project-consistency-release/project-consistency-kit.tar.gz.sha256" \
             --verify-tag \
             --notes-file "$notes" \
-            --title "Project Consistency Kit $RELEASE_TAG"
+            --title "Recensio $RELEASE_TAG"

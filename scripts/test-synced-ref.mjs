@@ -1,4 +1,4 @@
-// 一致性机制 version: 2026-10-02
+// 一致性机制 version: 2026-10-03
 // 收尾指针 refs/pck/synced 的回归测试:创建与推进、SHA-256 仓库、worktree 共享、并发保护、事务失败、推送边界与异常引用。
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

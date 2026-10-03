@@ -1,5 +1,5 @@
-# Project Consistency Kit clean distribution whitelist.
-# 一致性机制 version: 2026-10-02
+# Recensio clean distribution whitelist.
+# 一致性机制 version: 2026-10-03
 # One tracked file per line. Directories and glob patterns are intentionally forbidden.
 .agents/skills/catchup/SKILL.md
 .agents/skills/catchup/agents/openai.yaml
@@ -29,6 +29,9 @@
 CHANGELOG.md
 LICENSE
 README.md
+README.en.md
+COMPATIBILITY.md
+COMPATIBILITY.zh-CN.md
 docs/example-session.md
 skills/project-consistency-installer/SKILL.md
 skills/project-consistency-installer/agents/openai.yaml

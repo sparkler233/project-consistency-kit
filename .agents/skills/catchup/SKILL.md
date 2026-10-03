@@ -3,7 +3,7 @@ name: catchup
 description: Restore the project's overall context and current working state from its entry documents and Git without modifying the repository. Use when starting a session, catching up, or recovering project context before continuing work.
 ---
 
-<!-- 一致性机制 version: 2026-10-02 -->
+<!-- 一致性机制 version: 2026-10-03 -->
 
 理解项目整体与当前工作现场，让用户能够判断你已接上项目、可以开始工作。全程只读：不改文件、不修入口、不运行测试或实验、不操作提交或 synced。
 

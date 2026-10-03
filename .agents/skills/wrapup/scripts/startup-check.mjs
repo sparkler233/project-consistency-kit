@@ -1,4 +1,4 @@
-// 一致性机制 version: 2026-10-02
+// 一致性机制 version: 2026-10-03
 // 启动静态检查:只读文件,不执行 hook、不修复、不写自检通过标记。
 import fs from 'node:fs';
 import path from 'node:path';

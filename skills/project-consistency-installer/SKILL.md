@@ -1,15 +1,15 @@
 ---
 name: project-consistency-installer
-description: Fetch Project Consistency Kit from a trusted local source or its verified clean GitHub Release, then safely integrate or upgrade PROJECT.md, AGENTS.md, the CLAUDE.md adapter, catchup and wrapup repository Skills, linkage rules, and hooks without silently overwriting project content. Use when the user asks to install, introduce, bootstrap, migrate, or update the consistency mechanism in the current repository.
+description: Fetch Recensio (formerly Project Consistency Kit) from a trusted local source or its verified clean GitHub Release, then safely integrate or upgrade PROJECT.md, AGENTS.md, the CLAUDE.md adapter, catchup and wrapup repository Skills, linkage rules, and hooks without silently overwriting project content. Use when the user asks to install, introduce, bootstrap, migrate, or update the consistency mechanism in the current repository.
 metadata:
-  version: "2.0.0"
+  version: "2.0.1"
 ---
 
-<!-- 一致性机制 version: 2026-10-02 -->
+<!-- 一致性机制 version: 2026-10-03 -->
 
-# Project Consistency Installer
+# Recensio Installer
 
-把 Project Consistency Kit 增量引入当前项目。安装器既能使用用户已有的本地源码 checkout 或干净分发目录,也能先从 GitHub Release 获取经过双层校验的只读套件源,再继续项目迁移。
+把 Recensio(原 Project Consistency Kit)增量引入当前项目。安装器既能使用用户已有的本地源码 checkout 或干净分发目录,也能先从 GitHub Release 获取经过双层校验的只读套件源,再继续项目迁移。
 
 核心原则:
 

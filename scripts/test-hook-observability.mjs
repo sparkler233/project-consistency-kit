@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-10-02
+// 一致性机制 version: 2026-10-03
 // hook 可观测性回归测试:失败留痕(输入解析不出、hook 内部异常、超过上限截断、自检通过后不再报告、scope.mjs --overview 的 hook_failures)
 // 与自检命令(本套件接线全部通过;hook 抛异常、脚本缺失、少接一项、接线文件坏掉时报失败;Codex 的 config.toml 内联接线;没有接线)。
 // 自检按当前平台运行:Windows 上 Codex 一侧经 commandWindows 与 PowerShell 适配器。

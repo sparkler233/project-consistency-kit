@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-10-02
+// 一致性机制 version: 2026-10-03
 // hook 自检:按本项目的实际接线(`.claude/settings.json`、`.codex/hooks.json` 或 `.codex/config.toml` 里机制的 hook 项),
 // 在临时仓库里把每个 hook 跑一遍,报告哪些有输出。临时仓库复制本项目的 `.agents/` 与接线文件,造出两个 hook 都该出声的场景:
 // 主线新增了改同一文件的提交(每轮提示)、上下文刚被压缩(压缩后提醒)。

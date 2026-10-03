@@ -1,4 +1,4 @@
-# 一致性机制 version: 2026-10-02
+# 一致性机制 version: 2026-10-03
 # Thin Windows adapter for the kit's cross-platform Node hooks: locates .agents/hooks/<Hook>.mjs and forwards stdin.
 # Used by Codex commandWindows for the per-turn notice and the post-compaction reminder.
 [CmdletBinding()]

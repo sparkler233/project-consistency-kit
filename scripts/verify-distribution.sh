@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-10-02
+# 一致性机制 version: 2026-10-03
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -127,7 +127,7 @@ fi
 
 metadata="$kit_dir/DISTRIBUTION-METADATA.txt"
 [ "$(metadata_value schema "$metadata")" = "1" ] || fail "unsupported metadata schema"
-[ "$(metadata_value source_repository "$metadata")" = "https://github.com/sparkler233/project-consistency-kit.git" ] \
+[ "$(metadata_value source_repository "$metadata")" = "https://github.com/sparkler233/recensio.git" ] \
   || fail "unexpected source repository"
 kit_version=$(metadata_value kit_version "$metadata")
 mechanism_revision=$(metadata_value mechanism_revision "$metadata")

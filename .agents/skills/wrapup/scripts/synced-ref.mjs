@@ -1,4 +1,4 @@
-// 一致性机制 version: 2026-10-02
+// 一致性机制 version: 2026-10-03
 // 项目收尾指针 refs/pck/synced:读取与原子更新。
 import { spawnSync } from 'node:child_process';
 export const SYNCED = 'refs/pck/synced';
@@ -20,7 +20,7 @@ export function writeSynced(root, before, target, canonicalRef, canonicalHead) {
   // 同时比较指针和主线位置;任一已变化则整个事务失败。
   const input=['start','option no-deref',`verify ${canonicalRef} ${canonicalHead}`,
     `update ${SYNCED} ${target} ${before.raw||zero}`,'prepare','commit',''].join('\n');
-  const r=git(root,['update-ref','--create-reflog','-m','Project Consistency Kit wrapup','--stdin'],input);
+  const r=git(root,['update-ref','--create-reflog','-m','Recensio wrapup','--stdin'],input);
   if(r.status===0)return {ok:true};
   const race=readSynced(root).raw!==before.raw||oid(root,canonicalRef)!==canonicalHead;
   return {ok:false,reason:race?'ref_race':'update_failed',error:r.stderr.trim()};

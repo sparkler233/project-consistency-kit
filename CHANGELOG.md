@@ -4,14 +4,21 @@
 > 任何机制文件发生真实变化:判断 SemVer 影响、全部修订日期一起 bump 到当天,并在此记入对应版本。
 > 本文件**套件专属,不随模板进项目**(绿地 rsync 已排除;安装器也不拷它)。
 
-## 未发布
+## v2.0.1 — 2026-10-03
 
-- **改名 Recensio**:对外名称由 Project Consistency Kit 改为 Recensio,GitHub 仓库改名为 `recensio`(旧地址自动跳转)。装进项目的目录、标记、收尾指针与安装器 Skill 名不变。
-- **公开文档**:`README.md` 改为英文,中文版为 `README.zh-CN.md`,按「只要 Git、项目现状加历史」重写开头,精简内部机制细节;兼容承诺与实验性范围从 README 挪到 `COMPATIBILITY.md` 与 `COMPATIBILITY.zh-CN.md`,内容不变。只改文档,不影响已发布的 2.0.0。
+**补丁版(patch)。** 改名 Recensio 后的名称与地址清理,并把公开文档补进分发包。装进项目的机制行为不变。
+
+**怎么升级**:先重新运行 README「安装」一节的 `npx skills add` 命令更新机器级安装器——2.0.0 的获取脚本只认改名前的仓库地址,会拒收 2.0.1 的包;之后 2.0.0 的项目照常由安装器升级。
+
+- **改名 Recensio**:对外名称由 Project Consistency Kit 改为 Recensio,GitHub 仓库改名为 `recensio`(旧地址自动跳转)。安装器 Skill 的描述与标题、Codex hook 配置的描述、收尾指针更新的 reflog 说明与 Release 标题改用新名。`一致性机制/` 目录、接入标记、`refs/pck/synced`、`projectConsistency.canonicalBranch`、安装器 Skill 名、包名 `project-consistency-kit.tar.gz`、机器缓存目录与环境变量不变。
+- **仓库地址**:获取、构建与发布脚本和运行规则里的仓库地址改为 `sparkler233/recensio`。分发包元数据 `source_repository` 改为新地址;获取脚本从新地址下载,校验时新旧地址都认,`--release v2.0.0` 与已缓存的旧包仍可用,`--repo` 也接受两者;输出的 `source=` 改为包里记录的地址。
+- **公开文档**:`README.md` 为中文主页,英文版为 `README.en.md`,按「只要 Git、项目现状加历史」重写开头,精简内部机制细节;兼容承诺与实验性范围从 README 挪到 `COMPATIBILITY.md` 与 `COMPATIBILITY.zh-CN.md`,内容不变。
+- **分发**:`README.en.md`、`COMPATIBILITY.md`、`COMPATIBILITY.zh-CN.md` 加入分发包(此前包里的 README 与 CHANGELOG 链到包外),共 44 个分发文件;手工绿地复制时排除这三份。
+- **版本**:VERSION 与安装器 metadata 为 `2.0.1`。
 
 ## v2.0.0 — 2026-10-02
 
-**正式版(major)。** 2.0 线的第一个正式版,GitHub 的 latest 指向它,不带 `--release` 即可获取。相对 v1.3.0 的主要变化分在 [CHANGELOG](https://github.com/sparkler233/project-consistency-kit/blob/main/CHANGELOG.md) 里三个已发布的预览版中:决策历史进 Git、PROJECT 改为入口式、运行规则独立、wrapup 一次确认与脚本化(preview.1),分支检查点与联动命中(preview.2),实验性的 Core 并行(preview.3)。本节只写相对 preview.3 的变化;`2.0.0-preview.4` 从未发布,内容全部归入本版。
+**正式版(major)。** 2.0 线的第一个正式版,GitHub 的 latest 指向它,不带 `--release` 即可获取。相对 v1.3.0 的主要变化分在 [CHANGELOG](https://github.com/sparkler233/recensio/blob/main/CHANGELOG.md) 里三个已发布的预览版中:决策历史进 Git、PROJECT 改为入口式、运行规则独立、wrapup 一次确认与脚本化(preview.1),分支检查点与联动命中(preview.2),实验性的 Core 并行(preview.3)。本节只写相对 preview.3 的变化;`2.0.0-preview.4` 从未发布,内容全部归入本版。
 
 **怎么获取与升级**:
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-10-02
+// 一致性机制 version: 2026-10-03
 // 一次输出 catchup / wrapup 需要的 Git 范围,JSON 格式,模型直接取值,不再抄写哈希。
 // 用法:node scope.mjs            → 基线、基线后提交、改动清单、工作区(含未跟踪文件摘要)
 //       node scope.mjs --overview → 另加最近 15 条提交标题(沿 first-parent:一次并进主线只占一行,被合并进来的分支提交不逐条列出)、

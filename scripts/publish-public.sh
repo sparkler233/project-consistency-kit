@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一致性机制 version: 2026-10-02
+# 一致性机制 version: 2026-10-03
 # 从本仓库(内部工作仓库)的历史生成 GitHub 公开版历史:只保留 distribution/public-paths.txt 列出的路径,
 # 接在公开仓库最初的 main(PUBLIC_BASE,内部仓库建立前的旧线)之后,作者与提交者统一为公开身份,
 # 只改内部文件的提交自动略去。每次都从同一个基整段重新生成,同样输入得到同样的提交号,
@@ -19,7 +19,7 @@
 #   --public-ref  公开仓库当前 main 的引用,用于检查新历史能否快进,默认 main
 set -euo pipefail
 
-PUBLIC_URL="https://github.com/sparkler233/project-consistency-kit.git"
+PUBLIC_URL="https://github.com/sparkler233/recensio.git"
 PUBLIC_NAME="sparkler"
 PUBLIC_EMAIL="sparkler233@users.noreply.github.com"
 # 内部仓库建立前公开 main 的最后一个提交;内部历史永远接在它后面(换了它,已公开的提交就无法原样重现)

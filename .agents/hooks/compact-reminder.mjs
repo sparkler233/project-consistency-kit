@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一致性机制 version: 2026-10-02
+// 一致性机制 version: 2026-10-03
 // 压缩后提醒 hook:接在 SessionStart(Claude Code 与 Codex 0.158 起都在上下文压缩后以 source 为 compact 触发)。
 // 只在压缩后输出,其余时候(新会话、恢复、清空)静默——新会话由 catchup 读取规则。
 // 压缩可能把 catchup 时读进来的运行规则一起压掉,这里把「重读」与并行的三条重新交给模型(additionalContext);
