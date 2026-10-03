@@ -103,7 +103,7 @@ printf '内部提交:%s\n公开基:%s\n公开 main:%s\n' "$src" "$base" "$curren
 
 # 已公开的提交必须原样重现:公开 main 在新历史里,推送才是快进
 git merge-base --is-ancestor "$current" public \
-  || die "新历史不包含公开 main $current(已公开的提交没有原样重现),推送会分叉;检查 --base 与内部历史是否被改写"
+  || die "新历史不包含公开 main $current(已公开的提交没有原样重现),推送会分叉;检查 --base、内部历史是否被改写、白名单是否删了曾公开的路径"
 # 新提交不得重复已公开的提交(同一作者时间与标题):基选错时内部历史会被整段重放一遍
 dup="$(comm -12 <(git log --format='%ad %s' --date=raw "$current" | LC_ALL=C sort -u) \
                 <(git log --format='%ad %s' --date=raw "$current..public" | LC_ALL=C sort -u) | head -n 3)"
